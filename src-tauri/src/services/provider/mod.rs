@@ -23,7 +23,7 @@ use crate::store::AppState;
 // Re-export sub-module functions for external access
 pub use live::{
     import_default_config, import_hermes_providers_from_live, import_openclaw_providers_from_live,
-    import_opencode_providers_from_live, read_live_settings,
+    import_opencode_providers_from_live, import_pi_providers_from_live, read_live_settings,
     should_import_default_config_on_startup, sync_current_to_live,
     update_toml_common_config_snippet,
 };
@@ -39,9 +39,15 @@ pub(crate) use live::{
 // Internal re-exports
 use live::{
     remove_hermes_provider_from_live, remove_openclaw_provider_from_live,
-    remove_opencode_provider_from_live, write_gemini_live,
+    remove_opencode_provider_from_live, remove_pi_provider_from_live, write_gemini_live,
 };
 use usage::validate_usage_script;
+
+/// Refuse mutating/removing the currently active Pi provider.
+/// Propagates read errors instead of treating them as "not active".
+fn ensure_pi_provider_not_active(id: &str) -> Result<(), AppError> {
+    crate::pi_config::ensure_provider_not_active(id)
+}
 
 /// The built-in Codex official provider is safe to select during takeover:
 /// Codex keeps ownership of its ChatGPT login and the proxy only forwards the
@@ -283,6 +289,7 @@ mod tests {
             secret_access_key: Some("sk-test".to_string()),
             team_organization_id: None,
             team_project_id: None,
+            allow_private_network: None,
         }
     }
 
@@ -2828,11 +2835,16 @@ impl ProviderService {
     ///
     /// 同时检查本地 settings 和数据库的当前供应商，防止删除任一端正在使用的供应商。
     /// 对于累加模式应用（OpenCode, OpenClaw），可以随时删除任意供应商，同时从 live 配置中移除。
+    /// Pi 例外：删除当前激活供应商会留下悬空的 `defaultProvider` / `modelRoles.default`，因此拒绝。
     pub fn delete(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
         // Additive mode apps - no current provider concept
         if app_type.is_additive_mode() {
             // Single DB read shared across all additive-mode sub-paths below.
             let existing = state.db.get_provider_by_id(id, app_type.as_str())?;
+
+            if matches!(app_type, AppType::Pi) {
+                ensure_pi_provider_not_active(id)?;
+            }
 
             if matches!(app_type, AppType::OpenCode) {
                 let provider_category = existing.as_ref().and_then(|p| p.category.clone());
@@ -2870,6 +2882,7 @@ impl ProviderService {
                     AppType::OpenCode => remove_opencode_provider_from_live(id)?,
                     AppType::OpenClaw => remove_openclaw_provider_from_live(id)?,
                     AppType::Hermes => remove_hermes_provider_from_live(id)?,
+                    AppType::Pi => remove_pi_provider_from_live(id)?,
                     _ => {}
                 }
             }
@@ -2934,6 +2947,10 @@ impl ProviderService {
             }
             AppType::Hermes => {
                 remove_hermes_provider_from_live(id)?;
+            }
+            AppType::Pi => {
+                ensure_pi_provider_not_active(id)?;
+                remove_pi_provider_from_live(id)?;
             }
             _ => {
                 return Err(AppError::Message(format!(
@@ -3188,6 +3205,20 @@ impl ProviderService {
             }
         }
 
+        if matches!(app_type, AppType::Pi) {
+            // Hard-fail: additive live upsert is fine to keep, but switch must not
+            // report success when defaultProvider / modelRoles.default did not update.
+            crate::pi_config::set_active_provider(&provider.id).map_err(|e| {
+                AppError::localized(
+                    "provider.pi.active_set_failed",
+                    format!("写入 Pi 配置成功，但更新默认供应商失败: {e}"),
+                    format!(
+                        "Pi provider config was written, but updating the active provider failed: {e}"
+                    ),
+                )
+            })?;
+        }
+
         // For additive-mode providers that were DB-only (live_config_managed == Some(false)),
         // flip the flag to true now that the provider has been successfully written to the live
         // file. This ensures sync_all_providers_to_live() will include it on future syncs.
@@ -3203,6 +3234,7 @@ impl ProviderService {
                     AppType::OpenCode => remove_opencode_provider_from_live(&provider.id),
                     AppType::OpenClaw => remove_openclaw_provider_from_live(&provider.id),
                     AppType::Hermes => remove_hermes_provider_from_live(&provider.id),
+                    AppType::Pi => remove_pi_provider_from_live(&provider.id),
                     _ => Ok(()),
                 };
 
@@ -3489,6 +3521,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(&provider.settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(&provider.settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::Pi => Ok(String::new()),     // Pi doesn't use common config snippets
         }
     }
 
@@ -3506,6 +3539,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::Pi => Ok(String::new()),     // Pi doesn't use common config snippets
         }
     }
 
@@ -4135,6 +4169,7 @@ impl ProviderService {
         access_token: Option<&str>,
         user_id: Option<&str>,
         template_type: Option<&str>,
+        allow_private_network: bool,
     ) -> Result<UsageResult, AppError> {
         usage::test_usage_script(
             state,
@@ -4147,6 +4182,7 @@ impl ProviderService {
             access_token,
             user_id,
             template_type,
+            allow_private_network,
         )
         .await
     }
@@ -4268,6 +4304,35 @@ impl ProviderService {
                         "provider.hermes.settings.not_object",
                         "Hermes 配置必须是 JSON 对象",
                         "Hermes configuration must be a JSON object",
+                    ));
+                }
+            }
+            AppType::Pi => {
+                // Pi uses config structure: { baseUrl, apiKey, api, models }
+                if !provider.settings_config.is_object() {
+                    return Err(AppError::localized(
+                        "provider.pi.settings.not_object",
+                        "Pi 配置必须是 JSON 对象",
+                        "Pi configuration must be a JSON object",
+                    ));
+                }
+
+                let has_model = provider
+                    .settings_config
+                    .get("models")
+                    .and_then(|v| v.as_array())
+                    .is_some_and(|models| {
+                        models.iter().any(|m| {
+                            m.get("id")
+                                .and_then(|id| id.as_str())
+                                .is_some_and(|id| !id.trim().is_empty())
+                        })
+                    });
+                if !has_model {
+                    return Err(AppError::localized(
+                        "provider.pi.models.required",
+                        "Pi 供应商至少需要配置一个带 id 的模型",
+                        "Pi provider requires at least one model with an id",
                     ));
                 }
             }
@@ -4475,8 +4540,8 @@ impl ProviderService {
 
                 Ok((api_key, base_url))
             }
-            AppType::OpenClaw | AppType::Hermes => {
-                // OpenClaw/Hermes use apiKey and baseUrl directly on the object
+            AppType::OpenClaw | AppType::Hermes | AppType::Pi => {
+                // OpenClaw/Hermes/Pi use apiKey and baseUrl directly on the object
                 let api_key = provider
                     .settings_config
                     .get("apiKey")

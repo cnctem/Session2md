@@ -102,7 +102,7 @@ export function ProxyTabContent({
           value="proxy"
           className="rounded-xl glass-card overflow-hidden"
         >
-          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/50 data-[state=open]:bg-muted/50">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-white/30 dark:hover:bg-white/[0.04] data-[state=open]:bg-white/25 dark:data-[state=open]:bg-white/[0.04]">
             <div className="flex items-center gap-3">
               <Server className="h-5 w-5 text-green-500" />
               <div className="text-left">
@@ -143,7 +143,7 @@ export function ProxyTabContent({
           value="failover"
           className="rounded-xl glass-card overflow-hidden"
         >
-          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/50 data-[state=open]:bg-muted/50">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-white/30 dark:hover:bg-white/[0.04] data-[state=open]:bg-white/25 dark:data-[state=open]:bg-white/[0.04]">
             <div className="flex items-center gap-3">
               <Activity className="h-5 w-5 text-orange-500" />
               <div className="text-left">
@@ -228,7 +228,7 @@ export function ProxyTabContent({
           value="rectifier"
           className="rounded-xl glass-card overflow-hidden"
         >
-          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/50 data-[state=open]:bg-muted/50">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-white/30 dark:hover:bg-white/[0.04] data-[state=open]:bg-white/25 dark:data-[state=open]:bg-white/[0.04]">
             <div className="flex items-center gap-3">
               <Zap className="h-5 w-5 text-purple-500" />
               <div className="text-left">
@@ -251,7 +251,7 @@ export function ProxyTabContent({
           value="globalProxy"
           className="rounded-xl glass-card overflow-hidden"
         >
-          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/50 data-[state=open]:bg-muted/50">
+          <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-white/30 dark:hover:bg-white/[0.04] data-[state=open]:bg-white/25 dark:data-[state=open]:bg-white/[0.04]">
             <div className="flex items-center gap-3">
               <Globe className="h-5 w-5 text-cyan-500" />
               <div className="text-left">

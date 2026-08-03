@@ -513,6 +513,9 @@
       "autoSyncLastErrorTitle": "Last auto sync failed",
       "autoSyncLastErrorHint": "Please check network or WebDAV settings. Auto sync will retry on future changes.",
       "missingUrl": "Please enter the WebDAV server URL",
+      "credentialsRiskTitle": "Remote sync risk",
+      "credentialsRiskBody": "Remote sync uploads a plaintext copy of your database, including API keys and credentials stored in CC Switch. Only continue if you trust this remote server and the network path to it.",
+      "credentialsRiskConfirm": "I understand the risk",
       "presets": {
         "label": "Provider",
         "jianguoyun": "Jianguoyun",
@@ -770,6 +773,8 @@
     "openclawConfigDirDescription": "Override OpenClaw configuration directory (openclaw.json).",
     "hermesConfigDir": "Hermes Configuration Directory",
     "hermesConfigDirDescription": "Override Hermes configuration directory (config.yaml).",
+    "piConfigDir": "Pi / Oh-my-pi Configuration Directory",
+    "piConfigDirDescription": "Override the Pi config root. Set to ~/.omp for Oh-my-pi (models.yml + config.yml). Default is ~/.pi (models.json + settings.json).",
     "browsePlaceholderClaude": "e.g., /home/<your-username>/.claude",
     "browsePlaceholderCodex": "e.g., /home/<your-username>/.codex",
     "browsePlaceholderGemini": "e.g., /home/<your-username>/.gemini",
@@ -777,6 +782,7 @@
     "browsePlaceholderOpencode": "e.g., /home/<your-username>/.config/opencode",
     "browsePlaceholderOpenclaw": "e.g., /home/<your-username>/.openclaw",
     "browsePlaceholderHermes": "e.g., /home/<your-username>/.hermes",
+    "browsePlaceholderPi": "e.g., ~/.omp or ~/.pi",
     "browseDirectory": "Browse Directory",
     "resetDefault": "Reset to default directory (takes effect after saving)",
     "checkForUpdates": "Check for Updates",
@@ -887,7 +893,8 @@
     "grokbuild": "Grok Build",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "pi": "Pi"
   },
   "grokBuild": {
     "apiBackend": "API backend",
@@ -1735,6 +1742,8 @@
     "formatSuccess": "Format successful",
     "formatFailed": "Format failed",
     "supportedVariables": "Supported Variables",
+    "allowPrivateNetwork": "Allow private network",
+    "allowPrivateNetworkHint": "Permit custom scripts to call LAN / private IP addresses (SSRF risk).",
     "variablesHint": "Supported variables: {{apiKey}}, {{baseUrl}} | extractor function receives API response JSON object",
     "scriptConfig": "Request configuration",
     "extractorCode": "Extractor code",
@@ -2224,6 +2233,37 @@
       "loadFailed": "Failed to read memory file",
       "openConfig": "Adjust limits in Hermes Web UI",
       "runtimeNote": "Changes apply on Hermes restart or new session."
+    }
+  },
+  "pi": {
+    "form": {
+      "baseUrl": "API Endpoint",
+      "providerKey": "Provider Key",
+      "providerKeyPlaceholder": "my-provider",
+      "providerKeyHint": "Lowercase letters, numbers, and hyphens only. Used as the provider name in models.json.",
+      "providerKeyLockedHint": "This provider is in Pi models.json; key is locked.",
+      "providerKeyRequired": "Provider key is required",
+      "providerKeyInvalid": "Provider key can only contain lowercase letters, numbers, and hyphens",
+      "providerKeyDuplicate": "This provider key already exists",
+      "api": "API Protocol",
+      "models": "Models",
+      "modelsEmpty": "No models yet. Add or fetch models.",
+      "modelsRequired": "Please add at least one model with an ID",
+      "modelId": "Model ID",
+      "modelName": "Display name",
+      "advanced": "Advanced",
+      "contextWindow": "Context window",
+      "maxTokens": "Max tokens",
+      "reasoning": "Reasoning model"
+    },
+    "health": {
+      "title": "Pi config warnings detected",
+      "missingBaseUrl": "Provider is missing 'baseUrl'. Pi requires a base URL to connect to the API.",
+      "missingBaseUrlNamed": "Provider '{{name}}' is missing 'baseUrl'.",
+      "missingApi": "Provider is missing 'api' field. Pi requires an API type (openai-completions, anthropic-messages, etc.).",
+      "missingApiNamed": "Provider '{{name}}' is missing 'api'.",
+      "missingModels": "Provider has no models configured.",
+      "missingModelsNamed": "Provider '{{name}}' has no models configured."
     }
   },
   "env": {

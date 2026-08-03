@@ -152,6 +152,7 @@ pub(crate) fn build_provider_from_request(
         AppType::OpenCode => build_opencode_settings(request),
         AppType::OpenClaw => build_additive_app_settings(request),
         AppType::Hermes => build_hermes_settings(request),
+        AppType::Pi => build_additive_app_settings(request),
     };
 
     // Build usage script configuration if provided
@@ -283,6 +284,7 @@ fn build_provider_meta(request: &DeepLinkImportRequest) -> Result<Option<Provide
         secret_access_key: None,
         team_organization_id: None,
         team_project_id: None,
+        allow_private_network: None,
     };
 
     Ok(Some(ProviderMeta {
@@ -646,7 +648,7 @@ pub fn parse_and_merge_config(
         "gemini" => merge_gemini_config(&mut merged, &config_value)?,
         "grokbuild" => merge_grokbuild_config(&mut merged, &config_value)?,
         // Additive mode apps use JSON config directly; pass through as-is
-        "openclaw" | "opencode" | "hermes" => {
+        "openclaw" | "opencode" | "hermes" | "pi" => {
             merge_additive_config(&mut merged, &config_value)?;
         }
         "" => {

@@ -39,8 +39,10 @@ import {
 import { checkAllEnvConflicts, checkEnvConflicts } from "@/lib/api/env";
 import { useProviderActions } from "@/hooks/useProviderActions";
 import { openclawKeys, useOpenClawHealth } from "@/hooks/useOpenClaw";
+import { piKeys, usePiHealth } from "@/hooks/usePi";
 import { hermesKeys, useOpenHermesWebUI } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
+import { piApi } from "@/lib/api/pi";
 import { useProxyStatus } from "@/hooks/useProxyStatus";
 import { useUsageCacheBridge } from "@/hooks/useUsageCacheBridge";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
@@ -93,6 +95,7 @@ import EnvPanel from "@/components/openclaw/EnvPanel";
 import ToolsPanel from "@/components/openclaw/ToolsPanel";
 import AgentsDefaultsPanel from "@/components/openclaw/AgentsDefaultsPanel";
 import OpenClawHealthBanner from "@/components/openclaw/OpenClawHealthBanner";
+import PiHealthBanner from "@/components/pi/PiHealthBanner";
 import HermesMemoryPanel from "@/components/hermes/HermesMemoryPanel";
 
 type View =
@@ -130,6 +133,7 @@ const VALID_APPS: AppId[] = [
   "opencode",
   "openclaw",
   "hermes",
+  "pi",
 ];
 
 const getInitialApp = (): AppId => {
@@ -198,6 +202,7 @@ function App() {
     opencode: true,
     openclaw: true,
     hermes: true,
+    pi: true,
   };
 
   const getFirstVisibleApp = (): AppId => {
@@ -209,6 +214,7 @@ function App() {
     if (visibleApps.opencode) return "opencode";
     if (visibleApps.openclaw) return "openclaw";
     if (visibleApps.hermes) return "hermes";
+    if (visibleApps.pi) return "pi";
     return "claude"; // fallback
   };
 
@@ -217,22 +223,6 @@ function App() {
       setActiveApp(getFirstVisibleApp());
     }
   }, [visibleApps, activeApp]);
-
-  // Fallback from sessions view when switching to an app without session support
-  useEffect(() => {
-    if (
-      currentView === "sessions" &&
-      sharedFeatureApp !== "claude" &&
-      sharedFeatureApp !== "codex" &&
-      sharedFeatureApp !== "grokbuild" &&
-      sharedFeatureApp !== "opencode" &&
-      sharedFeatureApp !== "openclaw" &&
-      sharedFeatureApp !== "gemini" &&
-      sharedFeatureApp !== "hermes"
-    ) {
-      setCurrentView("providers");
-    }
-  }, [sharedFeatureApp, currentView]);
 
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [usageProvider, setUsageProvider] = useState<Provider | null>(null);
@@ -287,7 +277,9 @@ function App() {
       currentView === "openclawAgents");
   const { data: openclawHealthWarnings = [] } =
     useOpenClawHealth(isOpenClawView);
-  const hasSkillsSupport = sharedFeatureApp !== "openclaw";
+  const isPiView = activeApp === "pi" && currentView === "providers";
+  const { data: piHealthWarnings = [] } = usePiHealth(isPiView);
+  const hasSkillsSupport = sharedFeatureApp !== "openclaw" && sharedFeatureApp !== "pi";
   const hasSessionSupport =
     sharedFeatureApp === "claude" ||
     sharedFeatureApp === "codex" ||
@@ -296,6 +288,27 @@ function App() {
     sharedFeatureApp === "openclaw" ||
     sharedFeatureApp === "gemini" ||
     sharedFeatureApp === "hermes";
+  const hasMcpSupport =
+    sharedFeatureApp !== "openclaw" && sharedFeatureApp !== "pi";
+
+  // Leave unsupported feature views when switching apps (e.g. Sessions → Pi).
+  useEffect(() => {
+    if (currentView === "sessions" && !hasSessionSupport) {
+      setCurrentView("providers");
+    }
+  }, [currentView, hasSessionSupport]);
+
+  useEffect(() => {
+    if (currentView === "skills" && !hasSkillsSupport) {
+      setCurrentView("providers");
+    }
+  }, [currentView, hasSkillsSupport]);
+
+  useEffect(() => {
+    if (currentView === "mcp" && !hasMcpSupport) {
+      setCurrentView("providers");
+    }
+  }, [currentView, hasMcpSupport]);
 
   const {
     addProvider,
@@ -675,6 +688,13 @@ function App() {
         await queryClient.invalidateQueries({
           queryKey: hermesKeys.liveProviderIds,
         });
+      } else if (activeApp === "pi") {
+        await queryClient.invalidateQueries({
+          queryKey: piKeys.liveProviderIds,
+        });
+        await queryClient.invalidateQueries({
+          queryKey: piKeys.activeProvider,
+        });
       }
       toast.success(
         t("notifications.removeFromConfigSuccess", {
@@ -726,7 +746,8 @@ function App() {
     if (
       activeApp === "opencode" ||
       activeApp === "openclaw" ||
-      activeApp === "hermes"
+      activeApp === "hermes" ||
+      activeApp === "pi"
     ) {
       let liveProviderIds: string[] = [];
       try {
@@ -741,10 +762,15 @@ function App() {
                   queryKey: openclawKeys.liveProviderIds,
                   queryFn: () => providersApi.getOpenClawLiveProviderIds(),
                 })
-              : await queryClient.ensureQueryData({
-                  queryKey: hermesKeys.liveProviderIds,
-                  queryFn: () => providersApi.getHermesLiveProviderIds(),
-                });
+              : activeApp === "hermes"
+                ? await queryClient.ensureQueryData({
+                    queryKey: hermesKeys.liveProviderIds,
+                    queryFn: () => providersApi.getHermesLiveProviderIds(),
+                  })
+                : await queryClient.ensureQueryData({
+                    queryKey: piKeys.liveProviderIds,
+                    queryFn: () => piApi.getLiveProviderIds(),
+                  });
       } catch (error) {
         console.error(
           "[App] Failed to load live provider IDs for duplication",
@@ -998,7 +1024,8 @@ function App() {
                       onRemoveFromConfig={
                         activeApp === "opencode" ||
                         activeApp === "openclaw" ||
-                        activeApp === "hermes"
+                        activeApp === "hermes" ||
+                        activeApp === "pi"
                           ? (provider) =>
                               setConfirmAction({ provider, action: "remove" })
                           : undefined
@@ -1021,7 +1048,7 @@ function App() {
                       onSetAsDefault={
                         activeApp === "openclaw"
                           ? setAsDefaultModel
-                          : activeApp === "hermes"
+                          : activeApp === "hermes" || activeApp === "pi"
                             ? switchProvider
                             : undefined
                       }
@@ -1406,7 +1433,9 @@ function App() {
                                 ? "hermes"
                                 : activeApp === "grokbuild"
                                   ? "grokbuild"
-                                  : "default"
+                                  : activeApp === "pi"
+                                    ? "pi"
+                                    : "default"
                           }
                           className="flex items-center gap-1"
                           initial={{ opacity: 0 }}
@@ -1546,7 +1575,13 @@ function App() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setCurrentView("mcp")}
-                                className="text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 w-8 px-2"
+                                className={cn(
+                                  "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5",
+                                  "transition-all duration-200 ease-in-out overflow-hidden",
+                                  hasMcpSupport
+                                    ? "opacity-100 w-8 scale-100 px-2"
+                                    : "opacity-0 w-0 scale-75 pointer-events-none px-0 -ml-1",
+                                )}
                                 title={t("mcp.title")}
                               >
                                 <McpIcon size={16} />
@@ -1575,6 +1610,9 @@ function App() {
       <main className="flex-1 min-h-0 flex flex-col overflow-y-auto animate-fade-in">
         {isOpenClawView && openclawHealthWarnings.length > 0 && (
           <OpenClawHealthBanner warnings={openclawHealthWarnings} />
+        )}
+        {isPiView && piHealthWarnings.length > 0 && (
+          <PiHealthBanner warnings={piHealthWarnings} />
         )}
         {renderContent()}
       </main>

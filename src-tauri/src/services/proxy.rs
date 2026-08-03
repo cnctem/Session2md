@@ -522,6 +522,12 @@ impl ProxyService {
             .get_global_proxy_config()
             .await
             .map_err(|e| format!("获取全局代理配置失败: {e}"))?;
+        let allow_lan = crate::settings::get_settings().proxy_allow_lan_listen;
+        crate::proxy::types::validate_proxy_listen_address(
+            &global_config.listen_address,
+            allow_lan,
+        )
+        .map_err(|e| e.to_string())?;
 
         if !global_config.proxy_enabled {
             global_config.proxy_enabled = true;
@@ -709,9 +715,11 @@ impl ProxyService {
             .await
             .map(|c| c.enabled)
             .unwrap_or(false);
-        // OpenCode and OpenClaw don't support proxy features, always return false
+        // OpenCode / OpenClaw / Hermes / Pi don't support proxy features.
         let opencode_enabled = false;
         let openclaw_enabled = false;
+        let hermes_enabled = false;
+        let pi_enabled = false;
 
         Ok(ProxyTakeoverStatus {
             claude: claude_enabled,
@@ -720,6 +728,8 @@ impl ProxyService {
             grokbuild: grokbuild_enabled,
             opencode: opencode_enabled,
             openclaw: openclaw_enabled,
+            hermes: hermes_enabled,
+            pi: pi_enabled,
         })
     }
 
@@ -731,6 +741,16 @@ impl ProxyService {
         let app = AppType::from_str(app_type).map_err(|e| format!("无效的应用类型: {e}"))?;
         let app_type_str = app.as_str();
         let _guard = self.switch_locks.lock_for_app(app_type_str).await;
+
+        // OpenCode / OpenClaw / Hermes / Pi 不支持代理接管
+        if enabled
+            && matches!(
+                app,
+                AppType::OpenCode | AppType::OpenClaw | AppType::Hermes | AppType::Pi
+            )
+        {
+            return Err("该应用不支持代理功能".to_string());
+        }
 
         if enabled {
             // 1) 代理服务未运行则自动启动
@@ -3065,6 +3085,10 @@ impl ProxyService {
 
     /// 更新代理配置
     pub async fn update_config(&self, config: &ProxyConfig) -> Result<(), String> {
+        let allow_lan = crate::settings::get_settings().proxy_allow_lan_listen;
+        crate::proxy::types::validate_proxy_listen_address(&config.listen_address, allow_lan)
+            .map_err(|e| e.to_string())?;
+
         // 记录旧配置用于判定是否需要重启
         let previous = self
             .db
