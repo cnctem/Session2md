@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { createElement } from "react";
-import { SessionMeta } from "@/types";
+import type { SessionMessage, SessionMeta } from "@/types";
 
 const CODEX_IDE_CONTEXT_PREFIX = "# Context from my IDE setup:";
 const CODEX_REQUEST_MARKER = "my request for codex";
@@ -118,16 +118,6 @@ export const getProviderLabel = (
   return translated === key ? providerId : translated;
 };
 
-// 根据 providerId 获取对应的图标名称
-export const getProviderIconName = (providerId: string) => {
-  if (providerId === "codex") return "openai";
-  if (providerId === "grokbuild") return "grok";
-  if (providerId === "claude") return "claude";
-  if (providerId === "opencode") return "opencode";
-  if (providerId === "openclaw") return "openclaw";
-  return providerId;
-};
-
 export const getRoleTone = (role: string) => {
   const normalized = role.toLowerCase();
   if (normalized === "assistant") return "text-blue-500";
@@ -152,6 +142,33 @@ export const formatSessionTitle = (session: SessionMeta) => {
     getBaseName(session.projectDir) ||
     session.sessionId.slice(0, 8)
   );
+};
+
+export const formatSessionMarkdown = (messages: SessionMessage[]) => {
+  const sections = messages.flatMap((message) => {
+    const role = message.role.toLowerCase();
+    if (role !== "user" && role !== "assistant") return [];
+
+    const content = message.content.trim();
+    if (!content) return [];
+
+    const heading = role === "user" ? "User" : "Assistant";
+    return [`## ${heading}\n\n${content}`];
+  });
+
+  return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";
+};
+
+export const getSessionMarkdownFileName = (session: SessionMeta) => {
+  const sanitizedTitle = formatSessionTitle(session)
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+    .replace(/[. -]+$/g, "");
+  const baseName = sanitizedTitle || `session-${session.sessionId.slice(0, 8)}`;
+
+  return `${baseName}.md`;
 };
 
 export const groupSessionsByProviderAndDirectory = (

@@ -120,38 +120,9 @@ pub fn session_discovery() -> PiSessionDiscovery {
 }
 
 fn resolve_session_root() -> SessionRootResolution {
-    let home = crate::config::get_home_dir();
-    if let Some(raw) = std::env::var_os("PI_CODING_AGENT_SESSION_DIR") {
-        if !raw.is_empty() {
-            return classify_configured_session_dir(
-                raw.to_string_lossy().as_ref(),
-                &home,
-                "environment",
-            );
-        }
-    }
-
-    match crate::pi_config::read_pi_native_defaults() {
-        Ok(defaults) => {
-            if let Some(value) = defaults.session_dir.filter(|value| !value.is_empty()) {
-                return classify_configured_session_dir(&value, &home, "settings");
-            }
-        }
-        Err(error) => {
-            return SessionRootResolution::Unavailable {
-                reason: error.to_string(),
-            };
-        }
-    }
-
-    match crate::pi_config::get_pi_agent_dir() {
-        Ok(agent_dir) => SessionRootResolution::Available {
-            root: agent_dir.join("sessions"),
-            layout: SessionLayout::ProjectDirectories,
-        },
-        Err(error) => SessionRootResolution::Unavailable {
-            reason: error.to_string(),
-        },
+    SessionRootResolution::Available {
+        root: crate::session_manager::paths::pi_sessions_dir(),
+        layout: SessionLayout::ProjectDirectories,
     }
 }
 
@@ -350,10 +321,6 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         created_at: header.timestamp,
         last_active_at: summary.last_active_at.or(header.timestamp),
         source_path: Some(source_path.clone()),
-        resume_command: Some(format!(
-            "pi --session {}",
-            crate::session_manager::terminal::shell_escape(&source_path)
-        )),
     })
 }
 
@@ -995,12 +962,6 @@ mod tests {
         // Pi's session picker prefers the message timestamp over the enclosing
         // entry timestamp when both are present.
         assert_eq!(session.last_active_at, Some(1_700_000_001_000));
-        // Pi resumes a session by its exact file path.
-        assert!(session
-            .resume_command
-            .as_deref()
-            .is_some_and(|command| command.starts_with("pi --session ")));
-
         let messages =
             load_messages_with_layout(&root, &path, SessionLayout::Flat).expect("load messages");
         assert_eq!(

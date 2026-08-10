@@ -119,7 +119,6 @@ const createDefaultSessions = (): SessionMeta[] => {
       createdAt: now - 2000,
       lastActiveAt: now - 1000,
       sourcePath: "/mock/codex/session-1.jsonl",
-      resumeCommand: "codex resume codex-session-1",
     },
     {
       providerId: "claude",
@@ -130,7 +129,6 @@ const createDefaultSessions = (): SessionMeta[] => {
       createdAt: now - 4000,
       lastActiveAt: now - 3000,
       sourcePath: "/mock/claude/session-1.jsonl",
-      resumeCommand: "claude --resume claude-session-1",
     },
   ];
 };
@@ -411,23 +409,6 @@ export const getSessionMessages = (providerId: string, sourcePath: string) =>
   deepClone(
     sessionMessagesState[sessionMessageKey(providerId, sourcePath)] ?? [],
   ) as SessionMessage[];
-
-export const deleteSession = (
-  providerId: string,
-  sessionId: string,
-  sourcePath: string,
-) => {
-  sessionsState = sessionsState.filter(
-    (session) =>
-      !(
-        session.providerId === providerId &&
-        session.sessionId === sessionId &&
-        session.sourcePath === sourcePath
-      ),
-  );
-  delete sessionMessagesState[sessionMessageKey(providerId, sourcePath)];
-  return true;
-};
 
 export const setSessionFixtures = (
   sessions: SessionMeta[],

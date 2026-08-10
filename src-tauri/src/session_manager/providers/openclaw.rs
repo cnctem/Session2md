@@ -5,11 +5,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::openclaw_config::get_openclaw_dir;
-use crate::{
-    config::write_json_file,
-    session_manager::{SessionMessage, SessionMeta},
-};
+use crate::session_manager::{paths::openclaw_dir, SessionMessage, SessionMeta};
 
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
@@ -28,7 +24,7 @@ fn strip_message_id_suffix(text: &str) -> &str {
 }
 
 pub fn scan_sessions() -> Vec<SessionMeta> {
-    let agents_dir = get_openclaw_dir().join("agents");
+    let agents_dir = openclaw_dir().join("agents");
     if !agents_dir.exists() {
         return Vec::new();
     }
@@ -120,37 +116,6 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     }
 
     Ok(messages)
-}
-
-pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
-    let meta = parse_session(path, None).ok_or_else(|| {
-        format!(
-            "Failed to parse OpenClaw session metadata: {}",
-            path.display()
-        )
-    })?;
-
-    if meta.session_id != session_id {
-        return Err(format!(
-            "OpenClaw session ID mismatch: expected {session_id}, found {}",
-            meta.session_id
-        ));
-    }
-
-    let index_path = path
-        .parent()
-        .unwrap_or_else(|| Path::new(""))
-        .join("sessions.json");
-    prune_sessions_index(&index_path, session_id, path)?;
-
-    std::fs::remove_file(path).map_err(|e| {
-        format!(
-            "Failed to delete OpenClaw session file {}: {e}",
-            path.display()
-        )
-    })?;
-
-    Ok(true)
 }
 
 /// Read `sessions.json` index and build a sessionId → displayName lookup map.
@@ -295,45 +260,6 @@ fn parse_session(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
-        resume_command: None, // OpenClaw sessions are gateway-managed, no CLI resume
-    })
-}
-
-fn prune_sessions_index(
-    index_path: &Path,
-    session_id: &str,
-    source_path: &Path,
-) -> Result<(), String> {
-    if !index_path.exists() {
-        return Ok(());
-    }
-
-    let content = std::fs::read_to_string(index_path).map_err(|e| {
-        format!(
-            "Failed to read OpenClaw sessions index {}: {e}",
-            index_path.display()
-        )
-    })?;
-    let mut index: serde_json::Map<String, Value> =
-        serde_json::from_str(&content).map_err(|e| {
-            format!(
-                "Failed to parse OpenClaw sessions index {}: {e}",
-                index_path.display()
-            )
-        })?;
-
-    let source = source_path.to_string_lossy();
-    index.retain(|_, entry| {
-        let same_id = entry.get("sessionId").and_then(Value::as_str) == Some(session_id);
-        let same_file = entry.get("sessionFile").and_then(Value::as_str) == Some(source.as_ref());
-        !(same_id || same_file)
-    });
-
-    write_json_file(index_path, &index).map_err(|e| {
-        format!(
-            "Failed to update OpenClaw sessions index {}: {e}",
-            index_path.display()
-        )
     })
 }
 
@@ -427,47 +353,5 @@ mod tests {
         let title = meta.title.unwrap();
         assert!(title.len() <= TITLE_MAX_CHARS + 3); // +3 for "..."
         assert!(title.ends_with("..."));
-    }
-
-    #[test]
-    fn delete_session_updates_index_and_removes_jsonl() {
-        let temp = tempdir().expect("tempdir");
-        let sessions_dir = temp.path().join("main").join("sessions");
-        std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
-
-        let session_path = sessions_dir.join("session-123.jsonl");
-        std::fs::write(
-            &session_path,
-            concat!(
-                "{\"type\":\"session\",\"id\":\"session-123\",\"cwd\":\"/tmp/project\",\"timestamp\":\"2026-03-06T10:00:00Z\"}\n",
-                "{\"type\":\"message\",\"message\":{\"role\":\"user\",\"content\":\"hello\"},\"timestamp\":\"2026-03-06T10:01:00Z\"}\n"
-            ),
-        )
-        .expect("write session");
-        std::fs::write(
-            sessions_dir.join("sessions.json"),
-            serde_json::to_string(&serde_json::json!({
-                "agent:main:main": {
-                    "sessionId": "session-123",
-                    "sessionFile": session_path.to_string_lossy(),
-                },
-                "agent:main:other": {
-                    "sessionId": "session-456",
-                    "sessionFile": sessions_dir.join("session-456.jsonl").to_string_lossy(),
-                },
-            }))
-            .expect("serialize index"),
-        )
-        .expect("write index");
-
-        delete_session(temp.path(), &session_path, "session-123").expect("delete session");
-
-        assert!(!session_path.exists());
-        let updated: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(sessions_dir.join("sessions.json")).expect("read index"),
-        )
-        .expect("parse index");
-        assert!(updated.get("agent:main:main").is_none());
-        assert!(updated.get("agent:main:other").is_some());
     }
 }

@@ -10,9 +10,10 @@ use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::codex_config::{get_codex_config_dir, read_codex_config_text};
-use crate::codex_state_db::codex_state_db_paths;
-use crate::session_manager::{SessionMessage, SessionMeta};
+use crate::session_manager::{
+    paths::{codex_dir, codex_state_db_paths, read_codex_config_text},
+    SessionMessage, SessionMeta,
+};
 
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
@@ -41,7 +42,7 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
 }
 
 pub fn session_roots() -> Vec<PathBuf> {
-    let config_dir = get_codex_config_dir();
+    let config_dir = codex_dir();
     vec![
         config_dir.join("sessions"),
         config_dir.join("archived_sessions"),
@@ -73,8 +74,8 @@ fn scan_sessions_in_roots_with_titles(
 }
 
 fn load_thread_titles() -> HashMap<String, String> {
-    let config_dir = get_codex_config_dir();
-    let config_text = read_codex_config_text().unwrap_or_default();
+    let config_dir = codex_dir();
+    let config_text = read_codex_config_text(&config_dir);
     let db_paths = codex_state_db_paths(&config_dir, &config_text);
     load_thread_titles_from_paths(&config_dir.join(CODEX_SESSION_INDEX_FILENAME), &db_paths)
 }
@@ -268,27 +269,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
-pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
-    let meta = parse_session(path)
-        .ok_or_else(|| format!("Failed to parse Codex session metadata: {}", path.display()))?;
-
-    if meta.session_id != session_id {
-        return Err(format!(
-            "Codex session ID mismatch: expected {session_id}, found {}",
-            meta.session_id
-        ));
-    }
-
-    std::fs::remove_file(path).map_err(|e| {
-        format!(
-            "Failed to delete Codex session file {}: {e}",
-            path.display()
-        )
-    })?;
-
-    Ok(true)
-}
-
+#[cfg(test)]
 fn parse_session(path: &Path) -> Option<SessionMeta> {
     parse_session_with_titles(path, &HashMap::new())
 }
@@ -411,7 +392,6 @@ fn parse_session_with_titles(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
-        resume_command: Some(format!("codex resume {session_id}")),
     })
 }
 
@@ -524,8 +504,9 @@ fn collect_jsonl_files(root: &Path, files: &mut Vec<PathBuf>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codex_state_db::CODEX_STATE_DB_FILENAME;
     use tempfile::tempdir;
+
+    const CODEX_STATE_DB_FILENAME: &str = "state_5.sqlite";
 
     fn write_codex_session(path: &Path, session_id: &str, message: &str) {
         std::fs::write(
@@ -561,27 +542,6 @@ mod tests {
 
         assert!(ids.contains(&"active-id".to_string()));
         assert!(ids.contains(&"archived-id".to_string()));
-    }
-
-    #[test]
-    fn delete_session_removes_jsonl_file() {
-        let temp = tempdir().expect("tempdir");
-        let path = temp
-            .path()
-            .join("rollout-2026-03-06T21-50-12-019cc369-bd7c-7891-b371-7b20b4fe0b18.jsonl");
-        std::fs::write(
-            &path,
-            concat!(
-                "{\"timestamp\":\"2026-03-06T21:50:12Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"019cc369-bd7c-7891-b371-7b20b4fe0b18\",\"cwd\":\"/tmp/project\"}}\n",
-                "{\"timestamp\":\"2026-03-06T21:50:13Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"user\",\"content\":\"hello\"}}\n"
-            ),
-        )
-        .expect("write session");
-
-        delete_session(temp.path(), &path, "019cc369-bd7c-7891-b371-7b20b4fe0b18")
-            .expect("delete session");
-
-        assert!(!path.exists());
     }
 
     #[test]
