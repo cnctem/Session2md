@@ -9,6 +9,8 @@ import { setSessionFixtures } from "../msw/state";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
+const GROUP_EXPANSION_STORAGE_KEY =
+  "session2md.sessionManager.groupExpansionState";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -33,6 +35,19 @@ const renderPage = () => {
   );
 };
 
+const switchToGroupedView = async (
+  user: ReturnType<typeof userEvent.setup>,
+) => {
+  await user.click(
+    screen.getByRole("combobox", { name: "sessionManager.viewModeTooltip" }),
+  );
+  await user.click(
+    await screen.findByRole("option", {
+      name: "sessionManager.viewModeGrouped",
+    }),
+  );
+};
+
 describe("SessionManagerPage", () => {
   beforeEach(() => {
     toastSuccessMock.mockReset();
@@ -47,6 +62,14 @@ describe("SessionManagerPage", () => {
         projectDir: "/mock/codex",
         lastActiveAt: 20,
         sourcePath: "/mock/codex/session-1.jsonl",
+      },
+      {
+        providerId: "codex",
+        sessionId: "codex-session-2",
+        title: "Codex Docs Session",
+        projectDir: "/mock/docs",
+        lastActiveAt: 15,
+        sourcePath: "/mock/docs/session-2.jsonl",
       },
       {
         providerId: "claude",
@@ -68,6 +91,9 @@ describe("SessionManagerPage", () => {
     const messages: Record<string, SessionMessage[]> = {
       "codex:/mock/codex/session-1.jsonl": [
         { role: "user", content: "alpha", ts: 20 },
+      ],
+      "codex:/mock/docs/session-2.jsonl": [
+        { role: "user", content: "codex docs", ts: 15 },
       ],
       "claude:/mock/claude/session-1.jsonl": [
         { role: "assistant", content: "claude", ts: 30 },
@@ -98,7 +124,9 @@ describe("SessionManagerPage", () => {
       .mockResolvedValueOnce("/tmp/Alpha Session.md");
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Alpha Session/i }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Alpha Session/i }),
+    );
     const exportButton = await screen.findByRole("button", {
       name: "sessionManager.export",
     });
@@ -118,8 +146,12 @@ describe("SessionManagerPage", () => {
     renderPage();
     await screen.findByText("Alpha Session");
 
-    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /resume/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /delete/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /resume/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters the all-session list by provider", async () => {
@@ -163,5 +195,102 @@ describe("SessionManagerPage", () => {
         "## User\n\npi prompt\n\n## Assistant\n\npi answer\n",
       ),
     );
+  });
+
+  it("renders provider and directory groups as persisted collapsible sections", async () => {
+    const user = userEvent.setup();
+    const firstRender = renderPage();
+
+    await screen.findByText("Alpha Session");
+    await user.click(
+      screen.getByRole("combobox", {
+        name: "sessionManager.providerFilterTooltip",
+      }),
+    );
+    await user.click(await screen.findByRole("option", { name: /Codex/i }));
+    await switchToGroupedView(user);
+
+    expect(
+      screen.getByRole("button", {
+        name: "sessionManager.collapseAllGroups",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", {
+        name: "sessionManager.toggleProviderGroup",
+      }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", {
+        name: "sessionManager.toggleDirectoryGroup",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Alpha Session/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "sessionManager.toggleProviderGroup",
+      })[0],
+    );
+
+    expect(
+      screen.getAllByRole("button", {
+        name: "sessionManager.toggleDirectoryGroup",
+      }),
+    ).toHaveLength(2);
+    expect(
+      screen.queryByRole("button", { name: /Alpha Session/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getAllByRole("button", {
+        name: "sessionManager.toggleDirectoryGroup",
+      })[0],
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Alpha Session/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Codex Docs Session/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem(GROUP_EXPANSION_STORAGE_KEY)!),
+    ).toEqual({
+      expandedProviderIds: ["codex"],
+      expandedDirectoryKeys: ["codex:/mock/codex"],
+    });
+
+    firstRender.unmount();
+    renderPage();
+
+    await screen.findByRole("button", { name: /Alpha Session/ });
+    expect(
+      screen.getAllByRole("button", {
+        name: "sessionManager.toggleDirectoryGroup",
+      }),
+    ).toHaveLength(2);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.collapseAllGroups",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", {
+          name: "sessionManager.toggleDirectoryGroup",
+        }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      JSON.parse(window.localStorage.getItem(GROUP_EXPANSION_STORAGE_KEY)!),
+    ).toEqual({
+      expandedProviderIds: [],
+      expandedDirectoryKeys: [],
+    });
   });
 });
