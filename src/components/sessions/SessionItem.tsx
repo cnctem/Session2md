@@ -7,16 +7,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ProviderIcon } from "@/components/ProviderIcon";
 import type { SessionMeta } from "@/types";
 import {
   formatRelativeTime,
   formatSessionTitle,
-  getProviderIconName,
   getProviderLabel,
   getSessionKey,
   highlightText,
 } from "./utils";
+import { SessionProviderIcon } from "./SessionProviderIcon";
 
 interface SessionItemProps {
   session: SessionMeta;
@@ -74,11 +73,7 @@ export function SessionItem({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="shrink-0">
-                <ProviderIcon
-                  icon={getProviderIconName(session.providerId)}
-                  name={session.providerId}
-                  size={18}
-                />
+                <SessionProviderIcon providerId={session.providerId} size={18} />
               </span>
             </TooltipTrigger>
             <TooltipContent>

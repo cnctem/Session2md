@@ -119,16 +119,6 @@ export const getProviderLabel = (
   return translated === key ? providerId : translated;
 };
 
-// 根据 providerId 获取对应的图标名称
-export const getProviderIconName = (providerId: string) => {
-  if (providerId === "codex") return "openai";
-  if (providerId === "grokbuild") return "grok";
-  if (providerId === "claude") return "claude";
-  if (providerId === "opencode") return "opencode";
-  if (providerId === "openclaw") return "openclaw";
-  return providerId;
-};
-
 export const getRoleTone = (role: string) => {
   const normalized = role.toLowerCase();
   if (normalized === "assistant") return "text-blue-500";

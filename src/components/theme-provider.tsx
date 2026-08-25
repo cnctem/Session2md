@@ -5,7 +5,6 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
 
 type Theme = "light" | "dark" | "system";
 
@@ -93,38 +92,6 @@ export function ThemeProvider({
 
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [theme]);
-
-  // Sync native window theme (Windows/macOS title bar)
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const updateNativeTheme = async (nativeTheme: string) => {
-      if (isCancelled) return;
-      try {
-        await invoke("set_window_theme", { theme: nativeTheme });
-      } catch (e) {
-        // Ignore errors (e.g., when not running in Tauri)
-        console.debug("Failed to set native window theme:", e);
-      }
-    };
-
-    // When "system", pass "system" so Tauri uses None (follows OS theme natively).
-    // This keeps the WebView's prefers-color-scheme in sync with the real OS theme,
-    // allowing effect #3's media query listener to fire on system theme changes.
-    if (theme === "system") {
-      updateNativeTheme("system");
-    } else {
-      updateNativeTheme(theme);
-    }
-
-    return () => {
-      isCancelled = true;
-    };
   }, [theme]);
 
   const value = useMemo<ThemeContextValue>(

@@ -1,7 +1,7 @@
 {
-  "name": "cc-switch",
+  "name": "session2md",
   "version": "3.20.0",
-  "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
+  "description": "Read local AI sessions and export conversations as Markdown",
   "type": "module",
   "scripts": {
     "dev": "pnpm tauri dev",
