@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { createElement } from "react";
-import { SessionMeta } from "@/types";
+import type { SessionMessage, SessionMeta } from "@/types";
 
 const CODEX_IDE_CONTEXT_PREFIX = "# Context from my IDE setup:";
 const CODEX_REQUEST_MARKER = "my request for codex";
+const TOOL_MESSAGE_PREFIX = "[Tool:";
 export const UNKNOWN_PROJECT_DIR_KEY = "__unknown_project_dir__";
 
 export interface SessionDirectoryGroup {
@@ -152,6 +153,38 @@ export const formatSessionTitle = (session: SessionMeta) => {
     getBaseName(session.projectDir) ||
     session.sessionId.slice(0, 8)
   );
+};
+
+export const formatSessionMarkdown = (messages: SessionMessage[]) => {
+  const sections = messages.flatMap((message) => {
+    const role = message.role.toLowerCase();
+    if (role !== "user" && role !== "assistant") return [];
+
+    const content = message.content.trim();
+    if (
+      !content ||
+      (role === "assistant" && content.startsWith(TOOL_MESSAGE_PREFIX))
+    ) {
+      return [];
+    }
+
+    const heading = role === "user" ? "User" : "Assistant";
+    return [`## ${heading}\n\n${content}`];
+  });
+
+  return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";
+};
+
+export const getSessionMarkdownFileName = (session: SessionMeta) => {
+  const sanitizedTitle = formatSessionTitle(session)
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+    .replace(/[. -]+$/g, "");
+  const baseName = sanitizedTitle || `session-${session.sessionId.slice(0, 8)}`;
+
+  return `${baseName}.md`;
 };
 
 export const groupSessionsByProviderAndDirectory = (

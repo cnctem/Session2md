@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCodexPromptPreview,
+  formatSessionMarkdown,
   formatSessionMessagePreview,
+  getSessionMarkdownFileName,
   groupSessionsByProviderAndDirectory,
   shouldHideCodexMessageFromToc,
 } from "@/components/sessions/utils";
-import type { SessionMeta } from "@/types";
+import type { SessionMessage, SessionMeta } from "@/types";
 
 describe("session utils", () => {
   it("extracts Codex VS Code prompts after the request marker", () => {
@@ -109,6 +111,50 @@ describe("session utils", () => {
         "# Context from my IDE setup:\n\n## My request for Codex:\nFix it",
       ),
     ).toBe(false);
+  });
+
+  it("formats exportable messages and skips assistant tool messages", () => {
+    const messages: SessionMessage[] = [
+      { role: "system", content: "Internal instructions" },
+      { role: "user", content: "Build a greeting." },
+      {
+        role: "assistant",
+        content: 'Here it is:\n\n```ts\nconsole.log("hello");\n```',
+      },
+      { role: "assistant", content: "  [Tool: shell]  " },
+      { role: "assistant", content: "[Tool: bash]\n[Tool: bash]" },
+      { role: "assistant", content: "[Tool: bash]\nDone" },
+      { role: "assistant", content: "I ran [Tool: bash]\nDone" },
+      { role: "tool", content: "Command completed" },
+      { role: "USER", content: "Thanks" },
+    ];
+
+    expect(formatSessionMarkdown(messages)).toBe(
+      "## User\n\nBuild a greeting.\n\n" +
+        '## Assistant\n\nHere it is:\n\n```ts\nconsole.log("hello");\n```\n\n' +
+        "## Assistant\n\nI ran [Tool: bash]\nDone\n\n" +
+        "## User\n\nThanks\n",
+    );
+  });
+
+  it("returns no Markdown when every message is filtered", () => {
+    expect(
+      formatSessionMarkdown([
+        { role: "system", content: "Internal instructions" },
+        { role: "assistant", content: "[Tool: Read]\n[Tool: Read]" },
+        { role: "tool", content: "File contents" },
+      ]),
+    ).toBe("");
+  });
+
+  it("creates a safe Markdown file name from the session title", () => {
+    const session: SessionMeta = {
+      providerId: "codex",
+      sessionId: "12345678-abcd",
+      title: "Fix: auth/login?  ",
+    };
+
+    expect(getSessionMarkdownFileName(session)).toBe("Fix- auth-login.md");
   });
 
   it("formats message previews with truncation", () => {

@@ -236,6 +236,87 @@ describe("SessionManagerPage", () => {
     discovery.mockRestore();
   });
 
+  it("exports filtered Codex messages as Markdown", async () => {
+    const exportSpy = vi
+      .spyOn(sessionsApi, "exportMarkdown")
+      .mockResolvedValueOnce("/tmp/Filtered Session.md");
+
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "filtered-session",
+          title: "Filtered Session",
+          sourcePath: "/mock/codex/filtered-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/filtered-session.jsonl": [
+          {
+            role: "user",
+            content: "# AGENTS.md instructions for /mock/codex",
+          },
+          { role: "user", content: "Keep this request" },
+          { role: "assistant", content: "[Tool: shell]" },
+          { role: "assistant", content: "Here is the answer." },
+        ],
+      },
+    );
+
+    renderPage();
+
+    const exportButton = await screen.findByRole("button", {
+      name: /导出会话/i,
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    fireEvent.click(exportButton);
+
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith(
+        "Filtered Session.md",
+        "## User\n\nKeep this request\n\n" +
+          "## Assistant\n\nHere is the answer.\n",
+      ),
+    );
+    expect(toastSuccessMock).toHaveBeenCalled();
+
+    exportSpy.mockRestore();
+  });
+
+  it("disables export when only assistant tool messages remain", async () => {
+    const getMessagesSpy = vi.spyOn(sessionsApi, "getMessages");
+
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "tool-only-session",
+          title: "Tool-only Session",
+          sourcePath: "/mock/codex/tool-only-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/tool-only-session.jsonl": [
+          { role: "assistant", content: "[Tool: shell]\n[Tool: shell]" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(getMessagesSpy).toHaveBeenCalledWith(
+        "codex",
+        "/mock/codex/tool-only-session.jsonl",
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /导出会话/i })).toBeDisabled(),
+    );
+
+    getMessagesSpy.mockRestore();
+  });
+
   it("deletes the selected session and selects the next visible session", async () => {
     renderPage();
 
