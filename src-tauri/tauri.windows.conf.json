@@ -4,9 +4,9 @@
     "windows": [
       {
         "label": "main",
-        "title": "CC Switch",
+        "title": "Session2md",
         "titleBarStyle": "Visible",
-        "visible": false,
+        "visible": true,
         "minWidth": 900,
         "minHeight": 600
       }
