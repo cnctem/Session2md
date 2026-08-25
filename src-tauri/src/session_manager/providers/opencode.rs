@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::Connection;
 use serde_json::Value;
 
-use crate::session_manager::{SessionMessage, SessionMeta};
+use crate::session_manager::{paths::opencode_dir, SessionMessage, SessionMeta};
 
 use super::utils::{parse_timestamp_to_ms, path_basename, truncate_summary};
 
@@ -14,14 +14,7 @@ const PROVIDER_ID: &str = "opencode";
 /// Respects `XDG_DATA_HOME` on all platforms; falls back to
 /// `~/.local/share/opencode/`.
 pub(crate) fn get_opencode_base_dir() -> PathBuf {
-    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-        if !xdg.is_empty() {
-            return PathBuf::from(xdg).join("opencode");
-        }
-    }
-    dirs::home_dir()
-        .map(|h| h.join(".local/share/opencode"))
-        .unwrap_or_else(|| PathBuf::from(".local/share/opencode"))
+    opencode_dir()
 }
 
 /// Return the OpenCode JSON storage directory (legacy flat-file layout).

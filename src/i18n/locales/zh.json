@@ -981,6 +981,28 @@
     "expandContent": "展开完整内容",
     "collapseContent": "收起"
   },
+  "sessionSettings": {
+    "title": "设置",
+    "backToSessions": "返回会话管理",
+    "loadFailed": "无法加载 Session2md 设置",
+    "browseDirectory": "选择目录",
+    "resetDirectory": "恢复默认目录",
+    "directorySaveFailed": "保存目录设置失败：{{error}}",
+    "directoryOverrides": {
+      "title": "配置目录覆盖",
+      "description": "这些路径仅用于 Session2md 读取本地会话，不会修改 CC Switch 或 Agent 应用。"
+    },
+    "directories": {
+      "claude": "Claude 配置目录",
+      "codex": "Codex 配置目录",
+      "gemini": "Gemini 配置目录",
+      "grokbuild": "Grok Build 配置目录",
+      "opencode": "OpenCode 数据目录",
+      "openclaw": "OpenClaw 配置目录",
+      "hermes": "Hermes 配置目录",
+      "pi": "Pi 配置目录"
+    }
+  },
   "console": {
     "providerSwitchReceived": "收到供应商切换事件:",
     "setupListenerFailed": "设置供应商切换监听器失败:",

@@ -981,6 +981,28 @@
     "expandContent": "Expand full content",
     "collapseContent": "Collapse"
   },
+  "sessionSettings": {
+    "title": "Settings",
+    "backToSessions": "Back to Session Manager",
+    "loadFailed": "Unable to load Session2md settings",
+    "browseDirectory": "Choose directory",
+    "resetDirectory": "Restore default directory",
+    "directorySaveFailed": "Failed to save directory settings: {{error}}",
+    "directoryOverrides": {
+      "title": "Configuration Directory Overrides",
+      "description": "These paths are used only by Session2md to read local sessions. They do not modify CC Switch or agent applications."
+    },
+    "directories": {
+      "claude": "Claude configuration directory",
+      "codex": "Codex configuration directory",
+      "gemini": "Gemini configuration directory",
+      "grokbuild": "Grok Build configuration directory",
+      "opencode": "OpenCode data directory",
+      "openclaw": "OpenClaw configuration directory",
+      "hermes": "Hermes configuration directory",
+      "pi": "Pi configuration directory"
+    }
+  },
   "console": {
     "providerSwitchReceived": "Received provider switch event:",
     "setupListenerFailed": "Failed to setup provider switch listener:",

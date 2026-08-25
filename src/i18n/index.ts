@@ -9,11 +9,12 @@ import zhTW from "./locales/zh-TW.json";
 type Language = "zh" | "zh-TW" | "en" | "ja";
 
 const DEFAULT_LANGUAGE: Language = "zh";
+const LANGUAGE_STORAGE_KEY = "session2md-language";
 
 const getInitialLanguage = (): Language => {
   if (typeof window !== "undefined") {
     try {
-      const stored = window.localStorage.getItem("language");
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (
         stored === "zh" ||
         stored === "zh-TW" ||

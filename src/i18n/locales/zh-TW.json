@@ -982,6 +982,28 @@
     "expandContent": "展開完整內容",
     "collapseContent": "收起"
   },
+  "sessionSettings": {
+    "title": "設定",
+    "backToSessions": "返回工作階段管理",
+    "loadFailed": "無法載入 Session2md 設定",
+    "browseDirectory": "選擇目錄",
+    "resetDirectory": "還原預設目錄",
+    "directorySaveFailed": "儲存目錄設定失敗：{{error}}",
+    "directoryOverrides": {
+      "title": "設定目錄覆寫",
+      "description": "這些路徑僅供 Session2md 讀取本機工作階段，不會修改 CC Switch 或 Agent 應用程式。"
+    },
+    "directories": {
+      "claude": "Claude 設定目錄",
+      "codex": "Codex 設定目錄",
+      "gemini": "Gemini 設定目錄",
+      "grokbuild": "Grok Build 設定目錄",
+      "opencode": "OpenCode 資料目錄",
+      "openclaw": "OpenClaw 設定目錄",
+      "hermes": "Hermes 設定目錄",
+      "pi": "Pi 設定目錄"
+    }
+  },
   "console": {
     "providerSwitchReceived": "收到供應商切換事件：",
     "setupListenerFailed": "設定供應商切換監聽器失敗：",

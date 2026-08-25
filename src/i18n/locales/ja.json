@@ -981,6 +981,28 @@
     "expandContent": "全文を表示",
     "collapseContent": "折りたたむ"
   },
+  "sessionSettings": {
+    "title": "設定",
+    "backToSessions": "セッション管理に戻る",
+    "loadFailed": "Session2md の設定を読み込めません",
+    "browseDirectory": "ディレクトリを選択",
+    "resetDirectory": "標準のディレクトリに戻す",
+    "directorySaveFailed": "ディレクトリ設定の保存に失敗しました: {{error}}",
+    "directoryOverrides": {
+      "title": "設定ディレクトリの上書き",
+      "description": "これらのパスは Session2md がローカルセッションを読むためだけに使用します。CC Switch や Agent アプリケーションは変更しません。"
+    },
+    "directories": {
+      "claude": "Claude 設定ディレクトリ",
+      "codex": "Codex 設定ディレクトリ",
+      "gemini": "Gemini 設定ディレクトリ",
+      "grokbuild": "Grok Build 設定ディレクトリ",
+      "opencode": "OpenCode データディレクトリ",
+      "openclaw": "OpenClaw 設定ディレクトリ",
+      "hermes": "Hermes 設定ディレクトリ",
+      "pi": "Pi 設定ディレクトリ"
+    }
+  },
   "console": {
     "providerSwitchReceived": "プロバイダー切り替えイベントを受信:",
     "setupListenerFailed": "プロバイダー切り替えリスナーの設定に失敗:",
