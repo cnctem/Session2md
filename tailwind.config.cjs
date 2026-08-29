@@ -69,6 +69,12 @@ module.exports = {
           500: "#f59e0b",
         },
       },
+      // 裸 border-* / divide-* 类（未显式指定颜色）默认取 Tailwind 的浅灰
+      // #e4e4e7，深色模式下会变成刺眼的亮线；改为跟随 --border 主题变量，
+      // 浅色模式下该值恰为 #e4e4e7，外观不变，深色模式下切换为深灰。
+      borderColor: {
+        DEFAULT: "hsl(var(--border))",
+      },
       boxShadow: {
         sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
