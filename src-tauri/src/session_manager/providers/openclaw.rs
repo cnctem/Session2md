@@ -260,6 +260,7 @@ fn parse_session(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        resume_command: None,
     })
 }
 
@@ -284,6 +285,7 @@ mod tests {
 
         let meta = parse_session(&path, None).unwrap();
         assert_eq!(meta.title.as_deref(), Some("How do I deploy?"));
+        assert_eq!(meta.resume_command, None);
     }
 
     #[test]

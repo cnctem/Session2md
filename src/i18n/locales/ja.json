@@ -940,6 +940,7 @@
     "projectDirCopied": "ディレクトリをコピーしました",
     "copySourcePath": "元ファイルをコピー",
     "sourcePathCopied": "元ファイルをコピーしました",
+    "resumeCommandCopied": "再開コマンドをコピーしました",
     "delete": "セッションを削除",
     "deleting": "削除中...",
     "deleteTooltip": "このローカルセッション記録を完全に削除します",

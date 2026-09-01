@@ -941,6 +941,7 @@
     "projectDirCopied": "目錄已複製",
     "copySourcePath": "複製原始檔案",
     "sourcePathCopied": "原始檔案已複製",
+    "resumeCommandCopied": "繼續工作階段命令已複製",
     "delete": "刪除工作階段",
     "deleting": "刪除中...",
     "deleteTooltip": "永久刪除此本地工作階段紀錄",

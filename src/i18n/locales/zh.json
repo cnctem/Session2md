@@ -940,6 +940,7 @@
     "projectDirCopied": "目录已复制",
     "copySourcePath": "复制原始文件",
     "sourcePathCopied": "原始文件已复制",
+    "resumeCommandCopied": "恢复命令已复制",
     "delete": "删除会话",
     "deleting": "删除中...",
     "deleteTooltip": "永久删除此本地会话记录",

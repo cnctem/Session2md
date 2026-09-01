@@ -4,7 +4,9 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
+  Copy,
   Download,
+  FileText,
   FolderOpen,
   List,
   ListTree,
@@ -54,6 +56,7 @@ import {
   formatSessionMessagePreview,
   formatSessionTitle,
   formatTimestamp,
+  getBaseName,
   getSessionDirectoryGroupKey,
   getProviderLabel,
   getSessionMarkdownFileName,
@@ -647,7 +650,7 @@ export function SessionManagerPage() {
             ) : (
               <>
                 <CardHeader className="flex-row items-start justify-between gap-3 border-b px-4 py-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <SessionProviderIcon
                         providerId={selectedSession.providerId}
@@ -665,21 +668,100 @@ export function SessionManagerPage() {
                         </span>
                       )}
                       {selectedSession.projectDir && (
-                        <button
-                          type="button"
-                          className="inline-flex max-w-full items-center gap-1 truncate hover:text-foreground"
-                          onClick={() =>
-                            void copyText(
-                              selectedSession.projectDir!,
-                              t("sessionManager.projectDirCopied"),
-                            )
-                          }
-                        >
-                          <FolderOpen className="size-3 shrink-0" />
-                          {selectedSession.projectDir}
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t("sessionManager.copyProjectDir")}
+                              onClick={() =>
+                                void copyText(
+                                  selectedSession.projectDir!,
+                                  t("sessionManager.projectDirCopied"),
+                                )
+                              }
+                              className="flex items-center gap-1 transition-colors hover:text-foreground"
+                            >
+                              <FolderOpen className="size-3 shrink-0" />
+                              <span className="max-w-[200px] truncate">
+                                {getBaseName(selectedSession.projectDir)}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="text-xs font-medium">
+                              {t("sessionManager.copyProjectDir")}
+                            </p>
+                            <p className="break-all font-mono text-xs">
+                              {selectedSession.projectDir}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
+                    {selectedSession.sourcePath && (
+                      <div className="min-w-0 text-xs text-muted-foreground">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t("sessionManager.copySourcePath")}
+                              onClick={() =>
+                                void copyText(
+                                  selectedSession.sourcePath!,
+                                  t("sessionManager.sourcePathCopied"),
+                                )
+                              }
+                              className="inline-flex max-w-full items-center gap-1 transition-colors hover:text-foreground"
+                            >
+                              <FileText className="size-3 shrink-0" />
+                              <span className="max-w-[200px] truncate font-mono">
+                                {getBaseName(selectedSession.sourcePath)}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="break-all font-mono text-xs">
+                              {selectedSession.sourcePath}
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                              {t("sessionManager.clickToCopyPath")}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
+                    {selectedSession.resumeCommand && (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div
+                          className="min-w-0 flex-1 truncate rounded-md bg-muted/60 px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                          title={selectedSession.resumeCommand}
+                        >
+                          {selectedSession.resumeCommand}
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 shrink-0"
+                              aria-label={t("sessionManager.copyCommand")}
+                              onClick={() =>
+                                void copyText(
+                                  selectedSession.resumeCommand!,
+                                  t("sessionManager.resumeCommandCopied"),
+                                )
+                              }
+                            >
+                              <Copy className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {t("sessionManager.copyCommand")}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
                   </div>
                   <Tooltip>
                     <TooltipTrigger asChild>

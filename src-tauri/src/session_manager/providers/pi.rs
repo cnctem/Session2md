@@ -321,7 +321,12 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         created_at: header.timestamp,
         last_active_at: summary.last_active_at.or(header.timestamp),
         source_path: Some(source_path.clone()),
+        resume_command: Some(format!("pi --session {}", shell_escape(&source_path))),
     })
+}
+
+fn shell_escape(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
 }
 
 fn read_tree(path: &Path) -> Result<SessionTree, String> {
@@ -739,6 +744,11 @@ fn push_jsonl_file(entry: &fs::DirEntry, output: &mut Vec<PathBuf>, enforce_size
 mod tests {
     use super::*;
 
+    #[test]
+    fn shell_escape_preserves_literal_single_quotes() {
+        assert_eq!(shell_escape("/work/O'Reilly"), r"'/work/O'\''Reilly'");
+    }
+
     fn write_session_header(path: &Path, id: &str) {
         fs::create_dir_all(path.parent().expect("session parent")).expect("create session parent");
         fs::write(
@@ -962,6 +972,10 @@ mod tests {
         // Pi's session picker prefers the message timestamp over the enclosing
         // entry timestamp when both are present.
         assert_eq!(session.last_active_at, Some(1_700_000_001_000));
+        assert!(session
+            .resume_command
+            .as_deref()
+            .is_some_and(|command| command.starts_with("pi --session '")));
         let messages =
             load_messages_with_layout(&root, &path, SessionLayout::Flat).expect("load messages");
         assert_eq!(

@@ -62,6 +62,7 @@ describe("SessionManagerPage", () => {
         projectDir: "/mock/codex",
         lastActiveAt: 20,
         sourcePath: "/mock/codex/session-1.jsonl",
+        resumeCommand: "codex resume codex-session-1",
       },
       {
         providerId: "codex",
@@ -140,6 +141,54 @@ describe("SessionManagerPage", () => {
       ),
     );
     expect(toastSuccessMock).toHaveBeenCalled();
+  });
+
+  it("shows the CC Switch-aligned source and resume command rows", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Alpha Session/i }),
+    );
+    const copyDirectoryButton = await screen.findByRole("button", {
+      name: "sessionManager.copyProjectDir",
+    });
+    const copySourcePathButton = screen.getByRole("button", {
+      name: "sessionManager.copySourcePath",
+    });
+    const copyCommandButton = screen.getByRole("button", {
+      name: "sessionManager.copyCommand",
+    });
+
+    expect(copyDirectoryButton).toHaveTextContent("codex");
+    expect(copySourcePathButton).toHaveTextContent("session-1.jsonl");
+    expect(screen.getByText("codex resume codex-session-1")).toBeVisible();
+
+    fireEvent.click(copyDirectoryButton);
+    fireEvent.click(copySourcePathButton);
+    fireEvent.click(copyCommandButton);
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenNthCalledWith(1, "/mock/codex"),
+    );
+    expect(writeText).toHaveBeenNthCalledWith(2, "/mock/codex/session-1.jsonl");
+    expect(writeText).toHaveBeenNthCalledWith(
+      3,
+      "codex resume codex-session-1",
+    );
+  });
+
+  it("omits the resume command row when a session has no command", async () => {
+    renderPage();
+
+    expect(await screen.findByText("Pi Session")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "sessionManager.copyCommand" }),
+    ).not.toBeInTheDocument();
   });
 
   it("exports filtered Codex messages as Markdown", async () => {

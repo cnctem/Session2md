@@ -940,6 +940,7 @@
     "projectDirCopied": "Directory copied",
     "copySourcePath": "Copy source file",
     "sourcePathCopied": "Source file copied",
+    "resumeCommandCopied": "Resume command copied",
     "delete": "Delete session",
     "deleting": "Deleting...",
     "deleteTooltip": "Permanently delete this local session record",

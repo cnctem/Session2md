@@ -392,6 +392,7 @@ fn parse_session_with_titles(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        resume_command: Some(format!("codex resume {session_id}")),
     })
 }
 
@@ -560,6 +561,7 @@ mod tests {
 
         let meta = parse_session(&path).unwrap();
         assert_eq!(meta.title.as_deref(), Some("How do I deploy?"));
+        assert_eq!(meta.resume_command.as_deref(), Some("codex resume test-id"));
     }
 
     #[test]

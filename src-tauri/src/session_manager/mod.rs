@@ -23,6 +23,8 @@ pub struct SessionMeta {
     pub last_active_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
