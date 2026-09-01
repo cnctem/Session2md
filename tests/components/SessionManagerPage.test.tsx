@@ -263,16 +263,96 @@ describe("SessionManagerPage", () => {
     await waitFor(() => expect(exportButton).toBeDisabled());
   });
 
-  it("has no destructive or terminal-resume controls", async () => {
+  it("restores destructive controls without restoring terminal resume", async () => {
     renderPage();
     await screen.findByText("Alpha Session");
 
     expect(
-      screen.queryByRole("button", { name: /delete/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "sessionManager.delete" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "sessionManager.manageBatchTooltip",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /resume/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("deletes the selected session after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Alpha Session");
+    await user.click(screen.getByRole("button", { name: /Alpha Session/i }));
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.delete" }),
+    );
+    expect(
+      screen.getByText("sessionManager.deleteConfirmMessage"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.deleteConfirmAction",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("Alpha Session")).not.toBeInTheDocument(),
+    );
+    expect(toastSuccessMock).toHaveBeenCalled();
+  });
+
+  it("reports when the backend did not delete the selected session", async () => {
+    const user = userEvent.setup();
+    const deleteSpy = vi
+      .spyOn(sessionsApi, "delete")
+      .mockResolvedValueOnce(false);
+    renderPage();
+
+    await screen.findByText("Alpha Session");
+    await user.click(screen.getByRole("button", { name: /Alpha Session/i }));
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.delete" }),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.deleteConfirmAction",
+      }),
+    );
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalled());
+    expect(screen.getAllByText("Alpha Session")).not.toHaveLength(0);
+    deleteSpy.mockRestore();
+  });
+
+  it("batch deletes selected sessions after confirmation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Alpha Session");
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.manageBatchTooltip",
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.selectAllFiltered" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.deleteSelected" }),
+    );
+    expect(
+      screen.getByText("sessionManager.batchDeleteConfirmMessage"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.batchDeleteConfirmAction",
+      }),
+    );
+
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalled());
   });
 
   it("filters the all-session list by provider", async () => {

@@ -73,7 +73,10 @@ export function SessionItem({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="shrink-0">
-                <SessionProviderIcon providerId={session.providerId} size={18} />
+                <SessionProviderIcon
+                  providerId={session.providerId}
+                  size={18}
+                />
               </span>
             </TooltipTrigger>
             <TooltipContent>

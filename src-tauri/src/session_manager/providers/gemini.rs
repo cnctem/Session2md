@@ -112,6 +112,28 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(result)
 }
 
+pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    let meta = parse_session(path).ok_or_else(|| {
+        format!(
+            "Failed to parse Gemini session metadata: {}",
+            path.display()
+        )
+    })?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "Gemini session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+    std::fs::remove_file(path).map_err(|error| {
+        format!(
+            "Failed to delete Gemini session file {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(true)
+}
+
 fn parse_session(path: &Path) -> Option<SessionMeta> {
     let data = std::fs::read_to_string(path).ok()?;
     let value: Value = serde_json::from_str(&data).ok()?;

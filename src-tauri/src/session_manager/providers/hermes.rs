@@ -228,6 +228,39 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
     Ok(messages)
 }
 
+pub fn delete_session_sqlite(session_id: &str, source: &str) -> Result<bool, String> {
+    let (db_path, ref_session_id) = parse_sqlite_source(source)
+        .ok_or_else(|| format!("Invalid SQLite source reference: {source}"))?;
+    let db_path = db_path
+        .canonicalize()
+        .map_err(|error| format!("Failed to canonicalize Hermes database path: {error}"))?;
+    let expected_db_path = get_hermes_db_path().canonicalize().map_err(|error| {
+        format!("Failed to canonicalize expected Hermes database path: {error}")
+    })?;
+    if ref_session_id != session_id {
+        return Err(format!(
+            "Hermes SQLite session ID mismatch: expected {session_id}, found {ref_session_id}"
+        ));
+    }
+    if db_path != expected_db_path {
+        return Err("SQLite path does not match expected Hermes database".to_string());
+    }
+
+    let mut conn = Connection::open(&db_path)
+        .map_err(|error| format!("Failed to open Hermes database: {error}"))?;
+    let tx = conn
+        .transaction()
+        .map_err(|error| format!("Failed to begin transaction: {error}"))?;
+    tx.execute("DELETE FROM messages WHERE session_id = ?1", [session_id])
+        .map_err(|error| format!("Failed to delete Hermes messages: {error}"))?;
+    let deleted = tx
+        .execute("DELETE FROM sessions WHERE id = ?1", [session_id])
+        .map_err(|error| format!("Failed to delete Hermes session: {error}"))?;
+    tx.commit()
+        .map_err(|error| format!("Failed to commit session deletion: {error}"))?;
+    Ok(deleted > 0)
+}
+
 fn parse_sqlite_source(source: &str) -> Option<(PathBuf, String)> {
     let rest = source.strip_prefix("sqlite:")?;
     let hash_pos = rest.rfind('#')?;
@@ -443,6 +476,28 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
+pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    let meta = parse_jsonl_session(path).ok_or_else(|| {
+        format!(
+            "Failed to parse Hermes session metadata: {}",
+            path.display()
+        )
+    })?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "Hermes session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+    std::fs::remove_file(path).map_err(|error| {
+        format!(
+            "Failed to delete Hermes session file {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -497,6 +552,28 @@ mod tests {
         let meta = parse_jsonl_session(&path).expect("should parse");
         assert_eq!(meta.session_id, "my-session");
         assert!(meta.title.is_some()); // Falls back to first user message
+    }
+
+    #[test]
+    fn delete_jsonl_session_requires_matching_session_id() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("session.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"session\",\"id\":\"actual-id\"}\n",
+                "{\"role\":\"user\",\"content\":\"hello\"}\n"
+            ),
+        )
+        .expect("write session");
+
+        let error = delete_session(dir.path(), &path, "other-id")
+            .expect_err("mismatched session ID should be rejected");
+        assert!(error.contains("session ID mismatch"));
+        assert!(path.exists());
+
+        delete_session(dir.path(), &path, "actual-id").expect("delete session");
+        assert!(!path.exists());
     }
 
     #[test]

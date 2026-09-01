@@ -410,6 +410,23 @@ export const getSessionMessages = (providerId: string, sourcePath: string) =>
     sessionMessagesState[sessionMessageKey(providerId, sourcePath)] ?? [],
   ) as SessionMessage[];
 
+export const deleteSession = (
+  providerId: string,
+  sessionId: string,
+  sourcePath: string,
+) => {
+  const index = sessionsState.findIndex(
+    (session) =>
+      session.providerId === providerId &&
+      session.sessionId === sessionId &&
+      session.sourcePath === sourcePath,
+  );
+  if (index < 0) return false;
+  sessionsState.splice(index, 1);
+  delete sessionMessagesState[sessionMessageKey(providerId, sourcePath)];
+  return true;
+};
+
 export const setSessionFixtures = (
   sessions: SessionMeta[],
   messages: Record<string, SessionMessage[]>,

@@ -118,6 +118,33 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
+pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    let meta = parse_session(path, None).ok_or_else(|| {
+        format!(
+            "Failed to parse OpenClaw session metadata: {}",
+            path.display()
+        )
+    })?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "OpenClaw session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+    let index_path = path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join("sessions.json");
+    prune_sessions_index(&index_path, session_id, path)?;
+    std::fs::remove_file(path).map_err(|error| {
+        format!(
+            "Failed to delete OpenClaw session file {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(true)
+}
+
 /// Read `sessions.json` index and build a sessionId → displayName lookup map.
 /// Returns an empty map if the file does not exist or cannot be parsed.
 fn load_display_names(sessions_dir: &Path) -> HashMap<String, String> {
@@ -261,6 +288,54 @@ fn parse_session(
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
         resume_command: None,
+    })
+}
+
+fn prune_sessions_index(
+    index_path: &Path,
+    session_id: &str,
+    source_path: &Path,
+) -> Result<(), String> {
+    if !index_path.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(index_path).map_err(|error| {
+        format!(
+            "Failed to read OpenClaw sessions index {}: {error}",
+            index_path.display()
+        )
+    })?;
+    let mut index: serde_json::Map<String, Value> =
+        serde_json::from_str(&content).map_err(|error| {
+            format!(
+                "Failed to parse OpenClaw sessions index {}: {error}",
+                index_path.display()
+            )
+        })?;
+    let source = source_path.to_string_lossy();
+    index.retain(|_, entry| {
+        let same_id = entry.get("sessionId").and_then(Value::as_str) == Some(session_id);
+        let same_file = entry.get("sessionFile").and_then(Value::as_str) == Some(source.as_ref());
+        !(same_id || same_file)
+    });
+    let serialized = serde_json::to_vec_pretty(&index).map_err(|error| {
+        format!(
+            "Failed to serialize OpenClaw sessions index {}: {error}",
+            index_path.display()
+        )
+    })?;
+    let temporary_path = index_path.with_extension("json.tmp");
+    std::fs::write(&temporary_path, serialized).map_err(|error| {
+        format!(
+            "Failed to write OpenClaw sessions index {}: {error}",
+            temporary_path.display()
+        )
+    })?;
+    std::fs::rename(&temporary_path, index_path).map_err(|error| {
+        format!(
+            "Failed to update OpenClaw sessions index {}: {error}",
+            index_path.display()
+        )
     })
 }
 

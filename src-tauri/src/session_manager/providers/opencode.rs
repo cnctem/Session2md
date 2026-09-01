@@ -306,6 +306,106 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
     Ok(messages)
 }
 
+pub fn delete_session(storage: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    let message_root = storage.join("message");
+    if path.parent() != Some(message_root.as_path()) {
+        return Err(format!(
+            "OpenCode session source must be a direct message directory: {}",
+            path.display()
+        ));
+    }
+    if path.file_name().and_then(|name| name.to_str()) != Some(session_id) {
+        return Err(format!(
+            "OpenCode session path does not match session ID: expected {session_id}, found {}",
+            path.display()
+        ));
+    }
+
+    let mut message_files = Vec::new();
+    collect_json_files(path, &mut message_files);
+    let mut message_ids = Vec::new();
+    for message_path in message_files {
+        let Ok(data) = std::fs::read_to_string(message_path) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<Value>(&data) else {
+            continue;
+        };
+        if let Some(message_id) = value.get("id").and_then(Value::as_str) {
+            message_ids.push(message_id.to_string());
+        }
+    }
+
+    for message_id in message_ids {
+        let part_dir = storage.join("part").join(message_id);
+        remove_dir_all_if_exists(&part_dir).map_err(|error| {
+            format!(
+                "Failed to delete OpenCode part directory {}: {error}",
+                part_dir.display()
+            )
+        })?;
+    }
+    let session_diff_path = storage
+        .join("session_diff")
+        .join(format!("{session_id}.json"));
+    remove_file_if_exists(&session_diff_path).map_err(|error| {
+        format!(
+            "Failed to delete OpenCode session diff {}: {error}",
+            session_diff_path.display()
+        )
+    })?;
+    remove_dir_all_if_exists(path).map_err(|error| {
+        format!(
+            "Failed to delete OpenCode message directory {}: {error}",
+            path.display()
+        )
+    })?;
+    if let Some(session_file) = find_session_file(storage, session_id) {
+        remove_file_if_exists(&session_file).map_err(|error| {
+            format!(
+                "Failed to delete OpenCode session file {}: {error}",
+                session_file.display()
+            )
+        })?;
+    }
+    Ok(true)
+}
+
+pub fn delete_session_sqlite(session_id: &str, source: &str) -> Result<bool, String> {
+    let (db_path, ref_session_id) = parse_sqlite_source(source)
+        .ok_or_else(|| format!("Invalid SQLite source reference: {source}"))?;
+    let db_path = db_path
+        .canonicalize()
+        .map_err(|error| format!("Failed to canonicalize SQLite database path: {error}"))?;
+    let expected_db_path = get_opencode_db_path().canonicalize().map_err(|error| {
+        format!("Failed to canonicalize expected OpenCode database path: {error}")
+    })?;
+    if ref_session_id != session_id {
+        return Err(format!(
+            "OpenCode SQLite session ID mismatch: expected {session_id}, found {ref_session_id}"
+        ));
+    }
+    if db_path != expected_db_path {
+        return Err("SQLite path does not match expected OpenCode database".to_string());
+    }
+
+    let mut conn = Connection::open(&db_path)
+        .map_err(|error| format!("Failed to open OpenCode database: {error}"))?;
+    let tx = conn
+        .transaction()
+        .map_err(|error| format!("Failed to begin transaction: {error}"))?;
+    tx.execute("DELETE FROM part WHERE session_id = ?1", [session_id])
+        .map_err(|error| format!("Failed to delete OpenCode parts: {error}"))?;
+    tx.execute("DELETE FROM message WHERE session_id = ?1", [session_id])
+        .map_err(|error| format!("Failed to delete OpenCode messages: {error}"))?;
+    let deleted = tx
+        .execute("DELETE FROM session WHERE id = ?1", [session_id])
+        .map_err(|error| format!("Failed to delete OpenCode session: {error}"))?;
+    tx.commit()
+        .map_err(|error| format!("Failed to commit session deletion: {error}"))?;
+    Ok(deleted > 0)
+}
+
 fn parse_session(storage: &Path, path: &Path) -> Option<SessionMeta> {
     let data = std::fs::read_to_string(path).ok()?;
     let value: Value = serde_json::from_str(&data).ok()?;
@@ -481,6 +581,31 @@ fn collect_json_files(root: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
+fn find_session_file(storage: &Path, session_id: &str) -> Option<PathBuf> {
+    let mut files = Vec::new();
+    collect_json_files(&storage.join("session"), &mut files);
+    let expected = format!("{session_id}.json");
+    files
+        .into_iter()
+        .find(|path| path.file_name().and_then(|name| name.to_str()) == Some(expected.as_str()))
+}
+
+fn remove_file_if_exists(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+fn remove_dir_all_if_exists(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,6 +685,58 @@ mod tests {
         assert_eq!(msgs[0].role, "assistant");
         assert!(msgs[0].content.contains("[Tool: bash]"));
         assert!(msgs[0].content.contains("Here are the files."));
+    }
+
+    #[test]
+    fn delete_session_removes_legacy_transcript_and_related_data() {
+        let temp = tempdir().expect("tempdir");
+        let storage = temp.path();
+        let session_id = "ses_delete";
+        let message_id = "msg_delete";
+        let message_dir = storage.join("message").join(session_id);
+        let part_dir = storage.join("part").join(message_id);
+        let session_file = storage
+            .join("session")
+            .join("project")
+            .join(format!("{session_id}.json"));
+        let session_diff = storage
+            .join("session_diff")
+            .join(format!("{session_id}.json"));
+
+        std::fs::create_dir_all(&message_dir).expect("create message dir");
+        std::fs::create_dir_all(&part_dir).expect("create part dir");
+        std::fs::create_dir_all(session_file.parent().expect("session parent"))
+            .expect("create session dir");
+        std::fs::create_dir_all(session_diff.parent().expect("diff parent"))
+            .expect("create diff dir");
+        std::fs::write(
+            &message_dir.join(format!("{message_id}.json")),
+            format!(r#"{{"id":"{message_id}","sessionID":"{session_id}"}}"#),
+        )
+        .expect("write message");
+        std::fs::write(part_dir.join("part.json"), "{}").expect("write part");
+        std::fs::write(&session_file, format!(r#"{{"id":"{session_id}"}}"#))
+            .expect("write session");
+        std::fs::write(&session_diff, "[]").expect("write diff");
+
+        assert!(delete_session(storage, &message_dir, session_id).expect("delete session"));
+        assert!(!message_dir.exists());
+        assert!(!part_dir.exists());
+        assert!(!session_file.exists());
+        assert!(!session_diff.exists());
+    }
+
+    #[test]
+    fn delete_session_rejects_non_message_directories() {
+        let temp = tempdir().expect("tempdir");
+        let storage = temp.path();
+        let path = storage.join("other").join("ses_delete");
+        std::fs::create_dir_all(&path).expect("create unrelated directory");
+
+        let error = delete_session(storage, &path, "ses_delete")
+            .expect_err("unrelated directory should be rejected");
+        assert!(error.contains("direct message directory"));
+        assert!(path.exists());
     }
 
     #[test]
