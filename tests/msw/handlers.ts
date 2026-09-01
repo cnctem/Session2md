@@ -23,6 +23,7 @@ import {
   setMcpServerEnabled,
   upsertMcpServer,
   deleteMcpServer,
+  deleteSession,
 } from "./state";
 
 const TAURI_ENDPOINT = "http://tauri.local";
@@ -139,6 +140,31 @@ export const handlers = [
       sourcePath: string;
     }>(request);
     return success(getSessionMessages(providerId, sourcePath));
+  }),
+
+  http.post(`${TAURI_ENDPOINT}/delete_session`, async ({ request }) => {
+    const { providerId, sessionId, sourcePath } = await withJson<{
+      providerId: string;
+      sessionId: string;
+      sourcePath: string;
+    }>(request);
+    return success(deleteSession(providerId, sessionId, sourcePath));
+  }),
+
+  http.post(`${TAURI_ENDPOINT}/delete_sessions`, async ({ request }) => {
+    const { items = [] } = await withJson<{
+      items?: { providerId: string; sessionId: string; sourcePath: string }[];
+    }>(request);
+    return success(
+      items.map((item) => ({
+        ...item,
+        success: deleteSession(
+          item.providerId,
+          item.sessionId,
+          item.sourcePath,
+        ),
+      })),
+    );
   }),
 
   // MCP APIs

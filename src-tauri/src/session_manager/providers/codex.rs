@@ -269,7 +269,24 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
-#[cfg(test)]
+pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    let meta = parse_session(path)
+        .ok_or_else(|| format!("Failed to parse Codex session metadata: {}", path.display()))?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "Codex session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+    std::fs::remove_file(path).map_err(|error| {
+        format!(
+            "Failed to delete Codex session file {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(true)
+}
+
 fn parse_session(path: &Path) -> Option<SessionMeta> {
     parse_session_with_titles(path, &HashMap::new())
 }

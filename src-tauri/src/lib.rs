@@ -10,6 +10,8 @@ pub fn run() {
             commands::list_sessions,
             commands::get_session_messages,
             commands::export_session_markdown,
+            commands::delete_session,
+            commands::delete_sessions,
             commands::get_session2md_settings,
             commands::save_session2md_settings,
         ])

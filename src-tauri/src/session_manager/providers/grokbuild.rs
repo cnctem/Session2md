@@ -89,6 +89,43 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
+pub fn delete_session(root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    if !path.starts_with(root)
+        || path.file_name().and_then(|name| name.to_str()) != Some("summary.json")
+    {
+        return Err(format!(
+            "Unexpected Grok Build session source: {}",
+            path.display()
+        ));
+    }
+    let summary = read_summary(path)?;
+    if summary.info.id != session_id {
+        return Err(format!(
+            "Grok Build session ID mismatch: expected {session_id}, found {}",
+            summary.info.id
+        ));
+    }
+    let session_dir = path
+        .parent()
+        .ok_or_else(|| format!("Invalid Grok Build session path: {}", path.display()))?;
+    if session_dir == root
+        || !session_dir.starts_with(root)
+        || session_dir.file_name().and_then(|name| name.to_str()) != Some(session_id)
+    {
+        return Err(format!(
+            "Grok Build session directory does not match session ID: {}",
+            session_dir.display()
+        ));
+    }
+    std::fs::remove_dir_all(session_dir).map_err(|error| {
+        format!(
+            "Failed to delete Grok Build session directory {}: {error}",
+            session_dir.display()
+        )
+    })?;
+    Ok(true)
+}
+
 fn collect_summary_files(root: &Path, files: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(root) else {
         return;

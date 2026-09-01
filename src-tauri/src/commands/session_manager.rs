@@ -52,3 +52,25 @@ pub async fn export_session_markdown<R: tauri::Runtime>(
 
     Ok(Some(file_path))
 }
+
+#[tauri::command]
+pub async fn delete_session(
+    providerId: String,
+    sessionId: String,
+    sourcePath: String,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        session_manager::delete_session(&providerId, &sessionId, &sourcePath)
+    })
+    .await
+    .map_err(|error| format!("Failed to delete session: {error}"))?
+}
+
+#[tauri::command]
+pub async fn delete_sessions(
+    items: Vec<session_manager::DeleteSessionRequest>,
+) -> Result<Vec<session_manager::DeleteSessionOutcome>, String> {
+    tauri::async_runtime::spawn_blocking(move || session_manager::delete_sessions(&items))
+        .await
+        .map_err(|error| format!("Failed to delete sessions: {error}"))
+}

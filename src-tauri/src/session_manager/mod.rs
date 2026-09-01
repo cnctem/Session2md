@@ -1,8 +1,8 @@
 pub mod paths;
 pub mod providers;
 
-use serde::Serialize;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 use providers::{claude, codex, gemini, grokbuild, hermes, openclaw, opencode, pi};
 
@@ -34,6 +34,25 @@ pub struct SessionMessage {
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ts: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteSessionRequest {
+    pub provider_id: String,
+    pub session_id: String,
+    pub source_path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteSessionOutcome {
+    pub provider_id: String,
+    pub session_id: String,
+    pub source_path: String,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 pub fn scan_sessions() -> Vec<SessionMeta> {
@@ -94,5 +113,166 @@ pub fn load_messages(provider_id: &str, source_path: &str) -> Result<Vec<Session
         "hermes" => hermes::load_messages(path),
         "pi" => pi::load_messages(path),
         _ => Err(format!("Unsupported provider: {provider_id}")),
+    }
+}
+
+pub fn delete_session(
+    provider_id: &str,
+    session_id: &str,
+    source_path: &str,
+) -> Result<bool, String> {
+    if provider_id == "opencode" && source_path.starts_with("sqlite:") {
+        return opencode::delete_session_sqlite(session_id, source_path);
+    }
+    if provider_id == "hermes" && source_path.starts_with("sqlite:") {
+        return hermes::delete_session_sqlite(session_id, source_path);
+    }
+
+    let roots = provider_roots(provider_id)?;
+    delete_session_with_roots(provider_id, session_id, Path::new(source_path), &roots)
+}
+
+pub fn delete_sessions(requests: &[DeleteSessionRequest]) -> Vec<DeleteSessionOutcome> {
+    requests
+        .iter()
+        .map(|request| {
+            let result = delete_session(
+                &request.provider_id,
+                &request.session_id,
+                &request.source_path,
+            );
+            match result {
+                Ok(true) => DeleteSessionOutcome {
+                    provider_id: request.provider_id.clone(),
+                    session_id: request.session_id.clone(),
+                    source_path: request.source_path.clone(),
+                    success: true,
+                    error: None,
+                },
+                Ok(false) => DeleteSessionOutcome {
+                    provider_id: request.provider_id.clone(),
+                    session_id: request.session_id.clone(),
+                    source_path: request.source_path.clone(),
+                    success: false,
+                    error: Some("Session was not deleted".to_string()),
+                },
+                Err(error) => DeleteSessionOutcome {
+                    provider_id: request.provider_id.clone(),
+                    session_id: request.session_id.clone(),
+                    source_path: request.source_path.clone(),
+                    success: false,
+                    error: Some(error),
+                },
+            }
+        })
+        .collect()
+}
+
+fn delete_session_with_roots(
+    provider_id: &str,
+    session_id: &str,
+    source_path: &Path,
+    roots: &[PathBuf],
+) -> Result<bool, String> {
+    let validated_source = canonicalize_existing_path(source_path, "session source")?;
+
+    let mut saw_existing_root = false;
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+
+        saw_existing_root = true;
+        let validated_root = canonicalize_existing_path(root, "session root")?;
+        if validated_source.starts_with(&validated_root) {
+            return match provider_id {
+                "codex" => codex::delete_session(&validated_root, &validated_source, session_id),
+                "claude" => claude::delete_session(&validated_root, &validated_source, session_id),
+                "opencode" => {
+                    opencode::delete_session(&validated_root, &validated_source, session_id)
+                }
+                "openclaw" => {
+                    openclaw::delete_session(&validated_root, &validated_source, session_id)
+                }
+                "gemini" => gemini::delete_session(&validated_root, &validated_source, session_id),
+                "grokbuild" => {
+                    grokbuild::delete_session(&validated_root, &validated_source, session_id)
+                }
+                "hermes" => hermes::delete_session(&validated_root, &validated_source, session_id),
+                "pi" => pi::delete_session(&validated_root, &validated_source, session_id),
+                _ => Err(format!("Unsupported provider: {provider_id}")),
+            };
+        }
+    }
+
+    if !saw_existing_root {
+        return Err(format!("Session root not found for provider {provider_id}"));
+    }
+
+    Err(format!(
+        "Session source path is outside provider roots: {}",
+        source_path.display()
+    ))
+}
+
+fn provider_roots(provider_id: &str) -> Result<Vec<PathBuf>, String> {
+    let roots = match provider_id {
+        "codex" => codex::session_roots(),
+        "claude" => vec![paths::claude_dir().join("projects")],
+        "opencode" => vec![opencode::get_opencode_data_dir()],
+        "openclaw" => vec![paths::openclaw_dir().join("agents")],
+        "gemini" => vec![paths::gemini_dir().join("tmp")],
+        "grokbuild" => grokbuild::session_roots(),
+        "hermes" => vec![paths::hermes_dir().join("sessions")],
+        "pi" => pi::session_roots(),
+        _ => return Err(format!("Unsupported provider: {provider_id}")),
+    };
+    Ok(roots)
+}
+
+fn canonicalize_existing_path(path: &Path, label: &str) -> Result<PathBuf, String> {
+    if !path.exists() {
+        return Err(format!("{label} not found: {}", path.display()));
+    }
+    path.canonicalize()
+        .map_err(|error| format!("Failed to resolve {label} {}: {error}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn rejects_source_path_outside_provider_roots() {
+        let root = tempdir().expect("root");
+        let outside = tempdir().expect("outside");
+        let source = outside.path().join("session.jsonl");
+        std::fs::write(&source, "{}").expect("write source");
+
+        let error = delete_session_with_roots("codex", "session-1", &source, &[root.path().into()])
+            .expect_err("outside path should be rejected");
+
+        assert!(error.contains("outside provider roots"));
+    }
+
+    #[test]
+    fn batch_delete_reports_each_failure_without_stopping() {
+        let requests = vec![
+            DeleteSessionRequest {
+                provider_id: "unsupported".to_string(),
+                session_id: "one".to_string(),
+                source_path: "/missing/one".to_string(),
+            },
+            DeleteSessionRequest {
+                provider_id: "unsupported".to_string(),
+                session_id: "two".to_string(),
+                source_path: "/missing/two".to_string(),
+            },
+        ];
+
+        let outcomes = delete_sessions(&requests);
+        assert_eq!(outcomes.len(), 2);
+        assert!(outcomes.iter().all(|outcome| !outcome.success));
     }
 }

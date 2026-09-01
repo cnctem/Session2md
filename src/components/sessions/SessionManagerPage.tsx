@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -13,6 +14,8 @@ import {
   RefreshCw,
   Search,
   Clock,
+  CheckSquare,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSessionSearch } from "@/hooks/useSessionSearch";
@@ -25,7 +28,9 @@ import { extractErrorMessage } from "@/utils/errorUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -81,6 +86,13 @@ type SessionListViewMode = "flat" | "grouped";
 type SessionGroupExpansionState = {
   expandedProviderIds: Set<string>;
   expandedDirectoryKeys: Set<string>;
+};
+
+type GroupSelectionState = {
+  checked: boolean | "indeterminate";
+  isSelected: boolean;
+  selectedCount: number;
+  selectableCount: number;
 };
 
 const PROVIDER_FILTERS: ProviderFilter[] = [
@@ -163,6 +175,7 @@ const filterSetToAllowedValues = (
 
 export function SessionManagerPage() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch } = useSessionsQuery();
   const sessions = data ?? [];
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
@@ -179,6 +192,14 @@ export function SessionManagerPage() {
     Set<string>
   >(() => initialGroupExpansionState.expandedDirectoryKeys);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedSessionKeys, setSelectedSessionKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [deleteTargets, setDeleteTargets] = useState<SessionMeta[] | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
   const [tocDialogOpen, setTocDialogOpen] = useState(false);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
     null,
@@ -252,6 +273,18 @@ export function SessionManagerPage() {
     }
   }, [filteredSessions, selectedKey]);
 
+  useEffect(() => {
+    const validKeys = new Set(
+      sessions.map((session) => getSessionKey(session)),
+    );
+    setSelectedSessionKeys((current) => {
+      const next = new Set(
+        Array.from(current).filter((key) => validKeys.has(key)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [sessions]);
+
   const selectedSession = useMemo(
     () =>
       filteredSessions.find(
@@ -311,6 +344,206 @@ export function SessionManagerPage() {
       toast.success(successMessage);
     } catch (error) {
       toast.error(extractErrorMessage(error) || t("common.error"));
+    }
+  };
+
+  const deletableFilteredSessions = useMemo(
+    () => filteredSessions.filter((session) => Boolean(session.sourcePath)),
+    [filteredSessions],
+  );
+  const selectedDeletableSessions = useMemo(
+    () =>
+      sessions.filter(
+        (session) =>
+          Boolean(session.sourcePath) &&
+          selectedSessionKeys.has(getSessionKey(session)),
+      ),
+    [selectedSessionKeys, sessions],
+  );
+  const allFilteredSelected =
+    deletableFilteredSessions.length > 0 &&
+    deletableFilteredSessions.every((session) =>
+      selectedSessionKeys.has(getSessionKey(session)),
+    );
+
+  useEffect(() => {
+    if (!selectionMode) return;
+    const visibleKeys = new Set(
+      deletableFilteredSessions.map((session) => getSessionKey(session)),
+    );
+    setSelectedSessionKeys((current) => {
+      const next = new Set(
+        Array.from(current).filter((key) => visibleKeys.has(key)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [deletableFilteredSessions, selectionMode]);
+
+  const toggleSessionChecked = (session: SessionMeta, checked: boolean) => {
+    if (!session.sourcePath) return;
+    const key = getSessionKey(session);
+    setSelectedSessionKeys((current) => {
+      const next = new Set(current);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const getGroupSelectionState = (
+    groupSessions: SessionMeta[],
+  ): GroupSelectionState => {
+    const selectableSessions = groupSessions.filter((session) =>
+      Boolean(session.sourcePath),
+    );
+    const selectedCount = selectableSessions.filter((session) =>
+      selectedSessionKeys.has(getSessionKey(session)),
+    ).length;
+    const isSelected =
+      selectableSessions.length > 0 &&
+      selectedCount === selectableSessions.length;
+    return {
+      checked:
+        selectedCount === 0 ? false : isSelected ? true : "indeterminate",
+      isSelected,
+      selectedCount,
+      selectableCount: selectableSessions.length,
+    };
+  };
+
+  const toggleSessionGroupChecked = (
+    groupSessions: SessionMeta[],
+    checked: boolean,
+  ) => {
+    setSelectedSessionKeys((current) => {
+      const next = new Set(current);
+      groupSessions.forEach((session) => {
+        if (!session.sourcePath) return;
+        const key = getSessionKey(session);
+        if (checked) next.add(key);
+        else next.delete(key);
+      });
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedSessionKeys((current) => {
+      const next = new Set(current);
+      deletableFilteredSessions.forEach((session) => {
+        const key = getSessionKey(session);
+        if (allFilteredSelected) next.delete(key);
+        else next.add(key);
+      });
+      return next;
+    });
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedSessionKeys(new Set());
+  };
+
+  const removeDeletedSessions = (deleted: SessionMeta[]) => {
+    const deletedKeys = new Set(
+      deleted.map((session) => getSessionKey(session)),
+    );
+    queryClient.setQueryData<SessionMeta[]>(["sessions"], (current) =>
+      (current ?? []).filter(
+        (session) => !deletedKeys.has(getSessionKey(session)),
+      ),
+    );
+    deleted.forEach((session) => {
+      queryClient.removeQueries({
+        queryKey: ["sessionMessages", session.providerId, session.sourcePath],
+      });
+    });
+    setSelectedSessionKeys((current) => {
+      const next = new Set(current);
+      deletedKeys.forEach((key) => next.delete(key));
+      return next;
+    });
+    setSelectedKey((current) =>
+      current && deletedKeys.has(current) ? null : current,
+    );
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTargets?.length || isDeleting) return;
+    const targets = deleteTargets.filter(
+      (session): session is SessionMeta & { sourcePath: string } =>
+        Boolean(session.sourcePath),
+    );
+    if (!targets.length) {
+      setDeleteTargets(null);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      if (targets.length === 1) {
+        const [target] = targets;
+        const deleted = await sessionsApi.delete({
+          providerId: target.providerId,
+          sessionId: target.sessionId,
+          sourcePath: target.sourcePath,
+        });
+        if (!deleted) {
+          throw new Error(t("sessionManager.sessionNotFound"));
+        }
+        removeDeletedSessions([target]);
+        toast.success(t("sessionManager.sessionDeleted"));
+      } else {
+        const results = await sessionsApi.deleteMany(
+          targets.map((session) => ({
+            providerId: session.providerId,
+            sessionId: session.sessionId,
+            sourcePath: session.sourcePath,
+          })),
+        );
+        const successfulKeys = new Set(
+          results
+            .filter((result) => result.success)
+            .map((result) =>
+              getSessionKey({
+                providerId: result.providerId,
+                sessionId: result.sessionId,
+                sourcePath: result.sourcePath,
+              }),
+            ),
+        );
+        const successfulTargets = targets.filter((session) =>
+          successfulKeys.has(getSessionKey(session)),
+        );
+        if (successfulTargets.length) {
+          removeDeletedSessions(successfulTargets);
+          toast.success(
+            t("sessionManager.batchDeleteSuccess", {
+              count: successfulTargets.length,
+            }),
+          );
+        }
+        const failed = results.filter((result) => !result.success);
+        if (failed.length) {
+          toast.error(
+            t("sessionManager.batchDeleteFailed", { failed: failed.length }),
+            { description: failed[0].error },
+          );
+        }
+      }
+      setDeleteTargets(null);
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    } catch (error) {
+      toast.error(
+        targets.length === 1
+          ? t("sessionManager.deleteFailed", {
+              error: extractErrorMessage(error),
+            })
+          : extractErrorMessage(error) ||
+              t("sessionManager.batchDeleteRequestFailed"),
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -379,11 +612,12 @@ export function SessionManagerPage() {
       key={getSessionKey(session)}
       session={session}
       isSelected={selectedKey === getSessionKey(session)}
-      selectionMode={false}
-      isChecked={false}
+      selectionMode={selectionMode}
+      isChecked={selectedSessionKeys.has(getSessionKey(session))}
+      isCheckDisabled={!session.sourcePath || isDeleting}
       searchQuery={search}
       onSelect={setSelectedKey}
-      onToggleChecked={() => undefined}
+      onToggleChecked={(checked) => toggleSessionChecked(session, checked)}
     />
   );
 
@@ -401,6 +635,33 @@ export function SessionManagerPage() {
                   <Badge variant="secondary">{filteredSessions.length}</Badge>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {(selectionMode || deletableFilteredSessions.length > 0) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={selectionMode ? "secondary" : "ghost"}
+                          size="icon"
+                          aria-label={
+                            selectionMode
+                              ? t("sessionManager.exitBatchModeTooltip")
+                              : t("sessionManager.manageBatchTooltip")
+                          }
+                          onClick={() => {
+                            if (selectionMode) exitSelectionMode();
+                            else setSelectionMode(true);
+                          }}
+                          disabled={isDeleting}
+                        >
+                          <CheckSquare className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {selectionMode
+                          ? t("sessionManager.exitBatchModeTooltip")
+                          : t("sessionManager.manageBatchTooltip")}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   {listViewMode === "grouped" && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -506,6 +767,54 @@ export function SessionManagerPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {selectionMode && (
+                <div className="grid gap-2 rounded-md border bg-muted/40 px-2.5 py-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline" className="text-xs">
+                      {t("sessionManager.selectedCount", {
+                        count: selectedDeletableSessions.length,
+                      })}
+                    </Badge>
+                    <span className="truncate">
+                      {t("sessionManager.batchModeHint")}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={handleToggleSelectAll}
+                      disabled={!deletableFilteredSessions.length || isDeleting}
+                    >
+                      {allFilteredSelected
+                        ? t("sessionManager.clearFilteredSelection")
+                        : t("sessionManager.selectAllFiltered")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setSelectedSessionKeys(new Set())}
+                      disabled={!selectedDeletableSessions.length || isDeleting}
+                    >
+                      {t("sessionManager.clearSelection")}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="ml-auto h-7 gap-1.5 px-2 text-xs"
+                      onClick={() =>
+                        setDeleteTargets(selectedDeletableSessions)
+                      }
+                      disabled={!selectedDeletableSessions.length || isDeleting}
+                    >
+                      <Trash2 className="size-3.5" />
+                      {t("sessionManager.deleteSelected")}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <ScrollArea className="min-h-0 flex-1">
               <div className="space-y-1 p-2">
@@ -528,6 +837,9 @@ export function SessionManagerPage() {
                       providerGroup.providerId,
                       t,
                     );
+                    const providerSelection = getGroupSelectionState(
+                      providerGroup.sessions,
+                    );
 
                     return (
                       <Collapsible
@@ -538,6 +850,25 @@ export function SessionManagerPage() {
                         }
                       >
                         <div className="flex w-full items-center rounded-md border bg-muted/40 px-2.5 py-2 transition-colors hover:bg-muted">
+                          {selectionMode && (
+                            <Checkbox
+                              className="mr-2 shrink-0"
+                              checked={providerSelection.checked}
+                              disabled={
+                                !providerSelection.selectableCount || isDeleting
+                              }
+                              aria-label={t(
+                                "sessionManager.selectProviderGroupForBatch",
+                                { provider: providerLabel },
+                              )}
+                              onCheckedChange={(checked) =>
+                                toggleSessionGroupChecked(
+                                  providerGroup.sessions,
+                                  Boolean(checked),
+                                )
+                              }
+                            />
+                          )}
                           <CollapsibleTrigger asChild>
                             <button
                               type="button"
@@ -575,6 +906,9 @@ export function SessionManagerPage() {
                             const directoryOpen = expandedDirectoryGroups.has(
                               directory.key,
                             );
+                            const directorySelection = getGroupSelectionState(
+                              directory.sessions,
+                            );
 
                             return (
                               <Collapsible
@@ -585,6 +919,26 @@ export function SessionManagerPage() {
                                 }
                               >
                                 <div className="flex w-full items-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                  {selectionMode && (
+                                    <Checkbox
+                                      className="mr-2 shrink-0"
+                                      checked={directorySelection.checked}
+                                      disabled={
+                                        !directorySelection.selectableCount ||
+                                        isDeleting
+                                      }
+                                      aria-label={t(
+                                        "sessionManager.selectDirectoryGroupForBatch",
+                                        { directory: directory.label },
+                                      )}
+                                      onCheckedChange={(checked) =>
+                                        toggleSessionGroupChecked(
+                                          directory.sessions,
+                                          Boolean(checked),
+                                        )
+                                      }
+                                    />
+                                  )}
                                   <CollapsibleTrigger asChild>
                                     <button
                                       type="button"
@@ -763,25 +1117,43 @@ export function SessionManagerPage() {
                       </div>
                     )}
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        aria-label={t("sessionManager.export")}
-                        onClick={() => void handleExportMarkdown()}
-                        disabled={!hasExportableMessages || isExporting}
-                      >
-                        <Download
-                          className={
-                            isExporting ? "size-4 animate-pulse" : "size-4"
-                          }
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {t("sessionManager.exportTooltip")}
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          aria-label={t("sessionManager.export")}
+                          onClick={() => void handleExportMarkdown()}
+                          disabled={!hasExportableMessages || isExporting}
+                        >
+                          <Download
+                            className={
+                              isExporting ? "size-4 animate-pulse" : "size-4"
+                            }
+                          />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {t("sessionManager.exportTooltip")}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          aria-label={t("sessionManager.delete")}
+                          onClick={() => setDeleteTargets([selectedSession])}
+                          disabled={!selectedSession.sourcePath || isDeleting}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {t("sessionManager.deleteTooltip")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </CardHeader>
                 <CardContent className="flex min-h-0 flex-1 p-0">
                   <ScrollArea className="min-w-0 flex-1">
@@ -835,6 +1207,36 @@ export function SessionManagerPage() {
           </Card>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargets)}
+        title={
+          deleteTargets && deleteTargets.length > 1
+            ? t("sessionManager.batchDeleteConfirmTitle")
+            : t("sessionManager.deleteConfirmTitle")
+        }
+        message={
+          deleteTargets && deleteTargets.length > 1
+            ? t("sessionManager.batchDeleteConfirmMessage", {
+                count: deleteTargets.length,
+              })
+            : deleteTargets?.[0]
+              ? t("sessionManager.deleteConfirmMessage", {
+                  title: formatSessionTitle(deleteTargets[0]),
+                  sessionId: deleteTargets[0].sessionId,
+                })
+              : ""
+        }
+        confirmText={
+          deleteTargets && deleteTargets.length > 1
+            ? t("sessionManager.batchDeleteConfirmAction")
+            : t("sessionManager.deleteConfirmAction")
+        }
+        pending={isDeleting}
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => {
+          if (!isDeleting) setDeleteTargets(null);
+        }}
+      />
     </TooltipProvider>
   );
 }
