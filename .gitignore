@@ -7,9 +7,6 @@ release/
 .env.local
 *.tsbuildinfo
 .npmrc
-CLAUDE.md
-AGENTS.md
-GEMINI.md
 /.claude
 /.codex
 /.gemini
