@@ -18,23 +18,23 @@ Session2md discovers sessions from these local tools:
 - OpenClaw
 - Hermes
 - Pi
-- Cursor
-- Antigravity CLI
-- Reasonix
-- MiMo Code
+- DeepSeek Harness
+- Kimi Code
 - ZCode
-- Kimi CLI / Kimi Code
-- Kilo Code
 - Qoder CLI
 - WorkBuddy
 - Qwen Work
-- Continue
+- Antigravity CLI
+- Cursor
+- Kilo Code
 - Cline
 - Goose
 - Zed
+- MiMo Code
+- Reasonix
+- Continue
 - Crush
 - TeleAgent
-- DeepSeek Harness
 
 For each discovered session you can:
 

@@ -18,23 +18,23 @@ Session2md はオープンソースの [CC Switch](https://github.com/farion1231
 - OpenClaw
 - Hermes
 - Pi
-- Cursor
-- Antigravity CLI
-- Reasonix
-- MiMo Code
+- DeepSeek Harness
+- Kimi Code
 - ZCode
-- Kimi CLI / Kimi Code
-- Kilo Code
 - Qoder CLI
 - WorkBuddy
 - Qwen Work
-- Continue
+- Antigravity CLI
+- Cursor
+- Kilo Code
 - Cline
 - Goose
 - Zed
+- MiMo Code
+- Reasonix
+- Continue
 - Crush
 - TeleAgent
-- DeepSeek Harness
 
 検出したセッションでは、次の操作ができます。
 

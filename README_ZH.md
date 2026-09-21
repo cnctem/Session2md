@@ -18,23 +18,23 @@ Session2md 可以从以下本地工具发现会话：
 - OpenClaw
 - Hermes
 - Pi
-- Cursor
-- Antigravity CLI
-- Reasonix
-- MiMo Code
+- DeepSeek Harness
+- Kimi Code
 - ZCode
-- Kimi CLI / Kimi Code
-- Kilo Code
 - Qoder CLI
-- WorkBuddy
 - 千问办公
-- Continue
+- WorkBuddy
+- Antigravity CLI
+- Cursor
+- Kilo Code
 - Cline
 - Goose
 - Zed
+- MiMo Code
+- Reasonix
+- Continue
 - Crush
 - TeleAgent
-- DeepSeek Harness
 
 对发现的会话可以进行以下操作：
 
