@@ -123,12 +123,12 @@ pub fn goose_data_dir() -> PathBuf {
         }
         #[cfg(target_os = "windows")]
         {
-            if let Some(app_data) = std::env::var_os("APPDATA") {
-                return PathBuf::from(app_data)
-                    .join("Block")
-                    .join("goose")
-                    .join("data");
-            }
+            std::env::var_os("APPDATA")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir().join("AppData").join("Roaming"))
+                .join("Block")
+                .join("goose")
+                .join("data")
         }
         #[cfg(target_os = "macos")]
         {
@@ -149,9 +149,10 @@ pub fn zed_data_dir() -> PathBuf {
     directory_override_or("zed", || {
         #[cfg(target_os = "windows")]
         {
-            if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
-                return PathBuf::from(local_app_data).join("Zed");
-            }
+            std::env::var_os("LOCALAPPDATA")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home_dir().join("AppData").join("Local"))
+                .join("Zed")
         }
         #[cfg(target_os = "macos")]
         {
