@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
 import { sessionsApi } from "@/lib/api/sessions";
 import type { SessionMessage, SessionMeta } from "@/types";
-import { setHiddenSessionProviders, setSessionFixtures } from "../msw/state";
+import {
+  setHiddenSessionProviders,
+  setSession2mdDefaultExpansion,
+  setSessionFixtures,
+} from "../msw/state";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
@@ -263,7 +267,8 @@ describe("SessionManagerPage", () => {
     await waitFor(() => expect(exportButton).toBeDisabled());
   });
 
-  it("renders thinking, tool command, and tool output in grouped bubbles", async () => {
+  it("collapses thinking, tools, and system messages until opened", async () => {
+    const user = userEvent.setup();
     setSessionFixtures(
       [
         {
@@ -275,6 +280,11 @@ describe("SessionManagerPage", () => {
       ],
       {
         "dsh:/mock/dsh/detailed-session.jsonl": [
+          {
+            role: "system",
+            content: "hidden system instructions",
+            kind: "text",
+          },
           { role: "user", content: "run it", kind: "text" },
           { role: "assistant", content: "hidden thinking", kind: "reasoning" },
           { role: "assistant", content: "visible answer", kind: "text" },
@@ -298,14 +308,87 @@ describe("SessionManagerPage", () => {
 
     renderPage();
 
+    expect(await screen.findByText("visible answer")).toBeInTheDocument();
+    expect(screen.queryByText("hidden thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("$ ls -la")).not.toBeInTheDocument();
+    expect(screen.queryByText(/file-a\s+file-b/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("hidden system instructions"),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Thinking" }));
     expect(await screen.findByText("hidden thinking")).toBeInTheDocument();
-    expect(screen.getByText("visible answer")).toBeInTheDocument();
-    const command = screen.getByText("$ ls -la");
-    expect(command).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /sessionManager\.roleTool · bash/,
+      }),
+    );
+    const command = await screen.findByText("$ ls -la");
     const toolBubble = command.closest(".rounded-lg.border");
     expect(toolBubble).not.toHaveClass("bg-purple-500/5");
     expect(toolBubble).toHaveClass("bg-muted/40");
     expect(screen.getByText(/file-a\s+file-b/)).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.roleSystem" }),
+    );
+    expect(
+      await screen.findByText("hidden system instructions"),
+    ).toBeInTheDocument();
+  });
+
+  it("uses default expansion settings and allows manual collapse", async () => {
+    const user = userEvent.setup();
+    setSession2mdDefaultExpansion({
+      defaultExpandThinking: true,
+      defaultExpandTools: true,
+      defaultExpandSystem: true,
+    });
+    setSessionFixtures(
+      [
+        {
+          providerId: "dsh",
+          sessionId: "expanded-session",
+          title: "Expanded Session",
+          sourcePath: "/mock/dsh/expanded-session.jsonl",
+        },
+      ],
+      {
+        "dsh:/mock/dsh/expanded-session.jsonl": [
+          { role: "system", content: "system body", kind: "text" },
+          { role: "assistant", content: "reasoning body", kind: "reasoning" },
+          { role: "assistant", content: "answer body", kind: "text" },
+          {
+            role: "tool",
+            content: '{"command":"pwd"}',
+            kind: "toolCall",
+            toolCallId: "call-expanded",
+            toolName: "bash",
+          },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("system body")).toBeInTheDocument();
+    expect(screen.getByText("reasoning body")).toBeInTheDocument();
+    expect(screen.getByText("$ pwd")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Thinking" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: /sessionManager\.roleTool · bash/,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.roleSystem" }),
+    );
+
+    expect(screen.queryByText("system body")).not.toBeInTheDocument();
+    expect(screen.queryByText("reasoning body")).not.toBeInTheDocument();
+    expect(screen.queryByText("$ pwd")).not.toBeInTheDocument();
   });
 
   it("restores destructive controls without restoring terminal resume", async () => {

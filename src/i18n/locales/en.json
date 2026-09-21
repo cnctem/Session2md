@@ -1022,6 +1022,23 @@
       "clearAll": "Clear all",
       "saveFailed": "Failed to save agent visibility settings: {{error}}"
     },
+    "defaultExpansion": {
+      "title": "Default Expansion",
+      "description": "Choose which sections open automatically when viewing a session. Disabled sections start collapsed.",
+      "saveFailed": "Failed to save default expansion settings: {{error}}",
+      "expandThinking": {
+        "label": "Expand thinking by default",
+        "description": "Automatically open AI thinking content when viewing a session."
+      },
+      "expandTools": {
+        "label": "Expand tools by default",
+        "description": "Automatically open tool arguments and output when viewing a session."
+      },
+      "expandSystem": {
+        "label": "Expand system by default",
+        "description": "Automatically open system messages when viewing a session."
+      }
+    },
     "exportContent": {
       "title": "Markdown Export Content",
       "description": "By default only user messages and assistant text are exported. Additional execution details can be included.",

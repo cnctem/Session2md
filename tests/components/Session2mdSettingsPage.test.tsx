@@ -49,6 +49,23 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Choose visible agents",
             "sessionSettings.providerVisibility.selectAll": "Select all",
             "sessionSettings.providerVisibility.clearAll": "Clear all",
+            "sessionSettings.defaultExpansion.title": "Default Expansion",
+            "sessionSettings.defaultExpansion.description":
+              "Default expansion options",
+            "sessionSettings.defaultExpansion.saveFailed":
+              "Save expansion failed",
+            "sessionSettings.defaultExpansion.expandThinking.label":
+              "Expand thinking by default",
+            "sessionSettings.defaultExpansion.expandThinking.description":
+              "Expand thinking description",
+            "sessionSettings.defaultExpansion.expandTools.label":
+              "Expand tools by default",
+            "sessionSettings.defaultExpansion.expandTools.description":
+              "Expand tools description",
+            "sessionSettings.defaultExpansion.expandSystem.label":
+              "Expand system by default",
+            "sessionSettings.defaultExpansion.expandSystem.description":
+              "Expand system description",
             "sessionSettings.exportContent.title": "Markdown Export Content",
             "sessionSettings.exportContent.description": "Export options",
             "sessionSettings.exportContent.includeThinking.label":
@@ -114,6 +131,9 @@ const snapshot = {
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
+  defaultExpandThinking: false,
+  defaultExpandTools: false,
+  defaultExpandSystem: false,
   resolvedDirectories: Object.fromEntries(
     SESSION_DIRECTORY_IDS.map((id) => [id, `/home/mock/${id}`]),
   ) as Record<(typeof SESSION_DIRECTORY_IDS)[number], string>,
@@ -141,6 +161,9 @@ describe("Session2mdSettingsPage", () => {
       exportThinking: next.exportThinking,
       exportToolInputs: next.exportToolInputs,
       exportToolOutputs: next.exportToolOutputs,
+      defaultExpandThinking: next.defaultExpandThinking,
+      defaultExpandTools: next.defaultExpandTools,
+      defaultExpandSystem: next.defaultExpandSystem,
     }));
   });
 
@@ -189,6 +212,9 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
       }),
     );
   });
@@ -213,6 +239,9 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
       }),
     );
   });
@@ -228,6 +257,9 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
       }),
     );
 
@@ -239,6 +271,9 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
       }),
     );
   });
@@ -256,6 +291,31 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: true,
         exportToolInputs: false,
         exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
+      }),
+    );
+  });
+
+  it("saves default expansion options independently", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.click(
+      await screen.findByRole("switch", {
+        name: "Expand thinking by default",
+      }),
+    );
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
+        defaultExpandThinking: true,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
       }),
     );
   });
@@ -264,8 +324,13 @@ describe("Session2mdSettingsPage", () => {
     renderWithProviders(<Session2mdSettingsPage />);
 
     const exportTitle = await screen.findByText("Markdown Export Content");
+    const defaultExpansionTitle = screen.getByText("Default Expansion");
     const agentTitle = screen.getByText("Agent Visibility");
 
+    expect(
+      defaultExpansionTitle.compareDocumentPosition(exportTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       exportTitle.compareDocumentPosition(agentTitle) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -275,6 +340,12 @@ describe("Session2mdSettingsPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("switch", { name: /Include tool output/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Expand tools by default" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Expand system by default" }),
     ).toBeInTheDocument();
   });
 

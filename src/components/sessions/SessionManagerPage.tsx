@@ -225,21 +225,23 @@ export function SessionManagerPage() {
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
     null,
   );
-  const [expandedBlockKeys, setExpandedBlockKeys] = useState<
-    ReadonlySet<string>
-  >(() => new Set());
+  const [expandedBlockOverrides, setExpandedBlockOverrides] = useState<
+    ReadonlyMap<string, boolean>
+  >(() => new Map());
   const sessionListScrollRef = useRef<HTMLDivElement>(null);
   const messageListScrollRef = useRef<HTMLDivElement>(null);
   const activeMessageTimeoutRef = useRef<number | null>(null);
 
-  const toggleMessageBlock = useCallback((blockKey: string) => {
-    setExpandedBlockKeys((current) => {
-      const next = new Set(current);
-      if (next.has(blockKey)) next.delete(blockKey);
-      else next.add(blockKey);
-      return next;
-    });
-  }, []);
+  const toggleMessageBlock = useCallback(
+    (blockKey: string, expanded: boolean) => {
+      setExpandedBlockOverrides((current) => {
+        const next = new Map(current);
+        next.set(blockKey, expanded);
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -464,7 +466,7 @@ export function SessionManagerPage() {
   });
 
   useEffect(() => {
-    setExpandedBlockKeys(new Set());
+    setExpandedBlockOverrides(new Map());
     const scrollElement = messageListScrollRef.current?.closest<HTMLElement>(
       "[data-radix-scroll-area-viewport]",
     );
@@ -1383,7 +1385,20 @@ export function SessionManagerPage() {
                                   isActive={
                                     activeMessageIndex === virtualMessage.index
                                   }
-                                  expandedBlockKeys={expandedBlockKeys}
+                                  expandedBlockOverrides={
+                                    expandedBlockOverrides
+                                  }
+                                  defaultExpandThinking={
+                                    sessionSettings?.defaultExpandThinking ??
+                                    false
+                                  }
+                                  defaultExpandTools={
+                                    sessionSettings?.defaultExpandTools ?? false
+                                  }
+                                  defaultExpandSystem={
+                                    sessionSettings?.defaultExpandSystem ??
+                                    false
+                                  }
                                   searchQuery={search}
                                   onCopy={handleCopyMessage}
                                   onToggleBlock={toggleMessageBlock}

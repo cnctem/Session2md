@@ -6,6 +6,7 @@ import {
   FileText,
   FolderSearch,
   Loader2,
+  MessageSquareText,
   TerminalSquare,
   Undo2,
 } from "lucide-react";
@@ -124,6 +125,9 @@ export function Session2mdSettingsPage() {
         exportThinking: settings.exportThinking,
         exportToolInputs: settings.exportToolInputs,
         exportToolOutputs: settings.exportToolOutputs,
+        defaultExpandThinking: settings.defaultExpandThinking,
+        defaultExpandTools: settings.defaultExpandTools,
+        defaultExpandSystem: settings.defaultExpandSystem,
       });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setDrafts((current) => {
@@ -161,6 +165,9 @@ export function Session2mdSettingsPage() {
         exportThinking: settings.exportThinking,
         exportToolInputs: settings.exportToolInputs,
         exportToolOutputs: settings.exportToolOutputs,
+        defaultExpandThinking: settings.defaultExpandThinking,
+        defaultExpandTools: settings.defaultExpandTools,
+        defaultExpandSystem: settings.defaultExpandSystem,
       });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     } catch (error) {
@@ -204,11 +211,45 @@ export function Session2mdSettingsPage() {
         exportThinking: nextSettings.exportThinking,
         exportToolInputs: nextSettings.exportToolInputs,
         exportToolOutputs: nextSettings.exportToolOutputs,
+        defaultExpandThinking: nextSettings.defaultExpandThinking,
+        defaultExpandTools: nextSettings.defaultExpandTools,
+        defaultExpandSystem: nextSettings.defaultExpandSystem,
       });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
         t("sessionSettings.exportContent.saveFailed", {
+          error: String(error),
+        }),
+      );
+    }
+  };
+
+  const saveDefaultExpansionOption = async (
+    key: "defaultExpandThinking" | "defaultExpandTools" | "defaultExpandSystem",
+    value: boolean,
+  ) => {
+    if (!settings) return;
+
+    const previousSettings = settings;
+    const nextSettings = { ...settings, [key]: value };
+    queryClient.setQueryData(session2mdSettingsKey, nextSettings);
+
+    try {
+      await saveMutation.mutateAsync({
+        directoryOverrides: nextSettings.directoryOverrides,
+        hiddenProviders: nextSettings.hiddenProviders,
+        exportThinking: nextSettings.exportThinking,
+        exportToolInputs: nextSettings.exportToolInputs,
+        exportToolOutputs: nextSettings.exportToolOutputs,
+        defaultExpandThinking: nextSettings.defaultExpandThinking,
+        defaultExpandTools: nextSettings.defaultExpandTools,
+        defaultExpandSystem: nextSettings.defaultExpandSystem,
+      });
+    } catch (error) {
+      queryClient.setQueryData(session2mdSettingsKey, previousSettings);
+      toast.error(
+        t("sessionSettings.defaultExpansion.saveFailed", {
           error: String(error),
         }),
       );
@@ -262,6 +303,73 @@ export function Session2mdSettingsPage() {
             <TabsContent value="general" className="max-w-2xl space-y-8 py-6">
               <LanguageSettings value={language} onChange={changeLanguage} />
               <ThemeSettings />
+              <section className="space-y-5">
+                <header className="space-y-1">
+                  <h2 className="text-base font-semibold">
+                    {t("sessionSettings.defaultExpansion.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("sessionSettings.defaultExpansion.description")}
+                  </p>
+                </header>
+
+                <div className="space-y-3">
+                  <ToggleRow
+                    icon={<Brain className="size-4 text-blue-500" />}
+                    title={t(
+                      "sessionSettings.defaultExpansion.expandThinking.label",
+                    )}
+                    description={t(
+                      "sessionSettings.defaultExpansion.expandThinking.description",
+                    )}
+                    checked={settings.defaultExpandThinking}
+                    onCheckedChange={(value) =>
+                      void saveDefaultExpansionOption(
+                        "defaultExpandThinking",
+                        value,
+                      )
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={<TerminalSquare className="size-4 text-green-500" />}
+                    title={t(
+                      "sessionSettings.defaultExpansion.expandTools.label",
+                    )}
+                    description={t(
+                      "sessionSettings.defaultExpansion.expandTools.description",
+                    )}
+                    checked={settings.defaultExpandTools}
+                    onCheckedChange={(value) =>
+                      void saveDefaultExpansionOption(
+                        "defaultExpandTools",
+                        value,
+                      )
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={
+                      <MessageSquareText className="size-4 text-amber-500" />
+                    }
+                    title={t(
+                      "sessionSettings.defaultExpansion.expandSystem.label",
+                    )}
+                    description={t(
+                      "sessionSettings.defaultExpansion.expandSystem.description",
+                    )}
+                    checked={settings.defaultExpandSystem}
+                    onCheckedChange={(value) =>
+                      void saveDefaultExpansionOption(
+                        "defaultExpandSystem",
+                        value,
+                      )
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                </div>
+              </section>
+
               <section className="space-y-5">
                 <header className="space-y-1">
                   <h2 className="text-base font-semibold">

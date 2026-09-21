@@ -2,6 +2,7 @@ import { memo } from "react";
 import {
   Brain,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Copy,
   TerminalSquare,
@@ -33,8 +34,8 @@ const COLLAPSED_LENGTH = 1500;
 interface MessageTextBlockProps {
   blockKey: string;
   content: string;
-  expandedBlockKeys: ReadonlySet<string>;
-  onToggleBlock: (blockKey: string) => void;
+  expandedBlockOverrides: ReadonlyMap<string, boolean>;
+  onToggleBlock: (blockKey: string, expanded: boolean) => void;
   searchQuery?: string;
   className?: string;
 }
@@ -42,13 +43,13 @@ interface MessageTextBlockProps {
 function MessageTextBlock({
   blockKey,
   content,
-  expandedBlockKeys,
+  expandedBlockOverrides,
   onToggleBlock,
   searchQuery,
   className,
 }: MessageTextBlockProps) {
   const { t } = useTranslation();
-  const expanded = expandedBlockKeys.has(blockKey);
+  const expanded = expandedBlockOverrides.get(blockKey) ?? false;
   const isLong = content.length > COLLAPSE_THRESHOLD;
   const hasSearchMatch =
     isLong &&
@@ -76,7 +77,7 @@ function MessageTextBlock({
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => onToggleBlock(blockKey)}
+          onClick={() => onToggleBlock(blockKey, !expanded)}
           className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           {expanded ? (
@@ -108,16 +109,22 @@ const SectionDivider = () => <div className="my-3 border-t" />;
 interface SessionMessageItemProps {
   group: SessionMessageGroup;
   isActive: boolean;
-  expandedBlockKeys: ReadonlySet<string>;
+  expandedBlockOverrides: ReadonlyMap<string, boolean>;
+  defaultExpandThinking: boolean;
+  defaultExpandTools: boolean;
+  defaultExpandSystem: boolean;
   searchQuery?: string;
   onCopy: (content: string) => void;
-  onToggleBlock: (blockKey: string) => void;
+  onToggleBlock: (blockKey: string, expanded: boolean) => void;
 }
 
 export const SessionMessageItem = memo(function SessionMessageItem({
   group,
   isActive,
-  expandedBlockKeys,
+  expandedBlockOverrides,
+  defaultExpandThinking,
+  defaultExpandTools,
+  defaultExpandSystem,
   searchQuery,
   onCopy,
   onToggleBlock,
@@ -125,6 +132,8 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   const { t } = useTranslation();
   const role = group.role.toLowerCase();
   const isTool = group.kind === "tool";
+  const isSystem = role === "system";
+  const isOuterCollapsible = isTool || isSystem;
   const toolInput = isTool ? getToolInputDisplay(group) : null;
   const hasReasoning = Boolean(group.reasoning.trim());
   const hasContent = Boolean(group.content.trim());
@@ -134,6 +143,17 @@ export const SessionMessageItem = memo(function SessionMessageItem({
     group.toolName && group.toolName.toLowerCase() !== "unknown"
       ? group.toolName
       : null;
+  const outerBlockKey = isTool
+    ? `${group.id}:tool-section`
+    : `${group.id}:system-section`;
+  const outerDefaultExpanded = isTool
+    ? defaultExpandTools
+    : defaultExpandSystem;
+  const outerExpanded =
+    expandedBlockOverrides.get(outerBlockKey) ?? outerDefaultExpanded;
+  const reasoningBlockKey = `${group.id}:reasoning-section`;
+  const reasoningExpanded =
+    expandedBlockOverrides.get(reasoningBlockKey) ?? defaultExpandThinking;
 
   return (
     <div
@@ -165,75 +185,129 @@ export const SessionMessageItem = memo(function SessionMessageItem({
         </TooltipContent>
       </Tooltip>
 
-      <div className="flex items-center justify-between text-xs mb-1.5 pr-6">
-        <span className={cn("font-semibold", getRoleTone(group.role))}>
-          {isTool && toolName
-            ? `${getRoleLabel(group.role, t)} · ${toolName}`
-            : getRoleLabel(group.role, t)}
-        </span>
-        {group.ts && (
-          <span className="text-muted-foreground">
-            {formatTimestamp(group.ts)}
+      {isOuterCollapsible ? (
+        <button
+          type="button"
+          aria-expanded={outerExpanded}
+          onClick={() => onToggleBlock(outerBlockKey, !outerExpanded)}
+          className="mb-1.5 flex w-full items-center justify-between gap-3 pr-8 text-left text-xs"
+        >
+          <span
+            className={cn("min-w-0 font-semibold", getRoleTone(group.role))}
+          >
+            {isTool && toolName
+              ? `${getRoleLabel(group.role, t)} · ${toolName}`
+              : getRoleLabel(group.role, t)}
           </span>
-        )}
-      </div>
+          <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+            {outerExpanded ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
+            {group.ts && <span>{formatTimestamp(group.ts)}</span>}
+          </span>
+        </button>
+      ) : (
+        <div className="mb-1.5 flex items-center justify-between pr-6 text-xs">
+          <span className={cn("font-semibold", getRoleTone(group.role))}>
+            {getRoleLabel(group.role, t)}
+          </span>
+          {group.ts && (
+            <span className="text-muted-foreground">
+              {formatTimestamp(group.ts)}
+            </span>
+          )}
+        </div>
+      )}
 
       {isTool ? (
-        <>
-          {hasToolInput && toolInput && (
-            <div className="rounded-md bg-muted/60 p-2.5">
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <TerminalSquare className="size-3.5" />
-                {toolInput.language === "bash"
-                  ? t("sessionManager.toolCommand", {
-                      defaultValue: "调用命令",
-                    })
-                  : t("sessionManager.toolArguments", {
-                      defaultValue: "调用参数",
-                    })}
+        outerExpanded && (
+          <>
+            {hasToolInput && toolInput && (
+              <div className="rounded-md bg-muted/60 p-2.5">
+                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <TerminalSquare className="size-3.5" />
+                  {toolInput.language === "bash"
+                    ? t("sessionManager.toolCommand", {
+                        defaultValue: "调用命令",
+                      })
+                    : t("sessionManager.toolArguments", {
+                        defaultValue: "调用参数",
+                      })}
+                </div>
+                <MessageTextBlock
+                  blockKey={`${group.id}:tool-input`}
+                  content={
+                    toolInput.language === "bash"
+                      ? `$ ${toolInput.text}`
+                      : toolInput.text
+                  }
+                  expandedBlockOverrides={expandedBlockOverrides}
+                  onToggleBlock={onToggleBlock}
+                  searchQuery={searchQuery}
+                  className="font-mono text-xs"
+                />
               </div>
+            )}
+            {hasToolInput && hasToolOutput && <SectionDivider />}
+            {hasToolOutput && (
               <MessageTextBlock
-                blockKey={`${group.id}:tool-input`}
-                content={
-                  toolInput.language === "bash"
-                    ? `$ ${toolInput.text}`
-                    : toolInput.text
-                }
-                expandedBlockKeys={expandedBlockKeys}
+                blockKey={`${group.id}:tool-output`}
+                content={group.toolOutput ?? ""}
+                expandedBlockOverrides={expandedBlockOverrides}
                 onToggleBlock={onToggleBlock}
                 searchQuery={searchQuery}
                 className="font-mono text-xs"
               />
-            </div>
-          )}
-          {hasToolInput && hasToolOutput && <SectionDivider />}
-          {hasToolOutput && (
-            <MessageTextBlock
-              blockKey={`${group.id}:tool-output`}
-              content={group.toolOutput ?? ""}
-              expandedBlockKeys={expandedBlockKeys}
-              onToggleBlock={onToggleBlock}
-              searchQuery={searchQuery}
-              className="font-mono text-xs"
-            />
-          )}
-        </>
+            )}
+          </>
+        )
+      ) : isSystem ? (
+        outerExpanded &&
+        hasContent && (
+          <MessageTextBlock
+            blockKey={`${group.id}:system-content`}
+            content={group.content}
+            expandedBlockOverrides={expandedBlockOverrides}
+            onToggleBlock={onToggleBlock}
+            searchQuery={searchQuery}
+          />
+        )
       ) : (
         <>
           {hasReasoning && (
             <div className="rounded-md border border-blue-500/15 bg-blue-500/5 p-2.5">
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-                <Brain className="size-3.5" />
-                {t("sessionManager.thinking", { defaultValue: "Thinking" })}
-              </div>
-              <MessageTextBlock
-                blockKey={`${group.id}:reasoning`}
-                content={group.reasoning}
-                expandedBlockKeys={expandedBlockKeys}
-                onToggleBlock={onToggleBlock}
-                searchQuery={searchQuery}
-                className="text-muted-foreground"
-              />
+              <button
+                type="button"
+                aria-expanded={reasoningExpanded}
+                onClick={() =>
+                  onToggleBlock(reasoningBlockKey, !reasoningExpanded)
+                }
+                className="flex w-full items-center justify-between gap-3 text-left text-xs font-medium text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Brain className="size-3.5" />
+                  {t("sessionManager.thinking", { defaultValue: "Thinking" })}
+                </span>
+                {reasoningExpanded ? (
+                  <ChevronDown className="size-3.5" />
+                ) : (
+                  <ChevronRight className="size-3.5" />
+                )}
+              </button>
+              {reasoningExpanded && (
+                <div className="mt-1.5">
+                  <MessageTextBlock
+                    blockKey={`${group.id}:reasoning-content`}
+                    content={group.reasoning}
+                    expandedBlockOverrides={expandedBlockOverrides}
+                    onToggleBlock={onToggleBlock}
+                    searchQuery={searchQuery}
+                    className="text-muted-foreground"
+                  />
+                </div>
+              )}
             </div>
           )}
           {hasReasoning && hasContent && <SectionDivider />}
@@ -241,7 +315,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
             <MessageTextBlock
               blockKey={`${group.id}:content`}
               content={group.content}
-              expandedBlockKeys={expandedBlockKeys}
+              expandedBlockOverrides={expandedBlockOverrides}
               onToggleBlock={onToggleBlock}
               searchQuery={searchQuery}
             />

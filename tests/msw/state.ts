@@ -163,6 +163,9 @@ let session2mdSettingsState = {
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
+  defaultExpandThinking: false,
+  defaultExpandTools: false,
+  defaultExpandSystem: false,
 };
 let mcpConfigs: McpConfigState = {
   claude: {
@@ -231,6 +234,9 @@ export const resetProviderState = () => {
     exportThinking: false,
     exportToolInputs: false,
     exportToolOutputs: false,
+    defaultExpandThinking: false,
+    defaultExpandTools: false,
+    defaultExpandSystem: false,
   };
   settingsState = {
     showInTray: true,
@@ -454,6 +460,9 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
   exportThinking: session2mdSettingsState.exportThinking,
   exportToolInputs: session2mdSettingsState.exportToolInputs,
   exportToolOutputs: session2mdSettingsState.exportToolOutputs,
+  defaultExpandThinking: session2mdSettingsState.defaultExpandThinking,
+  defaultExpandTools: session2mdSettingsState.defaultExpandTools,
+  defaultExpandSystem: session2mdSettingsState.defaultExpandSystem,
   resolvedDirectories: Object.fromEntries(
     SESSION_PROVIDER_IDS.map((providerId) => [
       providerId,
@@ -468,6 +477,9 @@ export const saveSession2mdSettings = (settings: {
   exportThinking: boolean;
   exportToolInputs: boolean;
   exportToolOutputs: boolean;
+  defaultExpandThinking: boolean;
+  defaultExpandTools: boolean;
+  defaultExpandSystem: boolean;
 }) => {
   session2mdSettingsState = {
     directoryOverrides: deepClone(settings.directoryOverrides) as Record<
@@ -478,12 +490,26 @@ export const saveSession2mdSettings = (settings: {
     exportThinking: settings.exportThinking,
     exportToolInputs: settings.exportToolInputs,
     exportToolOutputs: settings.exportToolOutputs,
+    defaultExpandThinking: settings.defaultExpandThinking,
+    defaultExpandTools: settings.defaultExpandTools,
+    defaultExpandSystem: settings.defaultExpandSystem,
   };
   return getSession2mdSettings();
 };
 
 export const setHiddenSessionProviders = (providerIds: SessionProviderId[]) => {
   session2mdSettingsState.hiddenProviders = [...providerIds];
+};
+
+export const setSession2mdDefaultExpansion = (settings: {
+  defaultExpandThinking?: boolean;
+  defaultExpandTools?: boolean;
+  defaultExpandSystem?: boolean;
+}) => {
+  session2mdSettingsState = {
+    ...session2mdSettingsState,
+    ...settings,
+  };
 };
 
 export const setSessionFixtures = (

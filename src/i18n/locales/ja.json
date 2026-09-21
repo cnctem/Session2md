@@ -1022,6 +1022,23 @@
       "clearAll": "すべて解除",
       "saveFailed": "Agent の表示設定を保存できませんでした: {{error}}"
     },
+    "defaultExpansion": {
+      "title": "デフォルトで展開",
+      "description": "セッションを開いたときに自動展開する内容を設定します。無効なブロックは折りたたまれます。",
+      "saveFailed": "デフォルト展開設定を保存できませんでした: {{error}}",
+      "expandThinking": {
+        "label": "思考をデフォルトで展開",
+        "description": "セッションを開いたときに AI の思考内容を自動展開します。"
+      },
+      "expandTools": {
+        "label": "ツールをデフォルトで展開",
+        "description": "セッションを開いたときにツール引数と出力を自動展開します。"
+      },
+      "expandSystem": {
+        "label": "システムをデフォルトで展開",
+        "description": "セッションを開いたときにシステムメッセージを自動展開します。"
+      }
+    },
     "exportContent": {
       "title": "Markdown エクスポート内容",
       "description": "既定ではユーザーメッセージと AI の本文だけを出力します。必要に応じて実行記録を追加できます。",

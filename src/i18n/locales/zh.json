@@ -1022,6 +1022,23 @@
       "clearAll": "全部取消",
       "saveFailed": "保存 Agent 显示设置失败：{{error}}"
     },
+    "defaultExpansion": {
+      "title": "默认展开",
+      "description": "设置进入会话时默认展开的内容，关闭后对应区块保持收起。",
+      "saveFailed": "保存默认展开设置失败：{{error}}",
+      "expandThinking": {
+        "label": "默认展开思考",
+        "description": "进入会话时自动展开 AI 的思考内容。"
+      },
+      "expandTools": {
+        "label": "默认展开工具",
+        "description": "进入会话时自动展开工具调用参数和输出。"
+      },
+      "expandSystem": {
+        "label": "默认展开系统",
+        "description": "进入会话时自动展开系统消息。"
+      }
+    },
     "exportContent": {
       "title": "Markdown 导出内容",
       "description": "默认仅导出用户消息和 AI 正文，可按需附加更多执行记录。",

@@ -1023,6 +1023,23 @@
       "clearAll": "全部取消",
       "saveFailed": "儲存 Agent 顯示設定失敗：{{error}}"
     },
+    "defaultExpansion": {
+      "title": "預設展開",
+      "description": "設定進入工作階段時預設展開的內容，關閉後對應區塊會保持收合。",
+      "saveFailed": "儲存預設展開設定失敗：{{error}}",
+      "expandThinking": {
+        "label": "預設展開思考",
+        "description": "進入工作階段時自動展開 AI 的思考內容。"
+      },
+      "expandTools": {
+        "label": "預設展開工具",
+        "description": "進入工作階段時自動展開工具呼叫參數與輸出。"
+      },
+      "expandSystem": {
+        "label": "預設展開系統",
+        "description": "進入工作階段時自動展開系統訊息。"
+      }
+    },
     "exportContent": {
       "title": "Markdown 匯出內容",
       "description": "預設只匯出使用者訊息與 AI 正文，可依需求附加更多執行紀錄。",

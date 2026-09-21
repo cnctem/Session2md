@@ -44,6 +44,12 @@ pub struct Session2mdSettings {
     pub export_tool_inputs: bool,
     #[serde(default)]
     pub export_tool_outputs: bool,
+    #[serde(default)]
+    pub default_expand_thinking: bool,
+    #[serde(default)]
+    pub default_expand_tools: bool,
+    #[serde(default)]
+    pub default_expand_system: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,6 +60,9 @@ pub struct Session2mdSettingsSnapshot {
     pub export_thinking: bool,
     pub export_tool_inputs: bool,
     pub export_tool_outputs: bool,
+    pub default_expand_thinking: bool,
+    pub default_expand_tools: bool,
+    pub default_expand_system: bool,
     pub resolved_directories: BTreeMap<String, String>,
 }
 
@@ -113,6 +122,9 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
         export_thinking: settings.export_thinking,
         export_tool_inputs: settings.export_tool_inputs,
         export_tool_outputs: settings.export_tool_outputs,
+        default_expand_thinking: settings.default_expand_thinking,
+        default_expand_tools: settings.default_expand_tools,
+        default_expand_system: settings.default_expand_system,
         resolved_directories: crate::session_manager::paths::resolved_directories(),
     }
 }
@@ -214,5 +226,8 @@ mod tests {
         assert!(!settings.export_thinking);
         assert!(!settings.export_tool_inputs);
         assert!(!settings.export_tool_outputs);
+        assert!(!settings.default_expand_thinking);
+        assert!(!settings.default_expand_tools);
+        assert!(!settings.default_expand_system);
     }
 }
