@@ -394,7 +394,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          name: Session2md ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           draft: true
 
           body: |
@@ -411,7 +411,7 @@ jobs:
             - **Linux (ARM64)**: `Session2md-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
 
             ---
-            macOS 版本使用 AdHoc 签名。首次打开时，可能需要在 Finder 中右键点击应用并选择“打开”。
+            ### 更新内容
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
