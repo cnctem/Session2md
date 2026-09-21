@@ -92,6 +92,8 @@ Fehlerberichte und fokussierte Pull Requests sind willkommen. Bitte lesen Sie [C
 
 Unser Dank gilt den Maintainerinnen und Maintainer von CC Switch sowie allen [CC-Switch-Mitwirkenden](https://github.com/farion1231/cc-switch/graphs/contributors). Session2md baut auf der offenen Tauri-Architektur, den Anbieterintegrationen und den Grundlagen der Sitzungsverwaltung von CC Switch auf. Beiträge zum [Session2md-Repository](https://github.com/cnctem/Session2md) sind ebenfalls willkommen.
 
+Die Unterstützung von Session2md für das Lesen von Agent-Sitzungsprotokollen, einschließlich DeepSeek Harness, wurde unter Bezugnahme auf [Nwflower/dsh-chat-import](https://github.com/Nwflower/dsh-chat-import) implementiert. Wir danken den Autorinnen, Autoren und Mitwirkenden.
+
 ## Lizenz
 
 [MIT](LICENSE) © Jason Young

@@ -92,6 +92,8 @@ Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 Thank you to the CC Switch maintainers and all [CC Switch contributors](https://github.com/farion1231/cc-switch/graphs/contributors) for the original open-source Tauri architecture, provider integrations, and session-browser foundations on which Session2md builds. We also welcome contributions to the [Session2md repository](https://github.com/cnctem/Session2md).
 
+Session2md's support for reading Agent session histories, including DeepSeek Harness, was implemented with reference to [Nwflower/dsh-chat-import](https://github.com/Nwflower/dsh-chat-import). We thank its authors and contributors.
+
 ## License
 
 [MIT](LICENSE) © Jason Young

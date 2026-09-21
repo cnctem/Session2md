@@ -92,6 +92,8 @@ pnpm tauri build
 
 感谢 CC Switch 的维护者以及所有 [CC Switch 贡献者](https://github.com/farion1231/cc-switch/graphs/contributors)！Session2md 继承并延续了 CC Switch 的开源 Tauri 架构、供应商适配和会话浏览基础。也欢迎通过 [Session2md 仓库](https://github.com/cnctem/Session2md) 提交改进和贡献。
 
+Session2md 对 DeepSeek Harness 等 Agent 会话记录读取支持的实现参考了 [Nwflower/dsh-chat-import](https://github.com/Nwflower/dsh-chat-import)，在此感谢其作者与贡献者。
+
 ## 许可证
 
 [MIT](LICENSE) © Jason Young
