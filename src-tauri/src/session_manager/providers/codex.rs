@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::session_manager::{
     paths::{codex_dir, codex_state_db_paths, read_codex_config_text},
-    SessionMessage, SessionMeta,
+    SessionMessage, SessionMessageKind, SessionMeta,
 };
 
 use super::common::{messages_from_content, messages_from_parts, ContentPart};
@@ -207,6 +207,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open session file: {e}"))?;
     let reader = BufReader::new(file);
     let mut messages = Vec::new();
+    let mut tool_state = CodexToolState::default();
 
     for line in reader.lines() {
         let line = match line {
@@ -218,99 +219,398 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             Err(_) => continue,
         };
 
-        if value.get("type").and_then(Value::as_str) != Some("response_item") {
+        let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
+        let record_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+        let Some(payload) = value.get("payload") else {
             continue;
-        }
-
-        let payload = match value.get("payload") {
-            Some(payload) => payload,
-            None => continue,
         };
 
-        let payload_type = payload.get("type").and_then(Value::as_str).unwrap_or("");
-
-        // Codex uses separate payload types for tool interactions
-        let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-        match payload_type {
-            "message" => {
-                let role = payload
-                    .get("role")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown");
-                messages.extend(messages_from_content(
-                    role,
-                    payload.get("content").unwrap_or(&Value::Null),
-                    ts,
-                ));
-            }
-            "reasoning" => {
-                let mut parts = Vec::new();
-                if let Some(summary) = payload.get("summary") {
-                    parts.extend(super::common::normalize_content_parts(summary));
-                }
-                if let Some(content) = payload.get("content") {
-                    parts.extend(super::common::normalize_content_parts(content));
-                }
-                parts = parts
-                    .into_iter()
-                    .map(super::common::ContentPart::as_reasoning)
-                    .collect();
-                messages.extend(messages_from_parts("assistant", &parts, ts));
-            }
-            "function_call" | "custom_tool_call" | "tool_call" => {
-                let name = payload
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown");
-                let arguments = payload
-                    .get("arguments")
-                    .or_else(|| payload.get("input"))
-                    .map(|value| match value {
-                        Value::String(value) => value.clone(),
-                        _ => value.to_string(),
-                    })
-                    .unwrap_or_default();
-                messages.extend(messages_from_parts(
-                    "tool",
-                    &[ContentPart::tool_call_with_metadata(
-                        name,
-                        arguments,
-                        payload
-                            .get("call_id")
-                            .or_else(|| payload.get("callId"))
-                            .and_then(Value::as_str)
-                            .map(str::to_string),
-                    )],
-                    ts,
-                ));
-            }
-            "function_call_output" | "custom_tool_call_output" => {
-                let output = payload
-                    .get("output")
-                    .map(|value| match value {
-                        Value::String(value) => value.clone(),
-                        _ => value.to_string(),
-                    })
-                    .unwrap_or_default();
-                messages.extend(messages_from_parts(
-                    "tool",
-                    &[ContentPart::tool_result_with_metadata(
-                        output,
-                        payload
-                            .get("call_id")
-                            .or_else(|| payload.get("callId"))
-                            .and_then(Value::as_str)
-                            .map(str::to_string),
-                        None,
-                    )],
-                    ts,
-                ));
-            }
-            _ => {}
+        if record_type == "response_item" {
+            map_codex_response_item(&mut messages, &mut tool_state, payload, ts);
+        } else if record_type == "event_msg" {
+            map_codex_event_message(&mut messages, &mut tool_state, payload, ts);
         }
     }
 
     Ok(messages)
+}
+
+#[derive(Default)]
+struct CodexToolState {
+    call_indexes: HashMap<String, usize>,
+    result_indexes: HashMap<String, usize>,
+    actual_name_ids: HashSet<String>,
+}
+
+struct CodexToolEvent {
+    id: Option<String>,
+    name: String,
+    input: String,
+    output: Option<String>,
+    actual_name: bool,
+}
+
+fn map_codex_response_item(
+    messages: &mut Vec<SessionMessage>,
+    tool_state: &mut CodexToolState,
+    payload: &Value,
+    ts: Option<i64>,
+) {
+    let payload_type = payload.get("type").and_then(Value::as_str).unwrap_or("");
+    match payload_type {
+        "message" => {
+            let role = payload
+                .get("role")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            messages.extend(messages_from_content(
+                role,
+                payload.get("content").unwrap_or(&Value::Null),
+                ts,
+            ));
+        }
+        "reasoning" => {
+            let mut parts = Vec::new();
+            if let Some(summary) = payload.get("summary") {
+                parts.extend(super::common::normalize_content_parts(summary));
+            }
+            if let Some(content) = payload.get("content") {
+                parts.extend(super::common::normalize_content_parts(content));
+            }
+            parts = parts.into_iter().map(ContentPart::as_reasoning).collect();
+            messages.extend(messages_from_parts("assistant", &parts, ts));
+        }
+        "function_call" | "custom_tool_call" | "tool_call" => {
+            let name = payload
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let input = payload
+                .get("arguments")
+                .or_else(|| payload.get("input"))
+                .map(stringify_codex_value)
+                .unwrap_or_else(|| "{}".to_string());
+            upsert_codex_tool_call(
+                messages,
+                tool_state,
+                codex_call_id(payload),
+                name,
+                &input,
+                ts,
+                true,
+            );
+        }
+        "function_call_output" | "custom_tool_call_output" => {
+            let output = payload
+                .get("output")
+                .map(stringify_codex_value)
+                .unwrap_or_default();
+            upsert_codex_tool_result(
+                messages,
+                tool_state,
+                codex_call_id(payload),
+                &output,
+                None,
+                ts,
+            );
+        }
+        _ => {}
+    }
+}
+
+fn map_codex_event_message(
+    messages: &mut Vec<SessionMessage>,
+    tool_state: &mut CodexToolState,
+    payload: &Value,
+    ts: Option<i64>,
+) {
+    if payload.get("type").and_then(Value::as_str) != Some("item_completed") {
+        return;
+    }
+    let Some(item) = payload.get("item") else {
+        return;
+    };
+    let Some(event) = map_codex_event_item(item) else {
+        return;
+    };
+
+    upsert_codex_tool_call(
+        messages,
+        tool_state,
+        event.id.clone(),
+        &event.name,
+        &event.input,
+        ts,
+        event.actual_name,
+    );
+    if let Some(output) = event.output {
+        upsert_codex_tool_result(
+            messages,
+            tool_state,
+            event.id,
+            &output,
+            Some(event.name),
+            ts,
+        );
+    }
+}
+
+fn map_codex_event_item(item: &Value) -> Option<CodexToolEvent> {
+    let item_type = item.get("type").and_then(Value::as_str)?;
+    let id = codex_call_id(item);
+    match item_type {
+        "CommandExecution" => Some(CodexToolEvent {
+            id,
+            name: "exec_command".to_string(),
+            input: selected_json_string(
+                item,
+                &[
+                    "command",
+                    "cwd",
+                    "parsed_cmd",
+                    "source",
+                    "status",
+                    "exit_code",
+                ],
+            ),
+            output: command_execution_output(item),
+            actual_name: false,
+        }),
+        "FileChange" => Some(CodexToolEvent {
+            id,
+            name: "file_change".to_string(),
+            input: selected_json_string(item, &["changes", "status"]),
+            output: selected_text_output(item, &["stdout", "stderr"]),
+            actual_name: false,
+        }),
+        "WebSearch" => Some(CodexToolEvent {
+            id,
+            name: "web_search".to_string(),
+            input: item
+                .get("action")
+                .map(stringify_codex_value)
+                .or_else(|| item.get("query").map(stringify_codex_value))
+                .unwrap_or_else(|| "{}".to_string()),
+            output: None,
+            actual_name: true,
+        }),
+        "McpToolCall" => {
+            let server = item.get("server").and_then(Value::as_str).unwrap_or("mcp");
+            let tool = item
+                .get("tool")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            Some(CodexToolEvent {
+                id,
+                name: format!("mcp__{server}__{tool}"),
+                input: item
+                    .get("arguments")
+                    .map(stringify_codex_value)
+                    .unwrap_or_else(|| "{}".to_string()),
+                output: item.get("result").map(codex_result_text),
+                actual_name: true,
+            })
+        }
+        "CollabAgentToolCall" => Some(CodexToolEvent {
+            id,
+            name: item
+                .get("tool")
+                .and_then(Value::as_str)
+                .unwrap_or("collab_agent")
+                .to_string(),
+            input: selected_json_string(
+                item,
+                &["status", "sender_thread_id", "receiver_thread_ids"],
+            ),
+            output: None,
+            actual_name: true,
+        }),
+        "ImageView" => Some(CodexToolEvent {
+            id,
+            name: "view_image".to_string(),
+            input: selected_json_string(item, &["path"]),
+            output: None,
+            actual_name: true,
+        }),
+        _ => None,
+    }
+}
+
+fn upsert_codex_tool_call(
+    messages: &mut Vec<SessionMessage>,
+    state: &mut CodexToolState,
+    id: Option<String>,
+    name: &str,
+    input: &str,
+    ts: Option<i64>,
+    actual_name: bool,
+) {
+    if let Some(id) = id.as_deref() {
+        if let Some(index) = state.call_indexes.get(id).copied() {
+            let message = &mut messages[index];
+            if actual_name && !state.actual_name_ids.contains(id) {
+                message.tool_name = Some(name.to_string());
+                state.actual_name_ids.insert(id.to_string());
+            }
+            message.content = merge_tool_text(&message.content, input);
+            message.ts = message.ts.or(ts);
+            return;
+        }
+    }
+
+    let content = if input.trim().is_empty() {
+        "{}".to_string()
+    } else {
+        input.trim().to_string()
+    };
+    let message_index = messages.len();
+    messages.push(SessionMessage {
+        role: "tool".to_string(),
+        content,
+        kind: SessionMessageKind::ToolCall,
+        tool_call_id: id.clone(),
+        tool_name: Some(name.to_string()),
+        ts,
+    });
+    if let Some(id) = id {
+        if actual_name {
+            state.actual_name_ids.insert(id.clone());
+        }
+        state.call_indexes.insert(id, message_index);
+    }
+}
+
+fn upsert_codex_tool_result(
+    messages: &mut Vec<SessionMessage>,
+    state: &mut CodexToolState,
+    id: Option<String>,
+    output: &str,
+    tool_name: Option<String>,
+    ts: Option<i64>,
+) {
+    if output.trim().is_empty() {
+        return;
+    }
+    if let Some(id) = id.as_deref() {
+        if let Some(index) = state.result_indexes.get(id).copied() {
+            let message = &mut messages[index];
+            message.content = merge_tool_text(&message.content, output);
+            if message.tool_name.is_none() {
+                message.tool_name = tool_name;
+            }
+            message.ts = message.ts.or(ts);
+            return;
+        }
+    }
+
+    let message_index = messages.len();
+    messages.push(SessionMessage {
+        role: "tool".to_string(),
+        content: output.trim().to_string(),
+        kind: SessionMessageKind::ToolResult,
+        tool_call_id: id.clone(),
+        tool_name,
+        ts,
+    });
+    if let Some(id) = id {
+        state.result_indexes.insert(id, message_index);
+    }
+}
+
+fn codex_call_id(value: &Value) -> Option<String> {
+    value
+        .get("call_id")
+        .or_else(|| value.get("callId"))
+        .or_else(|| value.get("id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn stringify_codex_value(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        _ => serde_json::to_string_pretty(value).unwrap_or_default(),
+    }
+}
+
+fn selected_json_string(value: &Value, keys: &[&str]) -> String {
+    let mut selected = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) = value.get(*key) {
+            selected.insert((*key).to_string(), value.clone());
+        }
+    }
+    serde_json::to_string_pretty(&Value::Object(selected)).unwrap_or_else(|_| "{}".to_string())
+}
+
+fn command_execution_output(item: &Value) -> Option<String> {
+    for key in ["formatted_output", "aggregated_output", "stdout"] {
+        if let Some(output) = item
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|output| !output.is_empty())
+        {
+            return Some(output.to_string());
+        }
+    }
+    selected_text_output(item, &["stderr"])
+}
+
+fn selected_text_output(value: &Value, keys: &[&str]) -> Option<String> {
+    let output = keys
+        .iter()
+        .filter_map(|key| value.get(*key).and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    (!output.is_empty()).then_some(output)
+}
+
+fn codex_result_text(result: &Value) -> String {
+    if let Some(content) = result.get("content") {
+        let text = extract_text(content);
+        if !text.trim().is_empty() {
+            return text;
+        }
+    }
+    if let Some(text) = result.get("text").and_then(Value::as_str) {
+        return text.to_string();
+    }
+    stringify_codex_value(result)
+}
+
+fn merge_tool_text(existing: &str, incoming: &str) -> String {
+    let existing = existing.trim();
+    let incoming = incoming.trim();
+    if incoming.is_empty() || existing == incoming {
+        return existing.to_string();
+    }
+    if existing.is_empty() {
+        return incoming.to_string();
+    }
+    if existing.contains(incoming) {
+        return existing.to_string();
+    }
+    if incoming.contains(existing) {
+        return incoming.to_string();
+    }
+
+    if let (Ok(Value::Object(mut existing_object)), Ok(Value::Object(incoming_object))) = (
+        serde_json::from_str::<Value>(existing),
+        serde_json::from_str::<Value>(incoming),
+    ) {
+        for (key, value) in incoming_object {
+            existing_object.entry(key).or_insert(value);
+        }
+        return serde_json::to_string_pretty(&Value::Object(existing_object))
+            .unwrap_or_else(|_| format!("{existing}\n\n---\n\n{incoming}"));
+    }
+
+    format!("{existing}\n\n---\n\n{incoming}")
 }
 
 pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
@@ -1064,5 +1364,69 @@ mod tests {
         );
         assert_eq!(messages[2].tool_call_id.as_deref(), Some("custom_1"));
         assert_eq!(messages[2].content, "file.txt");
+    }
+
+    #[test]
+    fn load_messages_maps_structured_event_items_and_deduplicates_response_items() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"timestamp\":\"2026-09-21T10:00:00Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"function_call\",\"name\":\"exec\",\"arguments\":\"{\\\"cmd\\\":\\\"rg needle\\\"}\",\"call_id\":\"call-1\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:01Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"function_call_output\",\"call_id\":\"call-1\",\"output\":\"match\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:02Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"CommandExecution\",\"id\":\"call-1\",\"command\":[\"/bin/zsh\",\"-lc\",\"rg needle\"],\"cwd\":\"/tmp/project\",\"parsed_cmd\":[{\"type\":\"search\",\"query\":\"needle\"}],\"status\":\"completed\",\"exit_code\":0,\"aggregated_output\":\"match\"}}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:03Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"WebSearch\",\"id\":\"search-1\",\"query\":\"rust parser\",\"action\":{\"type\":\"search\",\"query\":\"rust parser\"}}}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:04Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"FileChange\",\"id\":\"edit-1\",\"changes\":{\"/tmp/project/src/main.rs\":{\"type\":\"update\",\"unified_diff\":\"@@ -1 +1 @@\\n-old\\n+new\"}},\"status\":\"completed\",\"stdout\":\"updated src/main.rs\"}}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:05Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"McpToolCall\",\"id\":\"mcp-1\",\"server\":\"figma\",\"tool\":\"get_screenshot\",\"arguments\":{\"nodeId\":\"1:2\"},\"status\":\"completed\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"screenshot ready\"}]}}}}\n"
+            ),
+        )
+        .expect("write session");
+
+        let messages = load_messages(&path).expect("load");
+        let tool_messages = messages
+            .iter()
+            .filter(|message| message.role == "tool")
+            .collect::<Vec<_>>();
+
+        assert_eq!(tool_messages.len(), 7);
+        assert_eq!(tool_messages[0].tool_name.as_deref(), Some("exec"));
+        assert_eq!(tool_messages[0].tool_call_id.as_deref(), Some("call-1"));
+        assert!(tool_messages[0].content.contains("rg needle"));
+        assert!(tool_messages[0].content.contains("parsed_cmd"));
+        assert_eq!(tool_messages[1].content, "match");
+
+        assert_eq!(tool_messages[2].tool_name.as_deref(), Some("web_search"));
+        assert!(tool_messages[2].content.contains("rust parser"));
+        assert_eq!(tool_messages[3].tool_name.as_deref(), Some("file_change"));
+        assert!(tool_messages[3].content.contains("unified_diff"));
+        assert_eq!(tool_messages[4].content, "updated src/main.rs");
+        assert_eq!(
+            tool_messages[5].tool_name.as_deref(),
+            Some("mcp__figma__get_screenshot")
+        );
+        assert_eq!(tool_messages[6].content, "screenshot ready");
+    }
+
+    #[test]
+    fn load_messages_uses_event_only_tool_calls_without_inventing_output() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"ImageView\",\"id\":\"image-1\",\"path\":\"/tmp/screenshot.png\"}}}\n",
+                "{\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"CollabAgentToolCall\",\"id\":\"agent-1\",\"tool\":\"wait\",\"status\":\"completed\",\"receiver_thread_ids\":[]}}}\n"
+            ),
+        )
+        .expect("write session");
+
+        let messages = load_messages(&path).expect("load");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].kind, SessionMessageKind::ToolCall);
+        assert_eq!(messages[0].tool_name.as_deref(), Some("view_image"));
+        assert!(messages[0].content.contains("screenshot.png"));
+        assert_eq!(messages[1].tool_name.as_deref(), Some("wait"));
+        assert!(messages[1].content.contains("completed"));
     }
 }

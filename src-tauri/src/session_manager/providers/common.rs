@@ -192,7 +192,7 @@ fn normalize_object_part(object: &serde_json::Map<String, Value>) -> Vec<Content
             .map(ContentPart::as_reasoning)
             .collect();
         }
-        "tool_use" | "toolCall" | "tool-call" | "toolRequest" | "function_call"
+        "tool_use" | "toolCall" | "tool-call" | "tool.call" | "toolRequest" | "function_call"
         | "custom_tool_call" | "function" | "ToolUse" => {
             return vec![ContentPart::tool_call_with_metadata(
                 tool_name(effective),
@@ -202,6 +202,7 @@ fn normalize_object_part(object: &serde_json::Map<String, Value>) -> Vec<Content
         }
         "tool_result"
         | "tool-result"
+        | "tool.result"
         | "toolResponse"
         | "function_call_output"
         | "custom_tool_call_output"
@@ -510,8 +511,10 @@ fn visible_item_text(item: &Value) -> Option<String> {
         | "tool-call"
         | "tool-result"
         | "toolCall"
+        | "tool.call"
         | "toolRequest"
         | "toolResponse"
+        | "tool.result"
         | "image"
         | "image_url"
         | "file"
@@ -728,5 +731,23 @@ mod tests {
         );
         assert_eq!(messages[2].tool_name.as_deref(), Some("read"));
         assert_eq!(messages[2].content, "{}");
+    }
+
+    #[test]
+    fn normalized_messages_map_dot_form_tool_events() {
+        let messages = messages_from_content(
+            "assistant",
+            &json!([
+                {"type": "tool.call", "name": "search", "args": {"query": "needle"}, "toolCallId": "call-1"},
+                {"type": "tool.result", "toolCallId": "call-1", "content": "found"}
+            ]),
+            None,
+        );
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].tool_name.as_deref(), Some("search"));
+        assert_eq!(messages[0].tool_call_id.as_deref(), Some("call-1"));
+        assert_eq!(messages[1].content, "found");
+        assert_eq!(messages[1].tool_call_id.as_deref(), Some("call-1"));
     }
 }

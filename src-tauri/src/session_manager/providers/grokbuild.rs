@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -5,7 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::session_manager::{paths::grok_dir, SessionMessage, SessionMeta};
+use crate::session_manager::{paths::grok_dir, SessionMessage, SessionMessageKind, SessionMeta};
 
 use super::common::{messages_from_parts, normalize_content_parts, ContentPart};
 use super::utils::{parse_timestamp_to_ms, truncate_summary, TITLE_MAX_CHARS};
@@ -30,6 +31,13 @@ struct GrokSessionSummary {
     updated_at: Option<Value>,
     #[serde(default)]
     last_active_at: Option<Value>,
+}
+
+#[derive(Clone)]
+struct GrokToolCompletion {
+    tool_name: Option<String>,
+    outcome: Option<String>,
+    duration_ms: Option<u64>,
 }
 
 pub fn session_roots() -> Vec<PathBuf> {
@@ -60,6 +68,9 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
         .map_err(|e| format!("Failed to open Grok Build chat history: {e}"))?;
     let reader = BufReader::new(file);
     let mut messages = Vec::new();
+    let completion_list = load_tool_completions(session_dir);
+    let completions = completion_list.iter().cloned().collect::<HashMap<_, _>>();
+    let mut seen_completions = HashSet::new();
 
     for line in reader.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<Value>(&line) else {
@@ -90,7 +101,12 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 }
             }
             "tool_result" => {
-                let content = value
+                let tool_call_id = value
+                    .get("tool_call_id")
+                    .or_else(|| value.get("toolCallId"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                let mut content = value
                     .get("content")
                     .map(|content| {
                         normalize_content_parts(content)
@@ -100,14 +116,20 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                             .join("\n")
                     })
                     .unwrap_or_default();
+                let completion = tool_call_id
+                    .as_deref()
+                    .and_then(|id| completions.get(id))
+                    .cloned();
+                if let Some(id) = tool_call_id.as_deref() {
+                    seen_completions.insert(id.to_string());
+                }
+                if let Some(completion) = completion.as_ref() {
+                    content = append_tool_completion(&content, completion);
+                }
                 parts.push(ContentPart::tool_result_with_metadata(
                     content,
-                    value
-                        .get("tool_call_id")
-                        .or_else(|| value.get("toolCallId"))
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                    None,
+                    tool_call_id,
+                    completion.and_then(|completion| completion.tool_name),
                 ));
             }
             "tool" => {
@@ -137,7 +159,86 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
         messages.extend(messages_from_parts(role, &parts, ts));
     }
 
+    for (id, completion) in completion_list {
+        if seen_completions.contains(&id) {
+            continue;
+        }
+        let content = append_tool_completion("", &completion);
+        if content.is_empty() {
+            continue;
+        }
+        messages.push(SessionMessage {
+            role: "tool".to_string(),
+            content,
+            kind: SessionMessageKind::ToolResult,
+            tool_call_id: Some(id),
+            tool_name: completion.tool_name,
+            ts: None,
+        });
+    }
+
     Ok(messages)
+}
+
+fn load_tool_completions(session_dir: &Path) -> Vec<(String, GrokToolCompletion)> {
+    let path = session_dir.join("events.jsonl");
+    let Ok(file) = File::open(path) else {
+        return Vec::new();
+    };
+    let reader = BufReader::new(file);
+    let mut completions = Vec::new();
+    for line in reader.lines().map_while(Result::ok) {
+        let Ok(value) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if value.get("type").and_then(Value::as_str) != Some("tool_completed") {
+            continue;
+        }
+        let Some(id) = value
+            .get("tool_call_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        else {
+            continue;
+        };
+        completions.push((
+            id.to_string(),
+            GrokToolCompletion {
+                tool_name: value
+                    .get("tool_name")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                outcome: value
+                    .get("outcome")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                duration_ms: value.get("duration_ms").and_then(Value::as_u64),
+            },
+        ));
+    }
+    completions
+}
+
+fn append_tool_completion(content: &str, completion: &GrokToolCompletion) -> String {
+    let mut metadata = Vec::new();
+    if let Some(outcome) = completion.outcome.as_deref() {
+        metadata.push(format!("status: {outcome}"));
+    }
+    if let Some(duration_ms) = completion.duration_ms {
+        metadata.push(format!("duration: {duration_ms} ms"));
+    }
+    if metadata.is_empty() {
+        return content.to_string();
+    }
+    let metadata = format!("[{}]", metadata.join(" · "));
+    if content.trim().is_empty() {
+        metadata
+    } else if content.contains(&metadata) {
+        content.to_string()
+    } else {
+        format!("{}\n\n{metadata}", content.trim())
+    }
 }
 
 pub fn delete_session(root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
@@ -284,7 +385,6 @@ mod tests {
             ),
         )
         .expect("write chat history");
-
         let messages = load_messages(&summary_path).expect("load messages");
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "user");
@@ -310,6 +410,11 @@ mod tests {
             ),
         )
         .expect("write chat history");
+        std::fs::write(
+            temp.path().join("events.jsonl"),
+            "{\"type\":\"tool_completed\",\"tool_name\":\"bash\",\"duration_ms\":7,\"outcome\":\"success\",\"tool_call_id\":\"call-1\"}\n",
+        )
+        .expect("write events");
 
         let messages = load_messages(&summary_path).expect("load messages");
         assert_eq!(messages.len(), 2);
@@ -325,6 +430,33 @@ mod tests {
             crate::session_manager::SessionMessageKind::ToolResult
         );
         assert_eq!(messages[1].tool_call_id.as_deref(), Some("call-1"));
-        assert_eq!(messages[1].content, "/tmp/project");
+        assert_eq!(messages[1].tool_name.as_deref(), Some("bash"));
+        assert!(messages[1].content.contains("/tmp/project"));
+        assert!(messages[1].content.contains("status: success"));
+        assert!(messages[1].content.contains("duration: 7 ms"));
+    }
+
+    #[test]
+    fn keeps_event_only_grok_tool_completions() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let summary_path = temp.path().join("summary.json");
+        std::fs::write(&summary_path, "{}").expect("write summary placeholder");
+        std::fs::write(temp.path().join("chat_history.jsonl"), "").expect("write chat history");
+        std::fs::write(
+            temp.path().join("events.jsonl"),
+            "{\"type\":\"tool_completed\",\"tool_name\":\"read_file\",\"duration_ms\":3,\"outcome\":\"success\",\"tool_call_id\":\"call-2\"}\n",
+        )
+        .expect("write events");
+
+        let messages = load_messages(&summary_path).expect("load messages");
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(messages[0].tool_name.as_deref(), Some("read_file"));
+        assert_eq!(messages[0].tool_call_id.as_deref(), Some("call-2"));
+        assert!(messages[0].content.contains("status: success"));
+        assert!(messages[0].content.contains("duration: 3 ms"));
     }
 }

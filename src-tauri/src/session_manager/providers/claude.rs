@@ -463,4 +463,29 @@ mod tests {
         let meta = parse_session(&path).unwrap();
         assert_eq!(meta.title.as_deref(), Some("帮我看看工作区的改动"));
     }
+
+    #[test]
+    fn load_messages_keeps_search_and_edit_tool_names() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-tools.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"tool-search\",\"name\":\"Grep\",\"input\":{\"pattern\":\"needle\"}},{\"type\":\"tool_use\",\"id\":\"tool-edit\",\"name\":\"Edit\",\"input\":{\"file_path\":\"a.txt\"}}]},\"timestamp\":\"2026-03-06T10:00:00Z\"}\n",
+                "{\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"tool-search\",\"content\":\"match\"},{\"type\":\"tool_result\",\"tool_use_id\":\"tool-edit\",\"content\":\"updated\"}]},\"timestamp\":\"2026-03-06T10:00:01Z\"}\n",
+            ),
+        )
+        .expect("write");
+
+        let messages = load_messages(&path).expect("load");
+        let calls = messages
+            .iter()
+            .filter(|message| message.kind == crate::session_manager::SessionMessageKind::ToolCall)
+            .collect::<Vec<_>>();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].tool_name.as_deref(), Some("Grep"));
+        assert_eq!(calls[1].tool_name.as_deref(), Some("Edit"));
+        assert!(calls[0].content.contains("needle"));
+        assert!(calls[1].content.contains("a.txt"));
+    }
 }

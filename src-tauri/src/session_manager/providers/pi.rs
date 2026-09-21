@@ -1182,4 +1182,24 @@ mod tests {
         assert_eq!(messages[0].tool_name.as_deref(), Some("read"));
         assert_eq!(messages[0].content, "contents");
     }
+
+    #[test]
+    fn assistant_content_maps_edit_and_search_tool_calls() {
+        let messages = pi_message_entries(
+            &serde_json::json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "toolCall", "name": "edit", "arguments": {"path": "a.txt"}},
+                    {"type": "toolCall", "name": "search", "arguments": {"query": "needle"}}
+                ]
+            }),
+            None,
+        );
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].tool_name.as_deref(), Some("edit"));
+        assert_eq!(messages[1].tool_name.as_deref(), Some("search"));
+        assert!(messages[0].content.contains("a.txt"));
+        assert!(messages[1].content.contains("needle"));
+    }
 }
