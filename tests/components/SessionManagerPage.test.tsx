@@ -212,7 +212,7 @@ describe("SessionManagerPage", () => {
             content: "# AGENTS.md instructions for /mock/codex",
           },
           { role: "user", content: "Keep this request" },
-          { role: "assistant", content: "[Tool: shell]\n[Tool: shell]" },
+          { role: "tool", content: "[Tool: shell]\n[Tool: shell]" },
           { role: "assistant", content: "Here is the answer." },
         ],
       },
@@ -277,6 +277,40 @@ describe("SessionManagerPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /resume/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides deletion controls for read-only providers", async () => {
+    setSessionFixtures(
+      [
+        {
+          providerId: "dsh",
+          sessionId: "dsh-session-1",
+          title: "DSH Session",
+          projectDir: "/mock/dsh",
+          lastActiveAt: 50,
+          sourcePath: "/mock/dsh/session.jsonl",
+          canDelete: false,
+        },
+      ],
+      {
+        "dsh:/mock/dsh/session.jsonl": [
+          { role: "user", content: "hello", ts: 50 },
+          { role: "assistant", content: "answer", ts: 51 },
+        ],
+      },
+    );
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /DSH Session/i }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "sessionManager.delete" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "sessionManager.manageBatchTooltip",
+      }),
     ).not.toBeInTheDocument();
   });
 

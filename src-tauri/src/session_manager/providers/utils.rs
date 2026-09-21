@@ -85,8 +85,24 @@ pub fn extract_text(content: &Value) -> String {
 fn extract_text_from_item(item: &Value) -> Option<String> {
     let item_type = item.get("type").and_then(Value::as_str).unwrap_or("");
 
+    if matches!(
+        item_type,
+        "thinking" | "Think" | "think" | "reasoning" | "reasoning_text" | "Thinking"
+    ) {
+        for key in ["thinking", "think", "reasoning", "text", "summary"] {
+            if let Some(text) = item.get(key).and_then(Value::as_str) {
+                if !text.trim().is_empty() {
+                    return Some(text.to_string());
+                }
+            }
+        }
+    }
+
     // Anthropic uses tool_use; Pi's assistant messages use toolCall.
-    if matches!(item_type, "tool_use" | "toolCall") {
+    if matches!(
+        item_type,
+        "tool_use" | "toolCall" | "tool-call" | "function_call" | "ToolUse"
+    ) {
         let name = item
             .get("name")
             .and_then(Value::as_str)

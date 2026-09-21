@@ -18,6 +18,23 @@ Session2md erkennt Sitzungen aus den folgenden lokal installierten Tools:
 - OpenClaw
 - Hermes
 - Pi
+- Cursor
+- Antigravity CLI
+- Reasonix
+- MiMo Code
+- ZCode
+- Kimi CLI / Kimi Code
+- Kilo Code
+- Qoder CLI
+- WorkBuddy
+- Qwen Work
+- Continue
+- Cline
+- Goose
+- Zed
+- Crush
+- TeleAgent
+- DeepSeek Harness
 
 Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 
@@ -32,7 +49,7 @@ Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 
 Session2md liest die lokalen Sitzungsdaten der jeweiligen Tools direkt ein. Die App verbindet sich nicht mit CC Switch, startet keinen Proxy, lädt keine Gesprächsinhalte hoch und startet bzw. setzt keine CLI-Sitzung fort. Ein angezeigter Wiederaufnahmebefehl wird nur auf ausdrückliche Nutzeraktion in die Zwischenablage kopiert.
 
-Das Löschen ist eine bestätigungspflichtige, destruktive Aktion. Nach der Bestätigung verwendet Session2md eine anbieterspezifische Bereinigung und ändert die ausgewählte lokale Sitzungsdatei oder Datenbank. Gelöschte Sitzungen können von der App nicht wiederhergestellt werden; wichtige Daten sollten vorher gesichert werden. Sprache, Design und Verzeichnisüberschreibungen der App werden separat gespeichert. Beim Export wird ausschließlich die im nativen Speicherdialog ausgewählte Markdown-Datei geschrieben.
+Das Löschen ist nur für Anbieter verfügbar, die in der App als löschbar markiert sind, und ist eine bestätigungspflichtige, destruktive Aktion. Nach der Bestätigung verwendet Session2md eine anbieterspezifische Bereinigung und ändert die ausgewählte lokale Sitzungsdatei oder Datenbank. Gelöschte Sitzungen können von der App nicht wiederhergestellt werden; wichtige Daten sollten vorher gesichert werden. Sprache, Design und Verzeichnisüberschreibungen der App werden separat gespeichert. Beim Export wird ausschließlich die im nativen Speicherdialog ausgewählte Markdown-Datei geschrieben.
 
 ## Sitzungsverzeichnisse
 

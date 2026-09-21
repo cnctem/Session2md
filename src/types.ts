@@ -477,6 +477,7 @@ export interface SessionMeta {
   lastActiveAt?: number;
   sourcePath?: string;
   resumeCommand?: string;
+  canDelete?: boolean;
 }
 
 export interface SessionMessage {

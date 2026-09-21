@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::hermes_dir, SessionMessage, SessionMeta};
 
+use super::common::messages_from_content;
 use super::utils::{
     extract_text, parse_timestamp_to_ms, read_head_tail_lines, truncate_summary, TITLE_MAX_CHARS,
 };
@@ -142,6 +143,7 @@ fn sqlite_row_to_session_meta(row: &Value, db_source: &str) -> Option<SessionMet
         created_at: started_at,
         last_active_at: ended_at.or(started_at),
         source_path: Some(source_path),
+        can_delete: true,
         resume_command: None,
     })
 }
@@ -416,6 +418,7 @@ fn parse_jsonl_session(path: &Path) -> Option<SessionMeta> {
         created_at: first_ts,
         last_active_at: last_ts.or(first_ts),
         source_path: Some(source_path),
+        can_delete: true,
         resume_command: None,
     })
 }
@@ -460,17 +463,15 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             };
 
         let role = match role_val.and_then(Value::as_str) {
-            Some(r) => r.to_string(),
+            Some(r) => r,
             None => continue,
         };
-
-        let content = content_val.map(extract_text).unwrap_or_default();
-        if content.trim().is_empty() {
-            continue;
-        }
-
         let ts = ts_val.and_then(parse_timestamp_to_ms);
-        messages.push(SessionMessage { role, content, ts });
+        messages.extend(messages_from_content(
+            role,
+            content_val.unwrap_or(&Value::Null),
+            ts,
+        ));
     }
 
     Ok(messages)

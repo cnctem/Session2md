@@ -3,6 +3,7 @@ import {
   extractCodexPromptPreview,
   formatSessionMarkdown,
   formatSessionMessagePreview,
+  getRoleTone,
   getSessionMarkdownFileName,
   groupSessionsByProviderAndDirectory,
   shouldHideCodexMessageFromToc,
@@ -10,6 +11,11 @@ import {
 import type { SessionMessage, SessionMeta } from "@/types";
 
 describe("session utils", () => {
+  it("uses green for user messages and blue for AI messages", () => {
+    expect(getRoleTone("user")).toContain("green");
+    expect(getRoleTone("assistant")).toContain("blue");
+  });
+
   it("extracts Codex VS Code prompts after the request marker", () => {
     const content = [
       "# Context from my IDE setup:",
@@ -121,9 +127,10 @@ describe("session utils", () => {
         role: "assistant",
         content: 'Here it is:\n\n```ts\nconsole.log("hello");\n```',
       },
-      { role: "assistant", content: "  [Tool: shell]  " },
-      { role: "assistant", content: "[Tool: bash]\n[Tool: bash]" },
-      { role: "assistant", content: "[Tool: bash]\nDone" },
+      { role: "tool", content: "  [Tool: shell]  " },
+      { role: "tool", content: "[Tool: bash]\n[Tool: bash]" },
+      { role: "tool", content: "[Tool: bash]" },
+      { role: "assistant", content: "Done" },
       { role: "assistant", content: "I ran [Tool: bash]\nDone" },
       { role: "tool", content: "Command completed" },
       { role: "USER", content: "Thanks" },
@@ -132,6 +139,7 @@ describe("session utils", () => {
     expect(formatSessionMarkdown(messages)).toBe(
       "## User\n\nBuild a greeting.\n\n" +
         '## Assistant\n\nHere it is:\n\n```ts\nconsole.log("hello");\n```\n\n' +
+        "## Assistant\n\nDone\n\n" +
         "## Assistant\n\nI ran [Tool: bash]\nDone\n\n" +
         "## User\n\nThanks\n",
     );
@@ -141,7 +149,7 @@ describe("session utils", () => {
     expect(
       formatSessionMarkdown([
         { role: "system", content: "Internal instructions" },
-        { role: "assistant", content: "[Tool: Read]\n[Tool: Read]" },
+        { role: "tool", content: "[Tool: Read]\n[Tool: Read]" },
         { role: "tool", content: "File contents" },
       ]),
     ).toBe("");

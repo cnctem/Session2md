@@ -7,7 +7,8 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::grok_dir, SessionMessage, SessionMeta};
 
-use super::utils::{extract_text, parse_timestamp_to_ms, truncate_summary, TITLE_MAX_CHARS};
+use super::common::messages_from_content;
+use super::utils::{parse_timestamp_to_ms, truncate_summary, TITLE_MAX_CHARS};
 
 #[derive(Debug, Deserialize)]
 struct GrokSessionInfo {
@@ -67,23 +68,18 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
         let kind = value.get("type").and_then(Value::as_str).unwrap_or("");
         let role = match kind {
             "system" | "user" | "assistant" | "tool" => kind,
-            // Reasoning records can contain encrypted/internal state and are not
-            // conversation messages shown by Grok's own history view.
+            "reasoning" => "assistant",
             _ => continue,
         };
-        let content = value.get("content").map(extract_text).unwrap_or_default();
-        if content.trim().is_empty() {
-            continue;
-        }
         let ts = value
             .get("timestamp")
             .or_else(|| value.get("ts"))
             .and_then(parse_timestamp_to_ms);
-        messages.push(SessionMessage {
-            role: role.to_string(),
-            content,
+        messages.extend(messages_from_content(
+            role,
+            value.get("content").unwrap_or(&Value::Null),
             ts,
-        });
+        ));
     }
 
     Ok(messages)
@@ -182,6 +178,7 @@ fn parse_summary(path: &Path) -> Option<SessionMeta> {
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        can_delete: true,
         resume_command: Some(format!("grok --resume {session_id}")),
     })
 }

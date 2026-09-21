@@ -15,6 +15,7 @@ use crate::session_manager::{
     SessionMessage, SessionMeta,
 };
 
+use super::common::{messages_from_content, messages_from_parts, ContentPart};
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
     TITLE_MAX_CHARS,
@@ -229,41 +230,61 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
         let payload_type = payload.get("type").and_then(Value::as_str).unwrap_or("");
 
         // Codex uses separate payload types for tool interactions
-        let (role, content) = match payload_type {
+        let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
+        match payload_type {
             "message" => {
                 let role = payload
                     .get("role")
                     .and_then(Value::as_str)
-                    .unwrap_or("unknown")
-                    .to_string();
-                let content = payload.get("content").map(extract_text).unwrap_or_default();
-                (role, content)
+                    .unwrap_or("unknown");
+                messages.extend(messages_from_content(
+                    role,
+                    payload.get("content").unwrap_or(&Value::Null),
+                    ts,
+                ));
             }
-            "function_call" => {
+            "reasoning" => {
+                let mut parts = Vec::new();
+                if let Some(summary) = payload.get("summary") {
+                    parts.extend(super::common::normalize_content_parts(summary));
+                }
+                if let Some(content) = payload.get("content") {
+                    parts.extend(super::common::normalize_content_parts(content));
+                }
+                messages.extend(messages_from_parts("assistant", &parts, ts));
+            }
+            "function_call" | "tool_call" => {
                 let name = payload
                     .get("name")
                     .and_then(Value::as_str)
                     .unwrap_or("unknown");
-                ("assistant".to_string(), format!("[Tool: {name}]"))
+                let arguments = payload
+                    .get("arguments")
+                    .or_else(|| payload.get("input"))
+                    .map(ToString::to_string)
+                    .unwrap_or_default();
+                messages.extend(messages_from_parts(
+                    "tool",
+                    &[ContentPart::tool_call(format!(
+                        "[Tool: {name}]\n{arguments}"
+                    ))],
+                    ts,
+                ));
             }
-            "function_call_output" => {
+            "function_call_output" | "custom_tool_call_output" => {
                 let output = payload
                     .get("output")
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string();
-                ("tool".to_string(), output)
+                messages.extend(messages_from_parts(
+                    "tool",
+                    &[ContentPart::tool_result(output)],
+                    ts,
+                ));
             }
-            _ => continue,
-        };
-
-        if content.trim().is_empty() {
-            continue;
+            _ => {}
         }
-
-        let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-
-        messages.push(SessionMessage { role, content, ts });
     }
 
     Ok(messages)
@@ -409,6 +430,7 @@ fn parse_session_with_titles(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        can_delete: true,
         resume_command: Some(format!("codex resume {session_id}")),
     })
 }
@@ -964,7 +986,7 @@ mod tests {
         assert_eq!(msgs[0].role, "user");
         assert_eq!(msgs[0].content, "list files");
 
-        assert_eq!(msgs[1].role, "assistant");
+        assert_eq!(msgs[1].role, "tool");
         assert!(msgs[1].content.contains("[Tool: shell]"));
 
         assert_eq!(msgs[2].role, "tool");

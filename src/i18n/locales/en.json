@@ -891,7 +891,24 @@
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
-    "pi": "Pi"
+    "pi": "Pi",
+    "cursor": "Cursor",
+    "antigravity": "Antigravity",
+    "reasonix": "Reasonix",
+    "mimocode": "MiMo Code",
+    "zcode": "ZCode",
+    "kimi": "Kimi",
+    "kilocode": "Kilo Code",
+    "qoder": "Qoder CLI",
+    "workbuddy": "WorkBuddy",
+    "qwen": "Qwen Work",
+    "continue": "Continue",
+    "cline": "Cline",
+    "goose": "Goose",
+    "zed": "Zed",
+    "crush": "Crush",
+    "teleagent": "TeleAgent",
+    "dsh": "DeepSeek"
   },
   "appSwitcher": {
     "more": "More apps"
@@ -1003,7 +1020,24 @@
       "opencode": "OpenCode data directory",
       "openclaw": "OpenClaw configuration directory",
       "hermes": "Hermes configuration directory",
-      "pi": "Pi configuration directory"
+      "pi": "Pi configuration directory",
+      "cursor": "Cursor directory",
+      "antigravity": "Antigravity CLI directory",
+      "reasonix": "Reasonix directory",
+      "mimocode": "MiMo Code directory",
+      "zcode": "ZCode directory",
+      "kimi": "Kimi directory",
+      "kilocode": "Kilo Code directory",
+      "qoder": "Qoder CLI directory",
+      "workbuddy": "WorkBuddy directory",
+      "qwen": "Qwen Work directory",
+      "continue": "Continue directory",
+      "cline": "Cline directory",
+      "goose": "Goose directory",
+      "zed": "Zed directory",
+      "crush": "Crush directory",
+      "teleagent": "TeleAgent directory",
+      "dsh": "DeepSeek Harness directory"
     }
   },
   "console": {

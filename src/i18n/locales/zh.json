@@ -891,7 +891,24 @@
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
-    "pi": "Pi"
+    "pi": "Pi",
+    "cursor": "Cursor",
+    "antigravity": "Antigravity",
+    "reasonix": "Reasonix",
+    "mimocode": "MiMo Code",
+    "zcode": "ZCode",
+    "kimi": "Kimi",
+    "kilocode": "Kilo Code",
+    "qoder": "Qoder CLI",
+    "workbuddy": "WorkBuddy",
+    "qwen": "Qwen Work",
+    "continue": "Continue",
+    "cline": "Cline",
+    "goose": "Goose",
+    "zed": "Zed",
+    "crush": "Crush",
+    "teleagent": "TeleAgent",
+    "dsh": "DeepSeek"
   },
   "appSwitcher": {
     "more": "更多应用"
@@ -1003,7 +1020,24 @@
       "opencode": "OpenCode 数据目录",
       "openclaw": "OpenClaw 配置目录",
       "hermes": "Hermes 配置目录",
-      "pi": "Pi 配置目录"
+      "pi": "Pi 配置目录",
+      "cursor": "Cursor 数据目录",
+      "antigravity": "Antigravity CLI 数据目录",
+      "reasonix": "Reasonix 数据目录",
+      "mimocode": "MiMo Code 数据目录",
+      "zcode": "ZCode 数据目录",
+      "kimi": "Kimi 数据目录",
+      "kilocode": "Kilo Code 数据目录",
+      "qoder": "Qoder CLI 数据目录",
+      "workbuddy": "WorkBuddy 数据目录",
+      "qwen": "Qwen Work 数据目录",
+      "continue": "Continue 数据目录",
+      "cline": "Cline 数据目录",
+      "goose": "Goose 数据目录",
+      "zed": "Zed 数据目录",
+      "crush": "Crush 数据目录",
+      "teleagent": "TeleAgent 数据目录",
+      "dsh": "DeepSeek Harness 数据目录"
     }
   },
   "console": {

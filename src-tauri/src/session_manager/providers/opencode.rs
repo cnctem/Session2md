@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::opencode_dir, SessionMessage, SessionMeta};
 
+use super::common::{messages_from_parts, normalize_content_parts, ContentPart};
 use super::utils::{parse_timestamp_to_ms, path_basename, truncate_summary};
 
 const PROVIDER_ID: &str = "opencode";
@@ -124,6 +125,16 @@ fn scan_sessions_sqlite() -> Vec<SessionMeta> {
     let mut sessions = Vec::new();
     for row in iter.flatten() {
         let (session_id, title, directory, created, updated) = row;
+        let message_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM message WHERE session_id = ?1",
+                [session_id.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        if message_count == 0 {
+            continue;
+        }
         let display_title = if title.is_empty() {
             path_basename(&directory)
         } else {
@@ -142,6 +153,7 @@ fn scan_sessions_sqlite() -> Vec<SessionMeta> {
             created_at: Some(created),
             last_active_at: Some(updated),
             source_path: Some(format!("sqlite:{db_display}:{session_id}")),
+            can_delete: true,
             resume_command: Some(format!("opencode -s {session_id}")),
         });
     }
@@ -162,8 +174,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let mut msg_files = Vec::new();
     collect_json_files(path, &mut msg_files);
 
-    // Parse all messages and collect (created_ts, message_id, role, parts_text)
-    let mut entries: Vec<(i64, String, String, String)> = Vec::new();
+    let mut entries = Vec::<(i64, String, Vec<ContentPart>)>::new();
 
     for msg_path in &msg_files {
         let data = match std::fs::read_to_string(msg_path) {
@@ -192,26 +203,23 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             .and_then(parse_timestamp_to_ms)
             .unwrap_or(0);
 
-        // Collect text parts from storage/part/{messageID}/
+        // Collect all conversational parts from storage/part/{messageID}/
         let part_dir = storage.join("part").join(&msg_id);
-        let text = collect_parts_text(&part_dir);
-        if text.trim().is_empty() {
+        let parts = collect_part_values(&part_dir);
+        let normalized_parts = normalize_content_parts(&Value::Array(parts));
+        if normalized_parts.is_empty() {
             continue;
         }
 
-        entries.push((created_ts, msg_id, role, text));
+        entries.push((created_ts, role, normalized_parts));
     }
 
     // Sort by created timestamp
-    entries.sort_by_key(|(ts, _, _, _)| *ts);
+    entries.sort_by_key(|(ts, _, _)| *ts);
 
     let messages = entries
         .into_iter()
-        .map(|(ts, _, role, content)| SessionMessage {
-            role,
-            content,
-            ts: if ts > 0 { Some(ts) } else { None },
-        })
+        .flat_map(|(ts, role, parts)| messages_from_parts(&role, &parts, (ts > 0).then_some(ts)))
         .collect();
 
     Ok(messages)
@@ -278,29 +286,25 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
             .unwrap_or("unknown")
             .to_string();
 
-        let mut texts = Vec::new();
-        if let Some(parts) = parts_map.get(&msg_id) {
-            for part_data in parts {
+        let mut parts = Vec::<ContentPart>::new();
+        if let Some(message_parts) = parts_map.get(&msg_id) {
+            for part_data in message_parts {
                 let part_value: Value = match serde_json::from_str(part_data) {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
-                if let Some(text) = extract_part_text(&part_value) {
-                    texts.push(text);
+                if part_value.get("type").and_then(Value::as_str) == Some("tool") {
+                    let name = part_value
+                        .get("tool")
+                        .and_then(Value::as_str)
+                        .unwrap_or("unknown");
+                    parts.push(ContentPart::tool_call(format!("[Tool: {name}]")));
+                } else {
+                    parts.extend(normalize_content_parts(&part_value));
                 }
             }
         }
-
-        let content = texts.join("\n");
-        if content.trim().is_empty() {
-            continue;
-        }
-
-        messages.push(SessionMessage {
-            role,
-            content,
-            ts: Some(ts),
-        });
+        messages.extend(messages_from_parts(&role, &parts, Some(ts)));
     }
 
     Ok(messages)
@@ -459,6 +463,7 @@ fn parse_session(storage: &Path, path: &Path) -> Option<SessionMeta> {
         created_at,
         last_active_at: updated_at.or(created_at),
         source_path: Some(source_path),
+        can_delete: true,
         resume_command: Some(format!("opencode -s {session_id}")),
     })
 }
@@ -559,6 +564,16 @@ fn collect_parts_text(part_dir: &Path) -> String {
     }
 
     texts.join("\n")
+}
+
+fn collect_part_values(part_dir: &Path) -> Vec<Value> {
+    let mut parts = Vec::new();
+    collect_json_files(part_dir, &mut parts);
+    parts
+        .into_iter()
+        .filter_map(|path| std::fs::read_to_string(path).ok())
+        .filter_map(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .collect()
 }
 
 fn collect_json_files(root: &Path, files: &mut Vec<PathBuf>) {
@@ -681,10 +696,16 @@ mod tests {
         .expect("write text part");
 
         let msgs = load_messages(&msg_dir).expect("load");
-        assert_eq!(msgs.len(), 1);
-        assert_eq!(msgs[0].role, "assistant");
-        assert!(msgs[0].content.contains("[Tool: bash]"));
-        assert!(msgs[0].content.contains("Here are the files."));
+        assert_eq!(msgs.len(), 3);
+        assert!(msgs
+            .iter()
+            .any(|message| message.role == "tool" && message.content.contains("[Tool: bash]")));
+        assert!(msgs
+            .iter()
+            .any(|message| message.role == "tool" && message.content.contains("file.txt")));
+        assert!(msgs.iter().any(|message| {
+            message.role == "assistant" && message.content.contains("Here are the files.")
+        }));
     }
 
     #[test]
@@ -778,6 +799,16 @@ mod tests {
             ("ses_2", "Named Session", "/tmp/project-b", 1_771_061_950_000_i64, 1_771_061_955_000_i64),
         )
         .expect("insert session 2");
+        conn.execute(
+            "INSERT INTO message (id, session_id, time_created, data) VALUES ('msg_1', 'ses_1', 1, '{\"role\":\"user\"}')",
+            [],
+        )
+        .expect("insert session 1 message");
+        conn.execute(
+            "INSERT INTO message (id, session_id, time_created, data) VALUES ('msg_2', 'ses_2', 2, '{\"role\":\"user\"}')",
+            [],
+        )
+        .expect("insert session 2 message");
         drop(conn);
 
         let sessions = scan_sessions_sqlite();
@@ -860,12 +891,14 @@ mod tests {
         let source = format!("sqlite:{}:ses_1", db_path.display());
         let messages = load_messages_sqlite(&source).expect("load sqlite messages");
 
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "user");
         assert_eq!(messages[0].content, "Hello");
         assert_eq!(messages[0].ts, Some(1000));
-        assert_eq!(messages[1].role, "assistant");
-        assert_eq!(messages[1].content, "[Tool: bash]\nDone");
-        assert_eq!(messages[1].ts, Some(2000));
+        assert_eq!(messages[1].role, "tool");
+        assert!(messages[1].content.contains("[Tool: bash]"));
+        assert_eq!(messages[2].role, "assistant");
+        assert_eq!(messages[2].content, "Done");
+        assert_eq!(messages[2].ts, Some(2000));
     }
 }

@@ -22,6 +22,7 @@ dirs = "5.0"
 log = "0.4"
 regex = "1.10"
 rusqlite = { version = "0.31", features = ["bundled"] }
+ruzstd = "0.8.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 tauri = { version = "2.8.2", features = ["image-png"] }
@@ -40,3 +41,7 @@ strip = "symbols"
 
 [dev-dependencies]
 tempfile = "3"
+
+[patch.crates-io]
+phf = { path = "vendor/phf" }
+phf_macros = { path = "vendor/phf_macros" }

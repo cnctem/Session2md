@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::session_manager::{SessionMessage, SessionMeta};
 
+use super::common::{messages_from_content, messages_from_parts, ContentPart};
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, truncate_summary, TITLE_MAX_CHARS,
 };
@@ -321,6 +322,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         created_at: header.timestamp,
         last_active_at: summary.last_active_at.or(header.timestamp),
         source_path: Some(source_path.clone()),
+        can_delete: true,
         resume_command: Some(format!("pi --session {}", shell_escape(&source_path))),
     })
 }
@@ -484,7 +486,7 @@ fn read_active_messages(path: &Path, tree: &SessionTree) -> Result<Vec<SessionMe
         match value.get("type").and_then(Value::as_str) {
             Some("session_info") => {}
             Some("message") => {
-                let Some((role, content)) = value.get("message").and_then(parse_message) else {
+                let Some(message) = value.get("message") else {
                     continue;
                 };
                 let timestamp = value
@@ -492,11 +494,7 @@ fn read_active_messages(path: &Path, tree: &SessionTree) -> Result<Vec<SessionMe
                     .and_then(|message| message.get("timestamp"))
                     .and_then(parse_timestamp_to_ms)
                     .or(entry_timestamp);
-                messages.push(SessionMessage {
-                    role,
-                    content,
-                    ts: timestamp,
-                });
+                messages.extend(pi_message_entries(message, timestamp));
             }
             Some("compaction") | Some("branch_summary") => {
                 push_system(
@@ -521,6 +519,46 @@ fn read_active_messages(path: &Path, tree: &SessionTree) -> Result<Vec<SessionMe
         }
     }
     Ok(messages)
+}
+
+fn pi_message_entries(message: &Value, ts: Option<i64>) -> Vec<SessionMessage> {
+    let Some(role) = message.get("role").and_then(Value::as_str) else {
+        return Vec::new();
+    };
+    match role {
+        "user" | "assistant" => {
+            messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts)
+        }
+        "toolResult" => {
+            messages_from_content("tool", message.get("content").unwrap_or(&Value::Null), ts)
+        }
+        "bashExecution" => messages_from_parts(
+            "tool",
+            &[ContentPart::tool_result(format!(
+                "$ {}\n{}",
+                message
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+                message
+                    .get("output")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+            ))],
+            ts,
+        ),
+        "branchSummary" | "compactionSummary" => messages_from_parts(
+            "system",
+            &[ContentPart::system(
+                message
+                    .get("summary")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            )],
+            ts,
+        ),
+        _ => Vec::new(),
+    }
 }
 
 fn push_system(messages: &mut Vec<SessionMessage>, content: &str, ts: Option<i64>) {

@@ -16,11 +16,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
-  SESSION_DIRECTORY_IDS,
   session2mdSettingsApi,
   type Session2mdSettings,
-  type SessionDirectoryId,
 } from "@/lib/api/session2mdSettings";
+import {
+  SESSION_DIRECTORY_IDS,
+  SESSION_DIRECTORY_LABEL_KEYS,
+  type SessionDirectoryId,
+} from "@/lib/sessionProviders";
 import {
   session2mdSettingsKey,
   useSession2mdSettingsQuery,
@@ -30,17 +33,6 @@ import i18n from "@/i18n";
 type LanguageOption = "zh" | "zh-TW" | "en" | "ja";
 
 const LANGUAGE_STORAGE_KEY = "session2md-language";
-
-const DIRECTORY_LABEL_KEYS: Record<SessionDirectoryId, string> = {
-  claude: "sessionSettings.directories.claude",
-  codex: "sessionSettings.directories.codex",
-  gemini: "sessionSettings.directories.gemini",
-  grokbuild: "sessionSettings.directories.grokbuild",
-  opencode: "sessionSettings.directories.opencode",
-  openclaw: "sessionSettings.directories.openclaw",
-  hermes: "sessionSettings.directories.hermes",
-  pi: "sessionSettings.directories.pi",
-};
 
 const asLanguageOption = (value: string): LanguageOption => {
   if (value === "zh" || value === "zh-TW" || value === "en" || value === "ja") {
@@ -188,7 +180,7 @@ export function Session2mdSettingsPage() {
                         className="text-sm font-medium"
                         htmlFor={`session-directory-${directoryId}`}
                       >
-                        {t(DIRECTORY_LABEL_KEYS[directoryId])}
+                        {t(SESSION_DIRECTORY_LABEL_KEYS[directoryId])}
                       </label>
                       <div className="flex items-center gap-2">
                         <Input

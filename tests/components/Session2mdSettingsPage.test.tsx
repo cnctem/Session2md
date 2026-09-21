@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SESSION_DIRECTORY_IDS } from "@/lib/sessionProviders";
 
 const settingsApiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock("react-i18next", async (importOriginal) => {
             "sessionSettings.directories.openclaw": "OpenClaw",
             "sessionSettings.directories.hermes": "Hermes",
             "sessionSettings.directories.pi": "Pi",
+            "sessionSettings.directories.dsh": "DeepSeek Harness",
             "sessionSettings.browseDirectory": "Choose directory",
             "sessionSettings.resetDirectory": "Restore default directory",
           }) as Record<string, string>
@@ -85,16 +87,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 const snapshot = {
   directoryOverrides: {},
-  resolvedDirectories: {
-    claude: "/home/mock/.claude",
-    codex: "/home/mock/.codex",
-    gemini: "/home/mock/.gemini",
-    grokbuild: "/home/mock/.grok",
-    opencode: "/home/mock/.local/share/opencode",
-    openclaw: "/home/mock/.openclaw",
-    hermes: "/home/mock/.hermes",
-    pi: "/home/mock/.pi",
-  },
+  resolvedDirectories: Object.fromEntries(
+    SESSION_DIRECTORY_IDS.map((id) => [id, `/home/mock/${id}`]),
+  ) as Record<(typeof SESSION_DIRECTORY_IDS)[number], string>,
 };
 
 const renderWithProviders = (ui: ReactNode) => {
@@ -160,6 +155,17 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
       }),
+    );
+  });
+
+  it("exposes the DeepSeek Harness source directory", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+    fireEvent.mouseDown(
+      await screen.findByRole("tab", { name: /Advanced|高级/ }),
+      { button: 0 },
+    );
+    expect(await screen.findByLabelText("DeepSeek Harness")).toHaveValue(
+      "/home/mock/dsh",
     );
   });
 });

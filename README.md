@@ -18,6 +18,23 @@ Session2md discovers sessions from these local tools:
 - OpenClaw
 - Hermes
 - Pi
+- Cursor
+- Antigravity CLI
+- Reasonix
+- MiMo Code
+- ZCode
+- Kimi CLI / Kimi Code
+- Kilo Code
+- Qoder CLI
+- WorkBuddy
+- Qwen Work
+- Continue
+- Cline
+- Goose
+- Zed
+- Crush
+- TeleAgent
+- DeepSeek Harness
 
 For each discovered session you can:
 
@@ -26,13 +43,13 @@ For each discovered session you can:
 - Filter by provider and switch between a flat list or provider/project-directory groups.
 - Copy the project directory, source path, or an available provider resume command.
 - Export the loaded conversation to a Markdown file through the native save dialog.
-- Delete one session or select multiple sessions, including whole provider or directory groups.
+- Delete supported legacy-provider sessions, or select multiple sessions and whole directory groups. Newly added read-only providers do not expose deletion.
 
 ## Data and safety
 
 Session2md reads the providers' local session stores. It does not connect to CC Switch, run a proxy, upload session content, or start/resume a CLI session. A displayed resume command is only copied to the clipboard when requested.
 
-Deletion is explicit and destructive. After confirmation, Session2md performs provider-specific cleanup in the selected local session file or database; deleted sessions cannot be recovered by the app. Back up important data before using deletion. The app also stores its own language, theme, and directory-override settings separately. Markdown export writes only the file chosen in the native save dialog.
+Deletion is available only for providers marked as deletable in the app and is explicit and destructive. After confirmation, Session2md performs provider-specific cleanup in the selected local session file or database; deleted sessions cannot be recovered by the app. Back up important data before using deletion. The app also stores its own language, theme, and directory-override settings separately. Markdown export writes only the file chosen in the native save dialog.
 
 ## Source directories
 

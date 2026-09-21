@@ -58,6 +58,158 @@ pub fn opencode_dir() -> PathBuf {
     })
 }
 
+pub fn cursor_dir() -> PathBuf {
+    directory_override_or("cursor", || home_dir().join(".cursor"))
+}
+
+pub fn antigravity_dir() -> PathBuf {
+    directory_override_or("antigravity", || {
+        home_dir().join(".gemini").join("antigravity-cli")
+    })
+}
+
+pub fn reasonix_dir() -> PathBuf {
+    directory_override_or("reasonix", || home_dir().join(".reasonix"))
+}
+
+pub fn mimocode_dir() -> PathBuf {
+    directory_override_or("mimocode", || xdg_data_home().join("mimocode"))
+}
+
+pub fn zcode_dir() -> PathBuf {
+    directory_override_or("zcode", || home_dir().join(".zcode"))
+}
+
+pub fn kimi_dir() -> PathBuf {
+    directory_override_or("kimi", || home_dir().join(".kimi-code"))
+}
+
+pub fn kilocode_dir() -> PathBuf {
+    directory_override_or("kilocode", || xdg_data_home().join("kilo"))
+}
+
+pub fn qoder_dir() -> PathBuf {
+    directory_override_or("qoder", || home_dir().join(".qoder"))
+}
+
+pub fn workbuddy_dir() -> PathBuf {
+    directory_override_or("workbuddy", || home_dir().join(".workbuddy"))
+}
+
+pub fn qwen_dir() -> PathBuf {
+    directory_override_or("qwen", || home_dir().join(".qwenworkcn"))
+}
+
+pub fn continue_dir() -> PathBuf {
+    directory_override_or("continue", || {
+        std::env::var_os("CONTINUE_GLOBAL_DIR")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir().join(".continue"))
+    })
+}
+
+pub fn cline_dir() -> PathBuf {
+    directory_override_or("cline", || home_dir().join(".cline"))
+}
+
+pub fn goose_data_dir() -> PathBuf {
+    directory_override_or("goose", || {
+        if let Some(root) = std::env::var_os("GOOSE_PATH_ROOT") {
+            let path = PathBuf::from(root);
+            if path.is_absolute() {
+                return path.join("data");
+            }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(app_data) = std::env::var_os("APPDATA") {
+                return PathBuf::from(app_data)
+                    .join("Block")
+                    .join("goose")
+                    .join("data");
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            home_dir()
+                .join("Library")
+                .join("Application Support")
+                .join("Block")
+                .join("goose")
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            home_dir().join(".local").join("share").join("goose")
+        }
+    })
+}
+
+pub fn zed_data_dir() -> PathBuf {
+    directory_override_or("zed", || {
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+                return PathBuf::from(local_app_data).join("Zed");
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            home_dir()
+                .join("Library")
+                .join("Application Support")
+                .join("Zed")
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            xdg_data_home().join("zed")
+        }
+    })
+}
+
+pub fn crush_data_dir() -> PathBuf {
+    directory_override_or("crush", || {
+        if let Some(root) = std::env::var_os("CRUSH_GLOBAL_DATA") {
+            let path = PathBuf::from(root);
+            if path.is_absolute() {
+                return path;
+            }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+                return PathBuf::from(local_app_data).join("crush");
+            }
+        }
+        xdg_data_home().join("crush")
+    })
+}
+
+pub fn teleagent_data_dir() -> PathBuf {
+    directory_override_or("teleagent", || {
+        std::env::var_os("TELEAGENT_HOME")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir().join(".local").join("share").join("TeleAgent"))
+    })
+}
+
+pub fn dsh_dir() -> PathBuf {
+    directory_override_or("dsh", || {
+        std::env::var_os("DSH_HOME")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home_dir().join(".dsh"))
+    })
+}
+
+fn xdg_data_home() -> PathBuf {
+    std::env::var_os("XDG_DATA_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".local").join("share"))
+}
+
 pub fn resolved_directories() -> BTreeMap<String, String> {
     BTreeMap::from([
         ("claude".to_string(), claude_dir().display().to_string()),
@@ -76,6 +228,32 @@ pub fn resolved_directories() -> BTreeMap<String, String> {
                 .display()
                 .to_string(),
         ),
+        ("cursor".to_string(), cursor_dir().display().to_string()),
+        (
+            "antigravity".to_string(),
+            antigravity_dir().display().to_string(),
+        ),
+        ("reasonix".to_string(), reasonix_dir().display().to_string()),
+        ("mimocode".to_string(), mimocode_dir().display().to_string()),
+        ("zcode".to_string(), zcode_dir().display().to_string()),
+        ("kimi".to_string(), kimi_dir().display().to_string()),
+        ("kilocode".to_string(), kilocode_dir().display().to_string()),
+        ("qoder".to_string(), qoder_dir().display().to_string()),
+        (
+            "workbuddy".to_string(),
+            workbuddy_dir().display().to_string(),
+        ),
+        ("qwen".to_string(), qwen_dir().display().to_string()),
+        ("continue".to_string(), continue_dir().display().to_string()),
+        ("cline".to_string(), cline_dir().display().to_string()),
+        ("goose".to_string(), goose_data_dir().display().to_string()),
+        ("zed".to_string(), zed_data_dir().display().to_string()),
+        ("crush".to_string(), crush_data_dir().display().to_string()),
+        (
+            "teleagent".to_string(),
+            teleagent_data_dir().display().to_string(),
+        ),
+        ("dsh".to_string(), dsh_dir().display().to_string()),
     ])
 }
 

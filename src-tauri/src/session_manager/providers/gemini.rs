@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::gemini_dir, SessionMessage, SessionMeta};
 
+use super::common::{messages_from_parts, ContentPart};
 use super::utils::{parse_timestamp_to_ms, truncate_summary};
 
 const PROVIDER_ID: &str = "gemini";
@@ -69,44 +70,40 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
         let role = match msg.get("type").and_then(Value::as_str) {
             Some("gemini") => "assistant",
             Some("user") => "user",
-            Some("info") | Some("error") => continue,
+            Some("info") | Some("error") => "system",
             Some(_) | None => continue,
         };
 
-        // Gemini content may be a plain string or an array of {text: ...} objects
-        let mut content = match msg.get("content") {
-            Some(Value::String(s)) => s.to_string(),
-            Some(Value::Array(items)) => items
-                .iter()
-                .filter_map(|item| item.get("text").and_then(Value::as_str))
-                .collect::<Vec<_>>()
-                .join("\n"),
-            _ => String::new(),
-        };
-
-        // Append tool call names from the optional toolCalls array
+        let mut parts = msg
+            .get("content")
+            .map(super::common::normalize_content_parts)
+            .unwrap_or_default();
+        if let Some(thoughts) = msg.get("thoughts") {
+            match thoughts {
+                Value::String(text) => parts.push(ContentPart::reasoning(text)),
+                Value::Array(_) | Value::Object(_) => {
+                    parts.extend(
+                        super::common::normalize_content_parts(thoughts)
+                            .into_iter()
+                            .map(|part| ContentPart::reasoning(part.content)),
+                    );
+                }
+                _ => {}
+            }
+        }
         if let Some(Value::Array(calls)) = msg.get("toolCalls") {
             for call in calls {
                 if let Some(name) = call.get("name").and_then(Value::as_str) {
-                    if !content.is_empty() {
-                        content.push('\n');
-                    }
-                    content.push_str(&format!("[Tool: {name}]"));
+                    let args = call
+                        .get("args")
+                        .map(ToString::to_string)
+                        .unwrap_or_default();
+                    parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{args}")));
                 }
             }
         }
-
-        if content.trim().is_empty() {
-            continue;
-        }
-
         let ts = msg.get("timestamp").and_then(parse_timestamp_to_ms);
-
-        result.push(SessionMessage {
-            role: role.to_string(),
-            content,
-            ts,
-        });
+        result.extend(messages_from_parts(role, &parts, ts));
     }
 
     Ok(result)
@@ -166,6 +163,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         created_at,
         last_active_at: last_active_at.or(created_at),
         source_path: Some(source_path),
+        can_delete: true,
         resume_command: Some(format!("gemini --resume {session_id}")),
     })
 }
@@ -194,11 +192,13 @@ mod tests {
         .expect("write");
 
         let msgs = load_messages(&path).expect("load");
-        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs.len(), 4);
         assert_eq!(msgs[0].role, "user");
         assert_eq!(msgs[0].content, "hello");
         assert_eq!(msgs[1].role, "assistant");
         assert_eq!(msgs[1].content, "world");
+        assert_eq!(msgs[2].role, "system");
+        assert_eq!(msgs[3].role, "system");
     }
 
     #[test]
@@ -218,11 +218,12 @@ mod tests {
         .expect("write");
 
         let msgs = load_messages(&path).expect("load");
-        assert_eq!(msgs.len(), 2);
-        assert_eq!(msgs[0].role, "assistant");
+        assert_eq!(msgs.len(), 3);
+        assert_eq!(msgs[0].role, "tool");
         assert!(msgs[0].content.contains("[Tool: web_search]"));
         assert_eq!(msgs[1].role, "assistant");
         assert!(msgs[1].content.contains("Here are the results."));
-        assert!(msgs[1].content.contains("[Tool: web_fetch]"));
+        assert_eq!(msgs[2].role, "tool");
+        assert!(msgs[2].content.contains("[Tool: web_fetch]"));
     }
 }

@@ -892,7 +892,24 @@
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
-    "pi": "Pi"
+    "pi": "Pi",
+    "cursor": "Cursor",
+    "antigravity": "Antigravity",
+    "reasonix": "Reasonix",
+    "mimocode": "MiMo Code",
+    "zcode": "ZCode",
+    "kimi": "Kimi",
+    "kilocode": "Kilo Code",
+    "qoder": "Qoder CLI",
+    "workbuddy": "WorkBuddy",
+    "qwen": "Qwen Work",
+    "continue": "Continue",
+    "cline": "Cline",
+    "goose": "Goose",
+    "zed": "Zed",
+    "crush": "Crush",
+    "teleagent": "TeleAgent",
+    "dsh": "DeepSeek"
   },
   "appSwitcher": {
     "more": "更多應用程式"
@@ -1004,7 +1021,24 @@
       "opencode": "OpenCode 資料目錄",
       "openclaw": "OpenClaw 設定目錄",
       "hermes": "Hermes 設定目錄",
-      "pi": "Pi 設定目錄"
+      "pi": "Pi 設定目錄",
+      "cursor": "Cursor 資料目錄",
+      "antigravity": "Antigravity CLI 資料目錄",
+      "reasonix": "Reasonix 資料目錄",
+      "mimocode": "MiMo Code 資料目錄",
+      "zcode": "ZCode 資料目錄",
+      "kimi": "Kimi 資料目錄",
+      "kilocode": "Kilo Code 資料目錄",
+      "qoder": "Qoder CLI 資料目錄",
+      "workbuddy": "WorkBuddy 資料目錄",
+      "qwen": "Qwen Work 資料目錄",
+      "continue": "Continue 資料目錄",
+      "cline": "Cline 資料目錄",
+      "goose": "Goose 資料目錄",
+      "zed": "Zed 資料目錄",
+      "crush": "Crush 資料目錄",
+      "teleagent": "TeleAgent 資料目錄",
+      "dsh": "DeepSeek Harness 資料目錄"
     }
   },
   "console": {

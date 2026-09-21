@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-pub const DIRECTORY_IDS: [&str; 8] = [
+pub const DIRECTORY_IDS: [&str; 25] = [
     "claude",
     "codex",
     "gemini",
@@ -12,6 +12,23 @@ pub const DIRECTORY_IDS: [&str; 8] = [
     "openclaw",
     "hermes",
     "pi",
+    "cursor",
+    "antigravity",
+    "reasonix",
+    "mimocode",
+    "zcode",
+    "kimi",
+    "kilocode",
+    "qoder",
+    "workbuddy",
+    "qwen",
+    "continue",
+    "cline",
+    "goose",
+    "zed",
+    "crush",
+    "teleagent",
+    "dsh",
 ];
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

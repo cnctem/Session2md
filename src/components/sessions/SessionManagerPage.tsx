@@ -51,6 +51,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { SessionMeta } from "@/types";
+import {
+  SESSION_PROVIDER_IDS,
+  type SessionProviderId,
+} from "@/lib/sessionProviders";
 import { SessionItem } from "./SessionItem";
 import { SessionMessageItem } from "./SessionMessageItem";
 import { SessionProviderIcon } from "./SessionProviderIcon";
@@ -70,16 +74,7 @@ import {
   shouldHideCodexMessageFromToc,
 } from "./utils";
 
-type ProviderFilter =
-  | "all"
-  | "codex"
-  | "grokbuild"
-  | "claude"
-  | "opencode"
-  | "openclaw"
-  | "gemini"
-  | "hermes"
-  | "pi";
+type ProviderFilter = "all" | SessionProviderId;
 
 type SessionListViewMode = "flat" | "grouped";
 
@@ -95,17 +90,10 @@ type GroupSelectionState = {
   selectableCount: number;
 };
 
-const PROVIDER_FILTERS: ProviderFilter[] = [
-  "all",
-  "codex",
-  "grokbuild",
-  "claude",
-  "opencode",
-  "openclaw",
-  "gemini",
-  "hermes",
-  "pi",
-];
+const PROVIDER_FILTERS: ProviderFilter[] = ["all", ...SESSION_PROVIDER_IDS];
+
+const isDeletableSession = (session: SessionMeta) =>
+  Boolean(session.sourcePath) && session.canDelete !== false;
 
 const LIST_VIEW_MODE_STORAGE_KEY = "session2md.sessionManager.listViewMode";
 const GROUP_EXPANSION_STORAGE_KEY =
@@ -348,14 +336,14 @@ export function SessionManagerPage() {
   };
 
   const deletableFilteredSessions = useMemo(
-    () => filteredSessions.filter((session) => Boolean(session.sourcePath)),
+    () => filteredSessions.filter(isDeletableSession),
     [filteredSessions],
   );
   const selectedDeletableSessions = useMemo(
     () =>
       sessions.filter(
         (session) =>
-          Boolean(session.sourcePath) &&
+          isDeletableSession(session) &&
           selectedSessionKeys.has(getSessionKey(session)),
       ),
     [selectedSessionKeys, sessions],
@@ -380,7 +368,7 @@ export function SessionManagerPage() {
   }, [deletableFilteredSessions, selectionMode]);
 
   const toggleSessionChecked = (session: SessionMeta, checked: boolean) => {
-    if (!session.sourcePath) return;
+    if (!isDeletableSession(session)) return;
     const key = getSessionKey(session);
     setSelectedSessionKeys((current) => {
       const next = new Set(current);
@@ -393,9 +381,7 @@ export function SessionManagerPage() {
   const getGroupSelectionState = (
     groupSessions: SessionMeta[],
   ): GroupSelectionState => {
-    const selectableSessions = groupSessions.filter((session) =>
-      Boolean(session.sourcePath),
-    );
+    const selectableSessions = groupSessions.filter(isDeletableSession);
     const selectedCount = selectableSessions.filter((session) =>
       selectedSessionKeys.has(getSessionKey(session)),
     ).length;
@@ -418,7 +404,7 @@ export function SessionManagerPage() {
     setSelectedSessionKeys((current) => {
       const next = new Set(current);
       groupSessions.forEach((session) => {
-        if (!session.sourcePath) return;
+        if (!isDeletableSession(session)) return;
         const key = getSessionKey(session);
         if (checked) next.add(key);
         else next.delete(key);
@@ -472,7 +458,7 @@ export function SessionManagerPage() {
     if (!deleteTargets?.length || isDeleting) return;
     const targets = deleteTargets.filter(
       (session): session is SessionMeta & { sourcePath: string } =>
-        Boolean(session.sourcePath),
+        isDeletableSession(session),
     );
     if (!targets.length) {
       setDeleteTargets(null);
@@ -614,7 +600,7 @@ export function SessionManagerPage() {
       isSelected={selectedKey === getSessionKey(session)}
       selectionMode={selectionMode}
       isChecked={selectedSessionKeys.has(getSessionKey(session))}
-      isCheckDisabled={!session.sourcePath || isDeleting}
+      isCheckDisabled={!isDeletableSession(session) || isDeleting}
       searchQuery={search}
       onSelect={setSelectedKey}
       onToggleChecked={(checked) => toggleSessionChecked(session, checked)}
@@ -1137,22 +1123,24 @@ export function SessionManagerPage() {
                         {t("sessionManager.exportTooltip")}
                       </TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          aria-label={t("sessionManager.delete")}
-                          onClick={() => setDeleteTargets([selectedSession])}
-                          disabled={!selectedSession.sourcePath || isDeleting}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t("sessionManager.deleteTooltip")}
-                      </TooltipContent>
-                    </Tooltip>
+                    {isDeletableSession(selectedSession) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            aria-label={t("sessionManager.delete")}
+                            onClick={() => setDeleteTargets([selectedSession])}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t("sessionManager.deleteTooltip")}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="flex min-h-0 flex-1 p-0">

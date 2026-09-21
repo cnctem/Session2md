@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::openclaw_dir, SessionMessage, SessionMeta};
 
+use super::common::messages_from_content;
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
     TITLE_MAX_CHARS,
@@ -101,18 +102,15 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
 
         // Map OpenClaw roles to our standard roles
         let role = match raw_role {
-            "toolResult" => "tool".to_string(),
-            other => other.to_string(),
+            "toolResult" => "tool",
+            other => other,
         };
-
-        let content = message.get("content").map(extract_text).unwrap_or_default();
-        if content.trim().is_empty() {
-            continue;
-        }
-
         let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-
-        messages.push(SessionMessage { role, content, ts });
+        messages.extend(messages_from_content(
+            role,
+            message.get("content").unwrap_or(&Value::Null),
+            ts,
+        ));
     }
 
     Ok(messages)
@@ -287,6 +285,7 @@ fn parse_session(
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        can_delete: true,
         resume_command: None,
     })
 }

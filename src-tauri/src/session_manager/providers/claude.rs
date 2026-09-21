@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::claude_dir, SessionMessage, SessionMeta};
 
+use super::common::messages_from_content;
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, read_head_tail_lines, truncate_summary,
     TITLE_MAX_CHARS,
@@ -52,33 +53,16 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             None => continue,
         };
 
-        let mut role = message
+        let role = message
             .get("role")
             .and_then(Value::as_str)
-            .unwrap_or("unknown")
-            .to_string();
-
-        // Claude wraps tool_result inside user messages; reclassify as "tool" role
-        if role == "user" {
-            if let Some(Value::Array(items)) = message.get("content") {
-                let all_tool_results = !items.is_empty()
-                    && items.iter().all(|item| {
-                        item.get("type").and_then(Value::as_str) == Some("tool_result")
-                    });
-                if all_tool_results {
-                    role = "tool".to_string();
-                }
-            }
-        }
-
-        let content = message.get("content").map(extract_text).unwrap_or_default();
-        if content.trim().is_empty() {
-            continue;
-        }
-
+            .unwrap_or("unknown");
         let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-
-        messages.push(SessionMessage { role, content, ts });
+        messages.extend(messages_from_content(
+            role,
+            message.get("content").unwrap_or(&Value::Null),
+            ts,
+        ));
     }
 
     Ok(messages)
@@ -253,6 +237,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         created_at,
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
+        can_delete: true,
         resume_command: Some(format!("claude --resume {session_id}")),
     })
 }
@@ -296,7 +281,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn load_messages_tool_use_shows_as_assistant() {
+    fn load_messages_tool_use_uses_tool_role() {
         let temp = tempdir().expect("tempdir");
         let path = temp.path().join("session.jsonl");
         std::fs::write(
@@ -310,7 +295,7 @@ mod tests {
 
         let msgs = load_messages(&path).expect("load");
         assert_eq!(msgs.len(), 2);
-        assert_eq!(msgs[0].role, "assistant");
+        assert_eq!(msgs[0].role, "tool");
         assert!(msgs[0].content.contains("[Tool: Write]"));
         assert_eq!(msgs[1].role, "tool");
         assert_eq!(msgs[1].content, "File written");
@@ -327,10 +312,11 @@ mod tests {
         .expect("write");
 
         let msgs = load_messages(&path).expect("load");
-        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0].role, "assistant");
         assert!(msgs[0].content.contains("Let me help."));
-        assert!(msgs[0].content.contains("[Tool: Read]"));
+        assert_eq!(msgs[1].role, "tool");
+        assert!(msgs[1].content.contains("[Tool: Read]"));
     }
 
     #[test]
@@ -344,9 +330,10 @@ mod tests {
         .expect("write");
 
         let msgs = load_messages(&path).expect("load");
-        assert_eq!(msgs.len(), 1);
-        assert_eq!(msgs[0].role, "user");
-        assert!(msgs[0].content.contains("Please continue"));
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].role, "tool");
+        assert_eq!(msgs[1].role, "user");
+        assert!(msgs[1].content.contains("Please continue"));
     }
 
     #[test]

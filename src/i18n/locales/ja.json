@@ -891,7 +891,24 @@
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
-    "pi": "Pi"
+    "pi": "Pi",
+    "cursor": "Cursor",
+    "antigravity": "Antigravity",
+    "reasonix": "Reasonix",
+    "mimocode": "MiMo Code",
+    "zcode": "ZCode",
+    "kimi": "Kimi",
+    "kilocode": "Kilo Code",
+    "qoder": "Qoder CLI",
+    "workbuddy": "WorkBuddy",
+    "qwen": "Qwen Work",
+    "continue": "Continue",
+    "cline": "Cline",
+    "goose": "Goose",
+    "zed": "Zed",
+    "crush": "Crush",
+    "teleagent": "TeleAgent",
+    "dsh": "DeepSeek"
   },
   "appSwitcher": {
     "more": "その他のアプリ"
@@ -1003,7 +1020,24 @@
       "opencode": "OpenCode データディレクトリ",
       "openclaw": "OpenClaw 設定ディレクトリ",
       "hermes": "Hermes 設定ディレクトリ",
-      "pi": "Pi 設定ディレクトリ"
+      "pi": "Pi 設定ディレクトリ",
+      "cursor": "Cursor データディレクトリ",
+      "antigravity": "Antigravity CLI データディレクトリ",
+      "reasonix": "Reasonix データディレクトリ",
+      "mimocode": "MiMo Code データディレクトリ",
+      "zcode": "ZCode データディレクトリ",
+      "kimi": "Kimi データディレクトリ",
+      "kilocode": "Kilo Code データディレクトリ",
+      "qoder": "Qoder CLI データディレクトリ",
+      "workbuddy": "WorkBuddy データディレクトリ",
+      "qwen": "Qwen Work データディレクトリ",
+      "continue": "Continue データディレクトリ",
+      "cline": "Cline データディレクトリ",
+      "goose": "Goose データディレクトリ",
+      "zed": "Zed データディレクトリ",
+      "crush": "Crush データディレクトリ",
+      "teleagent": "TeleAgent データディレクトリ",
+      "dsh": "DeepSeek Harness データディレクトリ"
     }
   },
   "console": {

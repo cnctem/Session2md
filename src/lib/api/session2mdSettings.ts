@@ -1,17 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
+import {
+  SESSION_DIRECTORY_IDS,
+  type SessionDirectoryId,
+} from "@/lib/sessionProviders";
 
-export const SESSION_DIRECTORY_IDS = [
-  "claude",
-  "codex",
-  "gemini",
-  "grokbuild",
-  "opencode",
-  "openclaw",
-  "hermes",
-  "pi",
-] as const;
-
-export type SessionDirectoryId = (typeof SESSION_DIRECTORY_IDS)[number];
+export { SESSION_DIRECTORY_IDS };
+export type { SessionDirectoryId };
 
 export interface Session2mdSettings {
   directoryOverrides: Partial<Record<SessionDirectoryId, string>>;

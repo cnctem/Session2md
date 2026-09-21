@@ -4,7 +4,6 @@ import type { SessionMessage, SessionMeta } from "@/types";
 
 const CODEX_IDE_CONTEXT_PREFIX = "# Context from my IDE setup:";
 const CODEX_REQUEST_MARKER = "my request for codex";
-const TOOL_MESSAGE_PREFIX = "[Tool:";
 export const UNKNOWN_PROJECT_DIR_KEY = "__unknown_project_dir__";
 
 export interface SessionDirectoryGroup {
@@ -121,8 +120,8 @@ export const getProviderLabel = (
 
 export const getRoleTone = (role: string) => {
   const normalized = role.toLowerCase();
-  if (normalized === "assistant") return "text-blue-500";
-  if (normalized === "user") return "text-emerald-500";
+  if (normalized === "assistant") return "text-blue-600 dark:text-blue-400";
+  if (normalized === "user") return "text-green-600 dark:text-green-400";
   if (normalized === "system") return "text-amber-500";
   if (normalized === "tool") return "text-purple-500";
   return "text-muted-foreground";
@@ -151,10 +150,7 @@ export const formatSessionMarkdown = (messages: SessionMessage[]) => {
     if (role !== "user" && role !== "assistant") return [];
 
     const content = message.content.trim();
-    if (
-      !content ||
-      (role === "assistant" && content.startsWith(TOOL_MESSAGE_PREFIX))
-    ) {
+    if (!content) {
       return [];
     }
 

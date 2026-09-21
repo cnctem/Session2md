@@ -13,6 +13,23 @@ const PROVIDER_BRAND_ICONS: Record<string, { icon: string; name: string }> = {
   openclaw: { icon: "openclaw", name: "OpenClaw" },
   opencode: { icon: "opencode", name: "OpenCode" },
   pi: { icon: "pi", name: "Pi" },
+  cursor: { icon: "cursor", name: "Cursor" },
+  antigravity: { icon: "antigravity", name: "Antigravity" },
+  reasonix: { icon: "reasonix", name: "Reasonix" },
+  mimocode: { icon: "mimocode", name: "MiMo Code" },
+  zcode: { icon: "zcode", name: "ZCode" },
+  kimi: { icon: "kimi", name: "Kimi" },
+  kilocode: { icon: "kilocode", name: "Kilo Code" },
+  qoder: { icon: "qoder", name: "Qoder CLI" },
+  workbuddy: { icon: "workbuddy", name: "WorkBuddy" },
+  qwen: { icon: "qwen", name: "Qwen Work" },
+  continue: { icon: "continue", name: "Continue" },
+  cline: { icon: "cline", name: "Cline" },
+  goose: { icon: "goose", name: "Goose" },
+  zed: { icon: "zed", name: "Zed" },
+  crush: { icon: "crush", name: "Crush" },
+  teleagent: { icon: "teleagent", name: "TeleAgent" },
+  dsh: { icon: "deepseek", name: "DeepSeek" },
 };
 
 interface SessionProviderIconProps {
