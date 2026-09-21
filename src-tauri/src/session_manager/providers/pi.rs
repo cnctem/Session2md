@@ -8,7 +8,9 @@ use serde_json::Value;
 
 use crate::session_manager::{SessionMessage, SessionMeta};
 
-use super::common::{messages_from_content, messages_from_parts, ContentPart};
+use super::common::{
+    messages_from_content, messages_from_parts, normalize_content_parts, ContentPart,
+};
 use super::utils::{
     extract_text, parse_timestamp_to_ms, path_basename, truncate_summary, TITLE_MAX_CHARS,
 };
@@ -530,21 +532,46 @@ fn pi_message_entries(message: &Value, ts: Option<i64>) -> Vec<SessionMessage> {
             messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts)
         }
         "toolResult" => {
-            messages_from_content("tool", message.get("content").unwrap_or(&Value::Null), ts)
+            let tool_call_id = message
+                .get("toolCallId")
+                .or_else(|| message.get("tool_call_id"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let tool_name = message
+                .get("toolName")
+                .or_else(|| message.get("tool_name"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let parts = normalize_content_parts(message.get("content").unwrap_or(&Value::Null))
+                .into_iter()
+                .map(|part| {
+                    ContentPart::tool_result_with_metadata(
+                        part.content,
+                        tool_call_id.clone(),
+                        tool_name.clone(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            messages_from_parts("tool", &parts, ts)
         }
         "bashExecution" => messages_from_parts(
             "tool",
-            &[ContentPart::tool_result(format!(
-                "$ {}\n{}",
-                message
-                    .get("command")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-                message
-                    .get("output")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-            ))],
+            &[
+                ContentPart::tool_call_with_metadata(
+                    "bash",
+                    message
+                        .get("command")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                    None,
+                ),
+                ContentPart::tool_result(
+                    message
+                        .get("output")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                ),
+            ],
             ts,
         ),
         "branchSummary" | "compactionSummary" => messages_from_parts(
@@ -562,13 +589,7 @@ fn pi_message_entries(message: &Value, ts: Option<i64>) -> Vec<SessionMessage> {
 }
 
 fn push_system(messages: &mut Vec<SessionMessage>, content: &str, ts: Option<i64>) {
-    if !content.trim().is_empty() {
-        messages.push(SessionMessage {
-            role: "system".to_string(),
-            content: content.to_string(),
-            ts,
-        });
-    }
+    super::push_message(messages, "system", content, ts);
 }
 
 fn parse_header(value: &Value) -> Result<SessionHeader, String> {
@@ -1115,5 +1136,50 @@ mod tests {
             SessionLayout::ProjectDirectories
         )
         .expect("delete project session"));
+    }
+
+    #[test]
+    fn bash_execution_keeps_command_and_output_separate() {
+        let messages = pi_message_entries(
+            &serde_json::json!({
+                "role": "bashExecution",
+                "command": "git status",
+                "output": "clean"
+            }),
+            None,
+        );
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(messages[0].tool_name.as_deref(), Some("bash"));
+        assert_eq!(messages[0].content, "git status");
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(messages[1].content, "clean");
+    }
+
+    #[test]
+    fn tool_results_keep_call_metadata() {
+        let messages = pi_message_entries(
+            &serde_json::json!({
+                "role": "toolResult",
+                "toolCallId": "tool-1",
+                "toolName": "read",
+                "content": [{"type": "text", "text": "contents"}]
+            }),
+            None,
+        );
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(messages[0].tool_call_id.as_deref(), Some("tool-1"));
+        assert_eq!(messages[0].tool_name.as_deref(), Some("read"));
+        assert_eq!(messages[0].content, "contents");
     }
 }

@@ -6,7 +6,9 @@ use serde_json::Value;
 
 use crate::session_manager::{paths, SessionMessage, SessionMeta};
 
-use super::common::{messages_from_content, read_json, walk_files};
+use super::common::{
+    messages_from_parts, normalize_content_parts, read_json, walk_files, ContentPart,
+};
 
 const PROVIDER_ID: &str = "continue";
 const MAX_SESSION_BYTES: u64 = 64 * 1024 * 1024;
@@ -44,13 +46,17 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 "user" | "assistant" => role,
                 _ => return None,
             };
-            let mut messages = messages_from_content(
-                normalized_role,
-                message.get("content").unwrap_or(&Value::Null),
-                None,
-            );
+            let mut parts = normalize_content_parts(message.get("content").unwrap_or(&Value::Null));
+            if role == "thinking" {
+                parts = parts.into_iter().map(ContentPart::as_reasoning).collect();
+            } else if normalized_role == "tool" {
+                parts = parts
+                    .into_iter()
+                    .map(|part| ContentPart::tool_result(part.content))
+                    .collect();
+            }
             if let Some(tool_calls) = message.get("toolCalls") {
-                messages.extend(messages_from_content("assistant", tool_calls, None));
+                parts.extend(normalize_content_parts(tool_calls));
             }
             if let Some(reasoning) = item
                 .get("reasoning")
@@ -58,13 +64,9 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 .and_then(Value::as_str)
                 .filter(|text| !text.trim().is_empty())
             {
-                messages.extend(messages_from_content(
-                    "assistant",
-                    &Value::String(reasoning.to_string()),
-                    None,
-                ));
+                parts.push(ContentPart::reasoning(reasoning));
             }
-            Some(messages)
+            Some(messages_from_parts(normalized_role, &parts, None))
         })
         .flatten()
         .collect())

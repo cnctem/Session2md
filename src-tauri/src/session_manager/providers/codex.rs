@@ -251,9 +251,13 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 if let Some(content) = payload.get("content") {
                     parts.extend(super::common::normalize_content_parts(content));
                 }
+                parts = parts
+                    .into_iter()
+                    .map(super::common::ContentPart::as_reasoning)
+                    .collect();
                 messages.extend(messages_from_parts("assistant", &parts, ts));
             }
-            "function_call" | "tool_call" => {
+            "function_call" | "custom_tool_call" | "tool_call" => {
                 let name = payload
                     .get("name")
                     .and_then(Value::as_str)
@@ -261,25 +265,44 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 let arguments = payload
                     .get("arguments")
                     .or_else(|| payload.get("input"))
-                    .map(ToString::to_string)
+                    .map(|value| match value {
+                        Value::String(value) => value.clone(),
+                        _ => value.to_string(),
+                    })
                     .unwrap_or_default();
                 messages.extend(messages_from_parts(
                     "tool",
-                    &[ContentPart::tool_call(format!(
-                        "[Tool: {name}]\n{arguments}"
-                    ))],
+                    &[ContentPart::tool_call_with_metadata(
+                        name,
+                        arguments,
+                        payload
+                            .get("call_id")
+                            .or_else(|| payload.get("callId"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    )],
                     ts,
                 ));
             }
             "function_call_output" | "custom_tool_call_output" => {
                 let output = payload
                     .get("output")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
+                    .map(|value| match value {
+                        Value::String(value) => value.clone(),
+                        _ => value.to_string(),
+                    })
+                    .unwrap_or_default();
                 messages.extend(messages_from_parts(
                     "tool",
-                    &[ContentPart::tool_result(output)],
+                    &[ContentPart::tool_result_with_metadata(
+                        output,
+                        payload
+                            .get("call_id")
+                            .or_else(|| payload.get("callId"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                        None,
+                    )],
                     ts,
                 ));
             }
@@ -987,12 +1010,59 @@ mod tests {
         assert_eq!(msgs[0].content, "list files");
 
         assert_eq!(msgs[1].role, "tool");
-        assert!(msgs[1].content.contains("[Tool: shell]"));
+        assert_eq!(
+            msgs[1].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(msgs[1].tool_name.as_deref(), Some("shell"));
+        assert_eq!(msgs[1].tool_call_id.as_deref(), Some("call_1"));
+        assert!(msgs[1].content.contains("ls"));
 
         assert_eq!(msgs[2].role, "tool");
+        assert_eq!(
+            msgs[2].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(msgs[2].tool_call_id.as_deref(), Some("call_1"));
         assert!(msgs[2].content.contains("file1.txt"));
 
         assert_eq!(msgs[3].role, "assistant");
         assert_eq!(msgs[3].content, "Done.");
+    }
+
+    #[test]
+    fn load_messages_keeps_custom_tool_calls_and_reasoning() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"response_item\",\"payload\":{\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"plan\"}]}}\n",
+                "{\"type\":\"response_item\",\"payload\":{\"type\":\"custom_tool_call\",\"name\":\"exec\",\"input\":\"{\\\"cmd\\\":[\\\"ls\\\"]}\",\"call_id\":\"custom_1\"}}\n",
+                "{\"type\":\"response_item\",\"payload\":{\"type\":\"custom_tool_call_output\",\"call_id\":\"custom_1\",\"output\":\"file.txt\"}}\n",
+            ),
+        )
+        .expect("write");
+
+        let messages = load_messages(&path).expect("load");
+        assert_eq!(messages.len(), 3);
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::Reasoning
+        );
+        assert_eq!(messages[0].content, "plan");
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(messages[1].tool_name.as_deref(), Some("exec"));
+        assert_eq!(messages[1].tool_call_id.as_deref(), Some("custom_1"));
+        assert!(messages[1].content.contains("ls"));
+        assert_eq!(
+            messages[2].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(messages[2].tool_call_id.as_deref(), Some("custom_1"));
+        assert_eq!(messages[2].content, "file.txt");
     }
 }

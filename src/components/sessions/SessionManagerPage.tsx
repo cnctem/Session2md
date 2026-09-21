@@ -60,6 +60,7 @@ import { SessionItem } from "./SessionItem";
 import { SessionMessageItem } from "./SessionMessageItem";
 import { SessionProviderIcon } from "./SessionProviderIcon";
 import { SessionTocDialog, SessionTocSidebar } from "./SessionToc";
+import { groupSessionMessages } from "./messageGroups";
 import {
   extractCodexPromptPreview,
   formatSessionMarkdown,
@@ -313,6 +314,10 @@ export function SessionManagerPage() {
       selectedSession?.sourcePath,
     );
   const isCodexSession = selectedSession?.providerId === "codex";
+  const messageGroups = useMemo(
+    () => groupSessionMessages(messages),
+    [messages],
+  );
   const exportMessages = useMemo(
     () =>
       isCodexSession
@@ -327,30 +332,40 @@ export function SessionManagerPage() {
     [isCodexSession, messages],
   );
   const sessionMarkdown = useMemo(
-    () => formatSessionMarkdown(exportMessages),
-    [exportMessages],
+    () =>
+      formatSessionMarkdown(exportMessages, {
+        includeThinking: sessionSettings?.exportThinking ?? false,
+        includeToolInputs: sessionSettings?.exportToolInputs ?? false,
+        includeToolOutputs: sessionSettings?.exportToolOutputs ?? false,
+      }),
+    [
+      exportMessages,
+      sessionSettings?.exportThinking,
+      sessionSettings?.exportToolInputs,
+      sessionSettings?.exportToolOutputs,
+    ],
   );
   const hasExportableMessages = sessionMarkdown.length > 0;
   const tocItems = useMemo(
     () =>
-      messages
-        .map((message, index) => ({ message, index }))
-        .filter(({ message }) => {
+      messageGroups
+        .map((group, index) => ({ group, index }))
+        .filter(({ group }) => {
           return (
-            message.role.toLowerCase() === "user" &&
-            !(isCodexSession && shouldHideCodexMessageFromToc(message.content))
+            group.role.toLowerCase() === "user" &&
+            !(isCodexSession && shouldHideCodexMessageFromToc(group.content))
           );
         })
-        .map(({ message, index }) => ({
+        .map(({ group, index }) => ({
           index,
           preview: formatSessionMessagePreview(
             isCodexSession
-              ? extractCodexPromptPreview(message.content)
-              : message.content,
+              ? extractCodexPromptPreview(group.content)
+              : group.content,
           ),
-          ts: message.ts,
+          ts: group.ts,
         })),
-    [isCodexSession, messages],
+    [isCodexSession, messageGroups],
   );
 
   const copyText = async (value: string, successMessage: string) => {
@@ -1177,21 +1192,21 @@ export function SessionManagerPage() {
                         <p className="p-4 text-center text-sm text-muted-foreground">
                           {t("sessionManager.loadingMessages")}
                         </p>
-                      ) : messages.length === 0 ? (
+                      ) : messageGroups.length === 0 ? (
                         <p className="p-4 text-center text-sm text-muted-foreground">
                           {t("sessionManager.emptySession")}
                         </p>
                       ) : (
-                        messages.map((message, index) => (
+                        messageGroups.map((group, index) => (
                           <div
-                            key={`${message.ts ?? ""}-${index}`}
+                            key={`${group.ts ?? ""}-${index}`}
                             ref={(node) => {
                               if (node) messageRefs.current.set(index, node);
                               else messageRefs.current.delete(index);
                             }}
                           >
                             <SessionMessageItem
-                              message={message}
+                              group={group}
                               isActive={activeMessageIndex === index}
                               searchQuery={search}
                               onCopy={(content) =>

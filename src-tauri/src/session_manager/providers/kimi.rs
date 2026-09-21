@@ -37,21 +37,16 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let wire = wire_path(path)?;
     let values = read_jsonl(&wire)?;
     let mut messages = visible_records(&values);
-    let loop_messages = loop_event_messages(&values);
-    if !messages.iter().any(|message| message.role == "assistant") {
-        messages.extend(
-            loop_messages
-                .iter()
-                .filter(|message| message.role == "assistant")
-                .cloned(),
-        );
-    }
-    if !messages.iter().any(|message| message.role == "tool") {
-        messages.extend(
-            loop_messages
-                .into_iter()
-                .filter(|message| message.role == "tool"),
-        );
+    for loop_message in loop_event_messages(&values) {
+        let duplicate = messages.iter().any(|message| {
+            message.role == loop_message.role
+                && message.kind == loop_message.kind
+                && message.content == loop_message.content
+                && message.tool_call_id == loop_message.tool_call_id
+        });
+        if !duplicate {
+            messages.push(loop_message);
+        }
     }
     Ok(messages)
 }
@@ -135,19 +130,54 @@ fn loop_event_messages(values: &[Value]) -> Vec<SessionMessage> {
                 }
             }
             Some("tool.call") => {
-                parts.push(ContentPart::tool_call(
+                let arguments = event
+                    .get("args")
+                    .map(|value| match value {
+                        Value::String(value) => value.clone(),
+                        _ => value.to_string(),
+                    })
+                    .or_else(|| {
+                        event
+                            .get("display")
+                            .and_then(|display| display.get("command"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                    })
+                    .unwrap_or_default();
+                parts.push(ContentPart::tool_call_with_metadata(
                     event
-                        .get("description")
+                        .get("name")
                         .and_then(Value::as_str)
-                        .unwrap_or(""),
+                        .unwrap_or("unknown"),
+                    arguments,
+                    event
+                        .get("toolCallId")
+                        .or_else(|| event.get("tool_call_id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                 ));
             }
             Some("tool.result") => {
-                parts.push(ContentPart::tool_result(
+                let result = event
+                    .get("result")
+                    .and_then(|result| result.get("output"))
+                    .or_else(|| event.get("result"))
+                    .map(|value| match value {
+                        Value::String(value) => value.clone(),
+                        _ => value.to_string(),
+                    })
+                    .unwrap_or_default();
+                parts.push(ContentPart::tool_result_with_metadata(
+                    result,
                     event
-                        .get("result")
-                        .map(ToString::to_string)
-                        .unwrap_or_default(),
+                        .get("toolCallId")
+                        .or_else(|| event.get("tool_call_id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    event
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                 ));
             }
             _ => {}
@@ -301,16 +331,54 @@ mod tests {
         )
         .expect("write");
         let messages = load_messages(root.path()).expect("messages");
+        assert_eq!(messages.len(), 5);
         assert!(messages.iter().any(|message| {
             message.role == "assistant"
-                && message.content.contains("reasoning")
-                && message.content.contains("answer")
+                && message.kind == crate::session_manager::SessionMessageKind::Reasoning
+                && message.content == "reasoning"
         }));
-        assert!(messages
-            .iter()
-            .any(|message| message.role == "tool" && message.content.contains("[Tool: read]")));
-        assert!(messages
-            .iter()
-            .any(|message| message.role == "tool" && message.content == "file contents"));
+        assert!(messages.iter().any(|message| {
+            message.role == "assistant"
+                && message.kind == crate::session_manager::SessionMessageKind::Text
+                && message.content == "answer"
+        }));
+        assert!(messages.iter().any(|message| {
+            message.role == "tool"
+                && message.kind == crate::session_manager::SessionMessageKind::ToolCall
+                && message.tool_name.as_deref() == Some("read")
+        }));
+        assert!(messages.iter().any(|message| {
+            message.role == "tool"
+                && message.kind == crate::session_manager::SessionMessageKind::ToolResult
+                && message.content == "file contents"
+        }));
+    }
+
+    #[test]
+    fn merges_loop_tool_calls_with_canonical_messages() {
+        let root = tempfile::tempdir().expect("root");
+        fs::write(
+            root.path().join("wire.jsonl"),
+            [
+                r#"{"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"answer"}]}}"#,
+                r#"{"type":"context.append_loop_event","event":{"type":"tool.call","name":"Bash","toolCallId":"call-1","args":{"command":"pwd"}}}"#,
+                r#"{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call-1","result":{"output":"/tmp"}}}"#,
+            ]
+            .join("\n"),
+        )
+        .expect("write");
+
+        let messages = load_messages(root.path()).expect("messages");
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::ToolCall
+                && message.tool_name.as_deref() == Some("Bash")
+                && message.tool_call_id.as_deref() == Some("call-1")
+                && message.content.contains("pwd")
+        }));
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::ToolResult
+                && message.tool_call_id.as_deref() == Some("call-1")
+                && message.content == "/tmp"
+        }));
     }
 }

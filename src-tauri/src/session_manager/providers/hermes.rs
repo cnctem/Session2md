@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::hermes_dir, SessionMessage, SessionMeta};
 
-use super::common::messages_from_content;
+use super::common::{messages_from_content, normalize_role};
 use super::utils::{
     extract_text, parse_timestamp_to_ms, read_head_tail_lines, truncate_summary, TITLE_MAX_CHARS,
 };
@@ -220,11 +220,15 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
             continue;
         }
         let ts_ms = ts.and_then(|v| parse_timestamp_to_ms(&Value::Number(v.into())));
-        messages.push(SessionMessage {
-            role,
-            content,
-            ts: ts_ms,
-        });
+        let content =
+            serde_json::from_str::<Value>(&content).unwrap_or_else(|_| Value::String(content));
+        let mut normalized = messages_from_content(&role, &content, ts_ms);
+        if normalize_role(&role) == "tool" {
+            for message in &mut normalized {
+                message.kind = crate::session_manager::SessionMessageKind::ToolResult;
+            }
+        }
+        messages.extend(normalized);
     }
 
     Ok(messages)

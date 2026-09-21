@@ -49,6 +49,20 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Choose visible agents",
             "sessionSettings.providerVisibility.selectAll": "Select all",
             "sessionSettings.providerVisibility.clearAll": "Clear all",
+            "sessionSettings.exportContent.title": "Markdown Export Content",
+            "sessionSettings.exportContent.description": "Export options",
+            "sessionSettings.exportContent.includeThinking.label":
+              "Include thinking",
+            "sessionSettings.exportContent.includeThinking.description":
+              "Include thinking description",
+            "sessionSettings.exportContent.includeToolInputs.label":
+              "Include tool arguments",
+            "sessionSettings.exportContent.includeToolInputs.description":
+              "Include arguments description",
+            "sessionSettings.exportContent.includeToolOutputs.label":
+              "Include tool output",
+            "sessionSettings.exportContent.includeToolOutputs.description":
+              "Include output description",
             "sessionSettings.directories.claude": "Claude",
             "sessionSettings.directories.codex": "Codex",
             "sessionSettings.directories.gemini": "Gemini",
@@ -97,6 +111,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 const snapshot = {
   directoryOverrides: {},
   hiddenProviders: [],
+  exportThinking: false,
+  exportToolInputs: false,
+  exportToolOutputs: false,
   resolvedDirectories: Object.fromEntries(
     SESSION_DIRECTORY_IDS.map((id) => [id, `/home/mock/${id}`]),
   ) as Record<(typeof SESSION_DIRECTORY_IDS)[number], string>,
@@ -121,6 +138,9 @@ describe("Session2mdSettingsPage", () => {
       ...snapshot,
       directoryOverrides: next.directoryOverrides,
       hiddenProviders: next.hiddenProviders,
+      exportThinking: next.exportThinking,
+      exportToolInputs: next.exportToolInputs,
+      exportToolOutputs: next.exportToolOutputs,
     }));
   });
 
@@ -166,6 +186,9 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: [],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
       }),
     );
   });
@@ -187,6 +210,9 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: ["codex"],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
       }),
     );
   });
@@ -199,6 +225,9 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [...SESSION_PROVIDER_IDS],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
       }),
     );
 
@@ -207,8 +236,46 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
       }),
     );
+  });
+
+  it("saves export content options independently", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.click(
+      await screen.findByRole("switch", { name: /Include thinking/ }),
+    );
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
+        exportThinking: true,
+        exportToolInputs: false,
+        exportToolOutputs: false,
+      }),
+    );
+  });
+
+  it("places export switches before agent visibility", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    const exportTitle = await screen.findByText("Markdown Export Content");
+    const agentTitle = screen.getByText("Agent Visibility");
+
+    expect(
+      exportTitle.compareDocumentPosition(agentTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("switch", { name: /Include tool arguments/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: /Include tool output/ }),
+    ).toBeInTheDocument();
   });
 
   it("exposes the DeepSeek Harness source directory", async () => {

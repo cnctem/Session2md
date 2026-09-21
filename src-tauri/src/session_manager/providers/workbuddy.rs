@@ -62,22 +62,28 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                 messages.extend(super::common::messages_from_parts("assistant", &parts, ts));
             }
             Some("function_call") => {
-                let content = value
+                let name = value
                     .get("name")
                     .and_then(Value::as_str)
-                    .map(|name| {
-                        format!(
-                            "[Tool: {name}]\n{}",
-                            value
-                                .get("arguments")
-                                .map(ToString::to_string)
-                                .unwrap_or_default()
-                        )
+                    .unwrap_or("unknown");
+                let arguments = value
+                    .get("arguments")
+                    .map(|value| match value {
+                        Value::String(value) => value.clone(),
+                        _ => value.to_string(),
                     })
                     .unwrap_or_default();
                 messages.extend(super::common::messages_from_parts(
                     "tool",
-                    &[ContentPart::tool_call(content)],
+                    &[ContentPart::tool_call_with_metadata(
+                        name,
+                        arguments,
+                        value
+                            .get("call_id")
+                            .or_else(|| value.get("callId"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    )],
                     ts,
                 ));
             }
@@ -88,7 +94,18 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                     .unwrap_or_default();
                 messages.extend(super::common::messages_from_parts(
                     "tool",
-                    &[ContentPart::tool_result(content)],
+                    &[ContentPart::tool_result_with_metadata(
+                        content,
+                        value
+                            .get("call_id")
+                            .or_else(|| value.get("callId"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                        value
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    )],
                     ts,
                 ));
             }

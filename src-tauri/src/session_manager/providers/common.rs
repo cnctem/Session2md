@@ -21,6 +21,8 @@ pub enum ContentPartKind {
 pub struct ContentPart {
     pub kind: ContentPartKind,
     pub content: String,
+    pub tool_call_id: Option<String>,
+    pub tool_name: Option<String>,
 }
 
 impl ContentPart {
@@ -28,6 +30,8 @@ impl ContentPart {
         Self {
             kind: ContentPartKind::Text,
             content: content.into(),
+            tool_call_id: None,
+            tool_name: None,
         }
     }
 
@@ -35,20 +39,38 @@ impl ContentPart {
         Self {
             kind: ContentPartKind::Reasoning,
             content: content.into(),
+            tool_call_id: None,
+            tool_name: None,
         }
     }
 
-    pub fn tool_call(content: impl Into<String>) -> Self {
+    pub fn tool_call_with_metadata(
+        tool_name: impl Into<String>,
+        content: impl Into<String>,
+        tool_call_id: Option<String>,
+    ) -> Self {
         Self {
             kind: ContentPartKind::ToolCall,
             content: content.into(),
+            tool_call_id,
+            tool_name: Some(tool_name.into()),
         }
     }
 
     pub fn tool_result(content: impl Into<String>) -> Self {
+        Self::tool_result_with_metadata(content, None, None)
+    }
+
+    pub fn tool_result_with_metadata(
+        content: impl Into<String>,
+        tool_call_id: Option<String>,
+        tool_name: Option<String>,
+    ) -> Self {
         Self {
             kind: ContentPartKind::ToolResult,
             content: content.into(),
+            tool_call_id,
+            tool_name,
         }
     }
 
@@ -56,6 +78,8 @@ impl ContentPart {
         Self {
             kind: ContentPartKind::System,
             content: content.into(),
+            tool_call_id: None,
+            tool_name: None,
         }
     }
 
@@ -63,7 +87,16 @@ impl ContentPart {
         Self {
             kind: ContentPartKind::Attachment,
             content: content.into(),
+            tool_call_id: None,
+            tool_name: None,
         }
+    }
+
+    pub fn as_reasoning(mut self) -> Self {
+        if self.kind == ContentPartKind::Text {
+            self.kind = ContentPartKind::Reasoning;
+        }
+        self
     }
 }
 
@@ -101,43 +134,34 @@ pub fn messages_from_parts(
     parts: &[ContentPart],
     ts: Option<i64>,
 ) -> Vec<crate::session_manager::SessionMessage> {
+    use crate::session_manager::SessionMessageKind;
+
     let source_role = normalize_role(source_role);
     let mut messages = Vec::new();
-    let mut text_buffer = Vec::<String>::new();
-
-    let flush_text = |messages: &mut Vec<crate::session_manager::SessionMessage>,
-                      text_buffer: &mut Vec<String>| {
-        if text_buffer.is_empty() {
-            return;
-        }
-        let content = text_buffer.join("\n\n");
-        text_buffer.clear();
-        super::push_message(messages, source_role, &content, ts);
-    };
 
     for part in parts {
-        match part.kind {
-            ContentPartKind::Text | ContentPartKind::Reasoning => {
-                if !part.content.trim().is_empty() {
-                    text_buffer.push(part.content.trim().to_string());
-                }
+        let (role, mut kind) = match part.kind {
+            ContentPartKind::Text | ContentPartKind::Attachment => {
+                (source_role, SessionMessageKind::Text)
             }
-            ContentPartKind::ToolCall | ContentPartKind::ToolResult => {
-                flush_text(&mut messages, &mut text_buffer);
-                super::push_message(&mut messages, "tool", &part.content, ts);
-            }
-            ContentPartKind::System => {
-                flush_text(&mut messages, &mut text_buffer);
-                super::push_message(&mut messages, "system", &part.content, ts);
-            }
-            ContentPartKind::Attachment => {
-                if !part.content.trim().is_empty() {
-                    text_buffer.push(part.content.trim().to_string());
-                }
-            }
+            ContentPartKind::Reasoning => (source_role, SessionMessageKind::Reasoning),
+            ContentPartKind::ToolCall => ("tool", SessionMessageKind::ToolCall),
+            ContentPartKind::ToolResult => ("tool", SessionMessageKind::ToolResult),
+            ContentPartKind::System => ("system", SessionMessageKind::Text),
+        };
+        if role == "tool" && matches!(kind, SessionMessageKind::Text) {
+            kind = SessionMessageKind::ToolResult;
         }
+        super::push_message_part(
+            &mut messages,
+            role,
+            &part.content,
+            kind,
+            ts,
+            part.tool_call_id.clone(),
+            part.tool_name.clone(),
+        );
     }
-    flush_text(&mut messages, &mut text_buffer);
     messages
 }
 
@@ -165,49 +189,56 @@ fn normalize_object_part(object: &serde_json::Map<String, Value>) -> Vec<Content
                 ],
             )
             .into_iter()
-            .map(|part| ContentPart::reasoning(part.content))
+            .map(ContentPart::as_reasoning)
             .collect();
         }
-        "tool_use" | "toolCall" | "tool-call" | "toolRequest" | "function_call" | "function"
-        | "ToolUse" => {
-            return vec![ContentPart::tool_call(format_tool_call(effective))];
+        "tool_use" | "toolCall" | "tool-call" | "toolRequest" | "function_call"
+        | "custom_tool_call" | "function" | "ToolUse" => {
+            return vec![ContentPart::tool_call_with_metadata(
+                tool_name(effective),
+                tool_arguments(effective),
+                tool_call_id(effective),
+            )];
         }
         "tool_result"
         | "tool-result"
         | "toolResponse"
         | "function_call_output"
+        | "custom_tool_call_output"
+        | "functionResponse"
+        | "function_response"
         | "tool_result_output"
         | "ToolResult" => {
-            return vec![ContentPart::tool_result(
-                value_text(
-                    effective
-                        .get("content")
-                        .or_else(|| effective.get("output"))
-                        .or_else(|| effective.get("value"))
-                        .or_else(|| effective.get("result")),
-                )
-                .unwrap_or_else(|| format_tool_result(effective)),
+            return vec![ContentPart::tool_result_with_metadata(
+                tool_result_content(effective),
+                tool_call_id(effective),
+                object_string(effective, &["name", "toolName", "tool_name"]),
             )];
         }
         "tool" => {
-            let name = effective
-                .get("tool")
-                .or_else(|| effective.get("name"))
-                .and_then(Value::as_str)
-                .unwrap_or("unknown");
+            let name = tool_name(effective);
+            let id = tool_call_id(effective);
             let input = effective
                 .get("state")
                 .and_then(|state| state.get("input"))
                 .or_else(|| effective.get("input"))
-                .map(ToString::to_string)
+                .map(stringify_value)
                 .unwrap_or_default();
-            let mut parts = vec![ContentPart::tool_call(format!("[Tool: {name}]\n{input}"))];
+            let mut parts = vec![ContentPart::tool_call_with_metadata(
+                name.clone(),
+                input,
+                id.clone(),
+            )];
             if let Some(output) = effective
                 .get("state")
                 .and_then(|state| state.get("output"))
                 .or_else(|| effective.get("output"))
             {
-                parts.push(ContentPart::tool_result(output.to_string()));
+                parts.push(ContentPart::tool_result_with_metadata(
+                    value_text(Some(output)).unwrap_or_default(),
+                    id,
+                    Some(name),
+                ));
             }
             return parts;
         }
@@ -233,10 +264,34 @@ fn normalize_object_part(object: &serde_json::Map<String, Value>) -> Vec<Content
             }
         }
     }
-    text_part(
-        object,
-        &["text", "content", "summary", "reasoning", "think"],
-    )
+    if object.get("name").is_some()
+        && (object.get("arguments").is_some()
+            || object.get("input").is_some()
+            || object.get("args").is_some()
+            || object.get("raw_input").is_some()
+            || object.get("rawInput").is_some()
+            || object.get("function").is_some())
+    {
+        return vec![ContentPart::tool_call_with_metadata(
+            tool_name(object),
+            tool_arguments(object),
+            tool_call_id(object),
+        )];
+    }
+    let mut fallback_parts = Vec::new();
+    for key in [
+        "reasoning_content",
+        "reasoningContent",
+        "reasoning",
+        "thinking",
+        "think",
+    ] {
+        if let Some(text) = value_text(object.get(key)).filter(|text| !text.trim().is_empty()) {
+            fallback_parts.push(ContentPart::reasoning(text));
+        }
+    }
+    fallback_parts.extend(text_part(object, &["text", "content", "summary"]));
+    fallback_parts
 }
 
 fn text_part(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Vec<ContentPart> {
@@ -268,39 +323,88 @@ fn value_text(value: Option<&Value>) -> Option<String> {
     }
 }
 
-fn format_tool_call(object: &serde_json::Map<String, Value>) -> String {
-    let name = object
-        .get("name")
-        .or_else(|| object.get("tool"))
+fn object_string(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        object
+            .get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    })
+}
+
+fn nested_object<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    key: &str,
+) -> Option<&'a serde_json::Map<String, Value>> {
+    object.get(key).and_then(Value::as_object)
+}
+
+fn tool_name(object: &serde_json::Map<String, Value>) -> String {
+    object_string(object, &["name", "tool", "toolName", "tool_name"])
         .or_else(|| {
-            object
-                .get("function")
-                .and_then(Value::as_object)
-                .and_then(|function| function.get("name"))
+            nested_object(object, "function").and_then(|value| object_string(value, &["name"]))
         })
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
-    let arguments = object
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn tool_call_id(object: &serde_json::Map<String, Value>) -> Option<String> {
+    object_string(
+        object,
+        &[
+            "toolCallId",
+            "tool_call_id",
+            "call_id",
+            "callId",
+            "tool_use_id",
+            "id",
+        ],
+    )
+}
+
+fn tool_arguments(object: &serde_json::Map<String, Value>) -> String {
+    object
         .get("arguments")
         .or_else(|| object.get("input"))
         .or_else(|| object.get("args"))
+        .or_else(|| object.get("raw_input"))
+        .or_else(|| object.get("rawInput"))
+        .or_else(|| object.get("parameters"))
         .or_else(|| {
-            object
-                .get("function")
-                .and_then(Value::as_object)
-                .and_then(|function| function.get("arguments"))
-        });
-    let arguments = value_text(arguments).unwrap_or_else(|| "{}".to_string());
-    format!("[Tool: {name}]\n{arguments}")
+            nested_object(object, "function").and_then(|function| function.get("arguments"))
+        })
+        .map(stringify_value)
+        .unwrap_or_else(|| "{}".to_string())
 }
 
-fn format_tool_result(object: &serde_json::Map<String, Value>) -> String {
+fn tool_result_content(object: &serde_json::Map<String, Value>) -> String {
     object
-        .get("tool_call_id")
-        .or_else(|| object.get("toolCallId"))
-        .and_then(Value::as_str)
-        .map(|id| format!("[Tool result: {id}]"))
-        .unwrap_or_else(|| "[Tool result]".to_string())
+        .get("content")
+        .or_else(|| object.get("output"))
+        .or_else(|| object.get("value"))
+        .or_else(|| object.get("result"))
+        .or_else(|| object.get("text"))
+        .or_else(|| {
+            object
+                .get("response")
+                .and_then(|response| response.get("output"))
+        })
+        .or_else(|| {
+            object
+                .get("response")
+                .and_then(|response| response.get("result"))
+        })
+        .or_else(|| object.get("response"))
+        .and_then(|value| value_text(Some(value)))
+        .unwrap_or_default()
+}
+
+fn stringify_value(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        _ => serde_json::to_string(value).unwrap_or_default(),
+    }
 }
 
 fn format_attachment(object: &serde_json::Map<String, Value>) -> String {
@@ -605,10 +709,24 @@ mod tests {
             ]),
             None,
         );
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "assistant");
-        assert_eq!(messages[0].content, "reasoning\n\nanswer");
-        assert_eq!(messages[1].role, "tool");
-        assert!(messages[1].content.contains("[Tool: read]"));
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::Reasoning
+        );
+        assert_eq!(messages[0].content, "reasoning");
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::Text
+        );
+        assert_eq!(messages[1].content, "answer");
+        assert_eq!(messages[2].role, "tool");
+        assert_eq!(
+            messages[2].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(messages[2].tool_name.as_deref(), Some("read"));
+        assert_eq!(messages[2].content, "{}");
     }
 }

@@ -119,7 +119,7 @@ describe("session utils", () => {
     ).toBe(false);
   });
 
-  it("formats exportable messages and skips assistant tool messages", () => {
+  it("formats legacy text messages and groups consecutive assistant text", () => {
     const messages: SessionMessage[] = [
       { role: "system", content: "Internal instructions" },
       { role: "user", content: "Build a greeting." },
@@ -139,9 +139,74 @@ describe("session utils", () => {
     expect(formatSessionMarkdown(messages)).toBe(
       "## User\n\nBuild a greeting.\n\n" +
         '## Assistant\n\nHere it is:\n\n```ts\nconsole.log("hello");\n```\n\n' +
-        "## Assistant\n\nDone\n\n" +
-        "## Assistant\n\nI ran [Tool: bash]\nDone\n\n" +
+        "## Assistant\n\nDone\n\nI ran [Tool: bash]\nDone\n\n" +
         "## User\n\nThanks\n",
+    );
+  });
+
+  it("exports thinking and tool records only when enabled", () => {
+    const messages: SessionMessage[] = [
+      { role: "user", content: "hello", kind: "text" },
+      { role: "assistant", content: "hidden", kind: "reasoning" },
+      { role: "assistant", content: "answer", kind: "text" },
+      {
+        role: "tool",
+        content: '{"command":"ls"}',
+        kind: "toolCall",
+        toolCallId: "call-1",
+        toolName: "bash",
+      },
+      {
+        role: "tool",
+        content: "file.txt",
+        kind: "toolResult",
+        toolCallId: "call-1",
+        toolName: "bash",
+      },
+    ];
+
+    expect(formatSessionMarkdown(messages)).toBe(
+      "## User\n\nhello\n\n## Assistant\n\nanswer\n",
+    );
+    expect(
+      formatSessionMarkdown(messages, { includeThinking: true }),
+    ).toContain("<thinking>\nhidden\n</thinking>");
+    expect(
+      formatSessionMarkdown(messages, { includeToolInputs: true }),
+    ).toContain("<bash>\n\n```bash\nls\n```\n\n</bash>");
+    expect(
+      formatSessionMarkdown(messages, { includeToolOutputs: true }),
+    ).toContain("```text\nfile.txt\n```");
+    expect(
+      formatSessionMarkdown(messages, {
+        includeThinking: true,
+        includeToolInputs: true,
+        includeToolOutputs: true,
+      }),
+    ).toBe(
+      "## User\n\nhello\n\n" +
+        "## Assistant\n\n<thinking>\nhidden\n</thinking>\n\nanswer\n\n" +
+        "## Tool: bash\n\n<bash>\n\n```bash\nls\n```\n\n</bash>\n\n" +
+        "```text\nfile.txt\n```\n",
+    );
+  });
+
+  it("uses the original tool name for non-shell argument tags", () => {
+    const markdown = formatSessionMarkdown(
+      [
+        {
+          role: "tool",
+          content: '{"path":"README.md"}',
+          kind: "toolCall",
+          toolCallId: "call-read",
+          toolName: "Read",
+        },
+      ],
+      { includeToolInputs: true },
+    );
+
+    expect(markdown).toBe(
+      '## Tool: Read\n\n<Read>\n\n```json\n{\n  "path": "README.md"\n}\n```\n\n</Read>\n',
     );
   });
 

@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FolderSearch, Loader2, Undo2 } from "lucide-react";
+import {
+  Brain,
+  FileText,
+  FolderSearch,
+  Loader2,
+  TerminalSquare,
+  Undo2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { LanguageSettings } from "@/components/settings/LanguageSettings";
@@ -11,6 +18,7 @@ import { getProviderLabel } from "@/components/sessions/utils";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleRow } from "@/components/ui/toggle-row";
 import {
   Tooltip,
   TooltipContent,
@@ -113,6 +121,9 @@ export function Session2mdSettingsPage() {
       await saveMutation.mutateAsync({
         directoryOverrides: nextOverrides,
         hiddenProviders: settings.hiddenProviders,
+        exportThinking: settings.exportThinking,
+        exportToolInputs: settings.exportToolInputs,
+        exportToolOutputs: settings.exportToolOutputs,
       });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setDrafts((current) => {
@@ -147,6 +158,9 @@ export function Session2mdSettingsPage() {
       await saveMutation.mutateAsync({
         directoryOverrides: settings.directoryOverrides,
         hiddenProviders: hiddenProviderList,
+        exportThinking: settings.exportThinking,
+        exportToolInputs: settings.exportToolInputs,
+        exportToolOutputs: settings.exportToolOutputs,
       });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
@@ -170,6 +184,34 @@ export function Session2mdSettingsPage() {
       nextHiddenProviders.add(providerId);
     }
     await saveProviderVisibility(nextHiddenProviders);
+  };
+
+  const saveExportOption = async (
+    key: "exportThinking" | "exportToolInputs" | "exportToolOutputs",
+    value: boolean,
+  ) => {
+    if (!settings) return;
+
+    const previousSettings = settings;
+    const nextSettings = { ...settings, [key]: value };
+    queryClient.setQueryData(session2mdSettingsKey, nextSettings);
+
+    try {
+      await saveMutation.mutateAsync({
+        directoryOverrides: nextSettings.directoryOverrides,
+        hiddenProviders: nextSettings.hiddenProviders,
+        exportThinking: nextSettings.exportThinking,
+        exportToolInputs: nextSettings.exportToolInputs,
+        exportToolOutputs: nextSettings.exportToolOutputs,
+      });
+    } catch (error) {
+      queryClient.setQueryData(session2mdSettingsKey, previousSettings);
+      toast.error(
+        t("sessionSettings.exportContent.saveFailed", {
+          error: String(error),
+        }),
+      );
+    }
   };
 
   const browseDirectory = async (directoryId: SessionDirectoryId) => {
@@ -219,6 +261,62 @@ export function Session2mdSettingsPage() {
             <TabsContent value="general" className="max-w-2xl space-y-8 py-6">
               <LanguageSettings value={language} onChange={changeLanguage} />
               <ThemeSettings />
+              <section className="space-y-5">
+                <header className="space-y-1">
+                  <h2 className="text-base font-semibold">
+                    {t("sessionSettings.exportContent.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("sessionSettings.exportContent.description")}
+                  </p>
+                </header>
+
+                <div className="space-y-3">
+                  <ToggleRow
+                    icon={<Brain className="size-4 text-blue-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.includeThinking.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeThinking.description",
+                    )}
+                    checked={settings.exportThinking}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportThinking", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={<TerminalSquare className="size-4 text-green-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.includeToolInputs.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeToolInputs.description",
+                    )}
+                    checked={settings.exportToolInputs}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportToolInputs", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={<FileText className="size-4 text-cyan-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.includeToolOutputs.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeToolOutputs.description",
+                    )}
+                    checked={settings.exportToolOutputs}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportToolOutputs", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                </div>
+              </section>
+
               <section className="space-y-5">
                 <header className="space-y-1">
                   <h2 className="text-base font-semibold">

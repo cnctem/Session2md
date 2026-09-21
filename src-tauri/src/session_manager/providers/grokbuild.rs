@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::session_manager::{paths::grok_dir, SessionMessage, SessionMeta};
 
-use super::common::messages_from_content;
+use super::common::{messages_from_parts, normalize_content_parts, ContentPart};
 use super::utils::{parse_timestamp_to_ms, truncate_summary, TITLE_MAX_CHARS};
 
 #[derive(Debug, Deserialize)]
@@ -66,20 +66,75 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             continue;
         };
         let kind = value.get("type").and_then(Value::as_str).unwrap_or("");
-        let role = match kind {
-            "system" | "user" | "assistant" | "tool" => kind,
-            "reasoning" => "assistant",
-            _ => continue,
-        };
         let ts = value
             .get("timestamp")
             .or_else(|| value.get("ts"))
             .and_then(parse_timestamp_to_ms);
-        messages.extend(messages_from_content(
-            role,
-            value.get("content").unwrap_or(&Value::Null),
-            ts,
-        ));
+        let mut parts = Vec::new();
+        match kind {
+            "system" | "user" | "assistant" => {
+                if let Some(content) = value.get("content") {
+                    parts.extend(normalize_content_parts(content));
+                }
+                if let Some(tool_calls) = value.get("tool_calls") {
+                    parts.extend(normalize_content_parts(tool_calls));
+                }
+            }
+            "reasoning" => {
+                if let Some(summary) = value.get("summary") {
+                    parts.extend(
+                        normalize_content_parts(summary)
+                            .into_iter()
+                            .map(ContentPart::as_reasoning),
+                    );
+                }
+            }
+            "tool_result" => {
+                let content = value
+                    .get("content")
+                    .map(|content| {
+                        normalize_content_parts(content)
+                            .into_iter()
+                            .map(|part| part.content)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    })
+                    .unwrap_or_default();
+                parts.push(ContentPart::tool_result_with_metadata(
+                    content,
+                    value
+                        .get("tool_call_id")
+                        .or_else(|| value.get("toolCallId"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    None,
+                ));
+            }
+            "tool" => {
+                if let Some(content) = value.get("content") {
+                    parts.extend(normalize_content_parts(content).into_iter().map(|part| {
+                        ContentPart::tool_result_with_metadata(
+                            part.content,
+                            value
+                                .get("tool_call_id")
+                                .or_else(|| value.get("toolCallId"))
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                            None,
+                        )
+                    }));
+                }
+            }
+            _ => continue,
+        }
+        let role = if kind == "reasoning" {
+            "assistant"
+        } else if kind == "tool_result" || kind == "tool" {
+            "tool"
+        } else {
+            kind
+        };
+        messages.extend(messages_from_parts(role, &parts, ts));
     }
 
     Ok(messages)
@@ -231,9 +286,45 @@ mod tests {
         .expect("write chat history");
 
         let messages = load_messages(&summary_path).expect("load messages");
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "user");
         assert_eq!(messages[0].content, "hello");
-        assert_eq!(messages[1].content, "Hi there");
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::Reasoning
+        );
+        assert_eq!(messages[1].content, "private");
+        assert_eq!(messages[2].content, "Hi there");
+    }
+
+    #[test]
+    fn keeps_grok_tool_calls_and_results() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let summary_path = temp.path().join("summary.json");
+        std::fs::write(&summary_path, "{}").expect("write summary placeholder");
+        std::fs::write(
+            temp.path().join("chat_history.jsonl"),
+            concat!(
+                "{\"type\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call-1\",\"name\":\"bash\",\"arguments\":\"{\\\"command\\\":\\\"pwd\\\"}\"}]}\n",
+                "{\"type\":\"tool_result\",\"tool_call_id\":\"call-1\",\"content\":[{\"type\":\"text\",\"text\":\"/tmp/project\"}]}\n"
+            ),
+        )
+        .expect("write chat history");
+
+        let messages = load_messages(&summary_path).expect("load messages");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[0].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(messages[0].tool_call_id.as_deref(), Some("call-1"));
+        assert_eq!(messages[0].tool_name.as_deref(), Some("bash"));
+        assert!(messages[0].content.contains("pwd"));
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(messages[1].tool_call_id.as_deref(), Some("call-1"));
+        assert_eq!(messages[1].content, "/tmp/project");
     }
 }

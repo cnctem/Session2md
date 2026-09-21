@@ -30,12 +30,35 @@ pub(crate) fn push_message(
     content: &str,
     ts: Option<i64>,
 ) {
+    push_message_part(
+        messages,
+        role,
+        content,
+        crate::session_manager::SessionMessageKind::Text,
+        ts,
+        None,
+        None,
+    );
+}
+
+pub(crate) fn push_message_part(
+    messages: &mut Vec<crate::session_manager::SessionMessage>,
+    role: &str,
+    content: &str,
+    kind: crate::session_manager::SessionMessageKind,
+    ts: Option<i64>,
+    tool_call_id: Option<String>,
+    tool_name: Option<String>,
+) {
     if content.trim().is_empty() {
         return;
     }
     messages.push(crate::session_manager::SessionMessage {
         role: role.to_string(),
         content: content.trim().to_string(),
+        kind,
+        tool_call_id,
+        tool_name,
         ts,
     });
 }

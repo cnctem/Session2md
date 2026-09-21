@@ -195,7 +195,14 @@ mod tests {
         assert_eq!(sessions.len(), 1);
         let messages =
             load_messages(sessions[0].source_path.as_deref().expect("source")).expect("messages");
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[1].content, "hidden\n\nanswer");
+        assert_eq!(messages.len(), 3);
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Reasoning
+                && message.content == "hidden"
+        }));
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Text
+                && message.content == "answer"
+        }));
     }
 }

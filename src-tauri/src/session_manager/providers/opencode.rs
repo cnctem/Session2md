@@ -298,7 +298,38 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
                         .get("tool")
                         .and_then(Value::as_str)
                         .unwrap_or("unknown");
-                    parts.push(ContentPart::tool_call(format!("[Tool: {name}]")));
+                    let input = part_value
+                        .get("state")
+                        .and_then(|state| state.get("input"))
+                        .map(|value| match value {
+                            Value::String(value) => value.clone(),
+                            _ => value.to_string(),
+                        })
+                        .unwrap_or_else(|| "{}".to_string());
+                    let tool_call_id = part_value
+                        .get("callID")
+                        .or_else(|| part_value.get("callId"))
+                        .or_else(|| part_value.get("id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    parts.push(ContentPart::tool_call_with_metadata(
+                        name,
+                        input,
+                        tool_call_id.clone(),
+                    ));
+                    if let Some(output) = part_value
+                        .get("state")
+                        .and_then(|state| state.get("output"))
+                    {
+                        parts.push(ContentPart::tool_result_with_metadata(
+                            output
+                                .as_str()
+                                .map(str::to_string)
+                                .unwrap_or_else(|| output.to_string()),
+                            tool_call_id,
+                            Some(name.to_string()),
+                        ));
+                    }
                 } else {
                     parts.extend(normalize_content_parts(&part_value));
                 }
@@ -697,12 +728,17 @@ mod tests {
 
         let msgs = load_messages(&msg_dir).expect("load");
         assert_eq!(msgs.len(), 3);
-        assert!(msgs
-            .iter()
-            .any(|message| message.role == "tool" && message.content.contains("[Tool: bash]")));
-        assert!(msgs
-            .iter()
-            .any(|message| message.role == "tool" && message.content.contains("file.txt")));
+        assert!(msgs.iter().any(|message| {
+            message.role == "tool"
+                && message.kind == crate::session_manager::SessionMessageKind::ToolCall
+                && message.tool_name.as_deref() == Some("bash")
+                && message.content.contains("ls")
+        }));
+        assert!(msgs.iter().any(|message| {
+            message.role == "tool"
+                && message.kind == crate::session_manager::SessionMessageKind::ToolResult
+                && message.content.contains("file.txt")
+        }));
         assert!(msgs.iter().any(|message| {
             message.role == "assistant" && message.content.contains("Here are the files.")
         }));
@@ -896,7 +932,11 @@ mod tests {
         assert_eq!(messages[0].content, "Hello");
         assert_eq!(messages[0].ts, Some(1000));
         assert_eq!(messages[1].role, "tool");
-        assert!(messages[1].content.contains("[Tool: bash]"));
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(messages[1].tool_name.as_deref(), Some("bash"));
         assert_eq!(messages[2].role, "assistant");
         assert_eq!(messages[2].content, "Done");
         assert_eq!(messages[2].ts, Some(2000));

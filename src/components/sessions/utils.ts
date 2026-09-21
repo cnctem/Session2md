@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import type { SessionMessage, SessionMeta } from "@/types";
+import {
+  getToolInputDisplay,
+  groupSessionMessages,
+  type SessionMessageGroup,
+} from "./messageGroups";
 
 const CODEX_IDE_CONTEXT_PREFIX = "# Context from my IDE setup:";
 const CODEX_REQUEST_MARKER = "my request for codex";
@@ -144,18 +149,67 @@ export const formatSessionTitle = (session: SessionMeta) => {
   );
 };
 
-export const formatSessionMarkdown = (messages: SessionMessage[]) => {
-  const sections = messages.flatMap((message) => {
-    const role = message.role.toLowerCase();
+export interface SessionMarkdownOptions {
+  includeThinking?: boolean;
+  includeToolInputs?: boolean;
+  includeToolOutputs?: boolean;
+}
+
+const fencedCodeBlock = (content: string, language: string) => {
+  const longestFence = Math.max(
+    3,
+    ...Array.from(content.matchAll(/`+/g), (match) => match[0].length + 1),
+  );
+  const fence = "`".repeat(longestFence);
+  return `${fence}${language}\n${content}\n${fence}`;
+};
+
+const formatToolGroupMarkdown = (
+  group: SessionMessageGroup,
+  options: SessionMarkdownOptions,
+) => {
+  const name =
+    group.toolName && group.toolName.toLowerCase() !== "unknown"
+      ? group.toolName.trim()
+      : "Tool";
+  const sections: string[] = [];
+  if (options.includeToolInputs && group.toolInput?.trim()) {
+    const input = getToolInputDisplay(group);
+    sections.push(
+      `<${name}>\n\n${fencedCodeBlock(input.text, input.language)}\n\n</${name}>`,
+    );
+  }
+  if (options.includeToolOutputs && group.toolOutput?.trim()) {
+    sections.push(fencedCodeBlock(group.toolOutput.trim(), "text"));
+  }
+  if (sections.length === 0) return null;
+
+  return `## Tool${name !== "Tool" ? `: ${name}` : ""}\n\n${sections.join("\n\n")}`;
+};
+
+export const formatSessionMarkdown = (
+  messages: SessionMessage[],
+  options: SessionMarkdownOptions = {},
+) => {
+  const sections = groupSessionMessages(messages).flatMap((group) => {
+    const role = group.role.toLowerCase();
+    if (role === "tool") {
+      const markdown = formatToolGroupMarkdown(group, options);
+      return markdown ? [markdown] : [];
+    }
     if (role !== "user" && role !== "assistant") return [];
 
-    const content = message.content.trim();
-    if (!content) {
-      return [];
-    }
+    const content = group.content.trim();
+    const reasoning = options.includeThinking ? group.reasoning.trim() : "";
+    if (!content && !reasoning) return [];
 
-    const heading = role === "user" ? "User" : "Assistant";
-    return [`## ${heading}\n\n${content}`];
+    const body = [
+      reasoning ? `<thinking>\n${reasoning}\n</thinking>` : "",
+      content,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    return [`## ${role === "user" ? "User" : "Assistant"}\n\n${body}`];
   });
 
   return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";

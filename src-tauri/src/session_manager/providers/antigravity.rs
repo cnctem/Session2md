@@ -61,7 +61,11 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                             .get("args")
                             .map(ToString::to_string)
                             .unwrap_or_default();
-                        parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{args}")));
+                        parts.push(ContentPart::tool_call_with_metadata(
+                            name,
+                            args,
+                            call.get("id").and_then(Value::as_str).map(str::to_string),
+                        ));
                     }
                 }
                 messages.extend(messages_from_parts(role, &parts, ts));
@@ -154,7 +158,14 @@ mod tests {
         )
         .expect("write");
         let messages = load_messages(&path).expect("messages");
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[1].content, "answer\n\nhidden");
+        assert_eq!(messages.len(), 3);
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Reasoning
+                && message.content == "hidden"
+        }));
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Text
+                && message.content == "answer"
+        }));
     }
 }

@@ -38,6 +38,12 @@ pub struct Session2mdSettings {
     pub directory_overrides: BTreeMap<String, String>,
     #[serde(default)]
     pub hidden_providers: BTreeSet<String>,
+    #[serde(default)]
+    pub export_thinking: bool,
+    #[serde(default)]
+    pub export_tool_inputs: bool,
+    #[serde(default)]
+    pub export_tool_outputs: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,6 +51,9 @@ pub struct Session2mdSettings {
 pub struct Session2mdSettingsSnapshot {
     pub directory_overrides: BTreeMap<String, String>,
     pub hidden_providers: BTreeSet<String>,
+    pub export_thinking: bool,
+    pub export_tool_inputs: bool,
+    pub export_tool_outputs: bool,
     pub resolved_directories: BTreeMap<String, String>,
 }
 
@@ -101,6 +110,9 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
     Session2mdSettingsSnapshot {
         directory_overrides: settings.directory_overrides,
         hidden_providers: settings.hidden_providers,
+        export_thinking: settings.export_thinking,
+        export_tool_inputs: settings.export_tool_inputs,
+        export_tool_outputs: settings.export_tool_outputs,
         resolved_directories: crate::session_manager::paths::resolved_directories(),
     }
 }
@@ -162,6 +174,7 @@ mod tests {
                 ("claude".to_string(), "   ".to_string()),
             ]),
             hidden_providers: BTreeSet::new(),
+            ..Session2mdSettings::default()
         };
 
         normalize_settings(&mut settings);
@@ -181,6 +194,7 @@ mod tests {
                 "unknown".to_string(),
                 "dsh".to_string(),
             ]),
+            ..Session2mdSettings::default()
         };
 
         normalize_settings(&mut settings);
@@ -197,5 +211,8 @@ mod tests {
             serde_json::from_str(r#"{"directoryOverrides":{}}"#).expect("settings");
 
         assert!(settings.hidden_providers.is_empty());
+        assert!(!settings.export_thinking);
+        assert!(!settings.export_tool_inputs);
+        assert!(!settings.export_tool_outputs);
     }
 }

@@ -483,6 +483,9 @@ export interface SessionMeta {
 export interface SessionMessage {
   role: string;
   content: string;
+  kind?: "text" | "reasoning" | "toolCall" | "toolResult";
+  toolCallId?: string;
+  toolName?: string;
   ts?: number;
 }
 

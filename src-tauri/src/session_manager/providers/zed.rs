@@ -157,7 +157,11 @@ fn visible_v3_messages(messages: &[Value]) -> Vec<SessionMessage> {
                         .or_else(|| result.get("output"))
                         .map(ToString::to_string)
                         .unwrap_or_else(|| format!("[Tool result: {id}]"));
-                    parts.push(ContentPart::tool_result(content));
+                    parts.push(ContentPart::tool_result_with_metadata(
+                        content,
+                        Some(id.clone()),
+                        None,
+                    ));
                 }
             }
             output.extend(messages_from_parts("assistant", &parts, None));
@@ -188,7 +192,11 @@ fn visible_legacy_messages(messages: &[Value]) -> Vec<SessionMessage> {
                     .get("input")
                     .map(ToString::to_string)
                     .unwrap_or_default();
-                parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{input}")));
+                parts.push(ContentPart::tool_call_with_metadata(
+                    name,
+                    input,
+                    call.get("id").and_then(Value::as_str).map(str::to_string),
+                ));
             }
         }
         if let Some(results) = message.get("tool_results").and_then(Value::as_array) {
@@ -198,7 +206,19 @@ fn visible_legacy_messages(messages: &[Value]) -> Vec<SessionMessage> {
                     .or_else(|| result.get("output"))
                     .map(ToString::to_string)
                     .unwrap_or_default();
-                parts.push(ContentPart::tool_result(content));
+                parts.push(ContentPart::tool_result_with_metadata(
+                    content,
+                    result
+                        .get("tool_use_id")
+                        .or_else(|| result.get("toolCallId"))
+                        .or_else(|| result.get("id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    result
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                ));
             }
         }
         output.extend(messages_from_parts(role, &parts, None));
@@ -228,7 +248,11 @@ fn zed_block_parts(blocks: &[Value]) -> Vec<ContentPart> {
                 .or_else(|| call.get("input"))
                 .map(ToString::to_string)
                 .unwrap_or_default();
-            parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{input}")));
+            parts.push(ContentPart::tool_call_with_metadata(
+                name,
+                input,
+                call.get("id").and_then(Value::as_str).map(str::to_string),
+            ));
         } else if block.get("type").and_then(Value::as_str) == Some("text") {
             parts.push(ContentPart::text(
                 block.get("text").and_then(Value::as_str).unwrap_or(""),
@@ -289,7 +313,14 @@ mod tests {
         assert_eq!(sessions.len(), 1);
         let messages =
             load_messages(sessions[0].source_path.as_deref().expect("source")).expect("messages");
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[1].content, "hidden\n\nanswer");
+        assert_eq!(messages.len(), 3);
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Reasoning
+                && message.content == "hidden"
+        }));
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Text
+                && message.content == "answer"
+        }));
     }
 }

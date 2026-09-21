@@ -296,8 +296,19 @@ mod tests {
         let msgs = load_messages(&path).expect("load");
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0].role, "tool");
-        assert!(msgs[0].content.contains("[Tool: Write]"));
+        assert_eq!(
+            msgs[0].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(msgs[0].tool_name.as_deref(), Some("Write"));
+        assert_eq!(msgs[0].tool_call_id.as_deref(), Some("toolu_1"));
+        assert!(msgs[0].content.contains("a.txt"));
         assert_eq!(msgs[1].role, "tool");
+        assert_eq!(
+            msgs[1].kind,
+            crate::session_manager::SessionMessageKind::ToolResult
+        );
+        assert_eq!(msgs[1].tool_call_id.as_deref(), Some("toolu_1"));
         assert_eq!(msgs[1].content, "File written");
     }
 
@@ -316,7 +327,11 @@ mod tests {
         assert_eq!(msgs[0].role, "assistant");
         assert!(msgs[0].content.contains("Let me help."));
         assert_eq!(msgs[1].role, "tool");
-        assert!(msgs[1].content.contains("[Tool: Read]"));
+        assert_eq!(
+            msgs[1].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(msgs[1].tool_name.as_deref(), Some("Read"));
     }
 
     #[test]

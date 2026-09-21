@@ -189,7 +189,16 @@ mod tests {
         )
         .expect("write");
         let messages = load_messages(&path).expect("messages");
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[1].content, "answer\n\nhidden");
+        assert_eq!(messages.len(), 3);
+        assert_eq!(
+            messages[1].kind,
+            crate::session_manager::SessionMessageKind::Text
+        );
+        assert_eq!(messages[1].content, "answer");
+        assert_eq!(
+            messages[2].kind,
+            crate::session_manager::SessionMessageKind::Reasoning
+        );
+        assert_eq!(messages[2].content, "hidden");
     }
 }

@@ -105,10 +105,27 @@ pub fn load_database(source: &str, provider_id: &str) -> Result<Vec<SessionMessa
                         .get("state")
                         .and_then(|state| state.get("input"))
                         .map(ToString::to_string)
-                        .unwrap_or_default();
-                    parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{input}")));
+                        .unwrap_or_else(|| "{}".to_string());
+                    let tool_call_id = part
+                        .get("callID")
+                        .or_else(|| part.get("callId"))
+                        .or_else(|| part.get("id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    parts.push(ContentPart::tool_call_with_metadata(
+                        name,
+                        input,
+                        tool_call_id.clone(),
+                    ));
                     if let Some(output) = part.get("state").and_then(|state| state.get("output")) {
-                        parts.push(ContentPart::tool_result(output.to_string()));
+                        parts.push(ContentPart::tool_result_with_metadata(
+                            output
+                                .as_str()
+                                .map(str::to_string)
+                                .unwrap_or_else(|| output.to_string()),
+                            tool_call_id,
+                            Some(name.to_string()),
+                        ));
                     }
                 }
                 Some("compaction") => {
@@ -310,7 +327,14 @@ mod tests {
         assert_eq!(sessions[0].can_delete, false);
         let source = sessions[0].source_path.as_deref().expect("source");
         let messages = load_database(source, "mimocode").expect("messages");
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[1].content, "hidden\n\nanswer");
+        assert_eq!(messages.len(), 3);
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Reasoning
+                && message.content == "hidden"
+        }));
+        assert!(messages.iter().any(|message| {
+            message.kind == crate::session_manager::SessionMessageKind::Text
+                && message.content == "answer"
+        }));
     }
 }

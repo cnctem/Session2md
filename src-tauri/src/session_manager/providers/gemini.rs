@@ -98,7 +98,14 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                         .get("args")
                         .map(ToString::to_string)
                         .unwrap_or_default();
-                    parts.push(ContentPart::tool_call(format!("[Tool: {name}]\n{args}")));
+                    parts.push(ContentPart::tool_call_with_metadata(
+                        name,
+                        args,
+                        call.get("id")
+                            .or_else(|| call.get("callId"))
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    ));
                 }
             }
         }
@@ -220,10 +227,18 @@ mod tests {
         let msgs = load_messages(&path).expect("load");
         assert_eq!(msgs.len(), 3);
         assert_eq!(msgs[0].role, "tool");
-        assert!(msgs[0].content.contains("[Tool: web_search]"));
+        assert_eq!(
+            msgs[0].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(msgs[0].tool_name.as_deref(), Some("web_search"));
+        assert_eq!(msgs[0].tool_call_id.as_deref(), Some("call_1"));
         assert_eq!(msgs[1].role, "assistant");
         assert!(msgs[1].content.contains("Here are the results."));
-        assert_eq!(msgs[2].role, "tool");
-        assert!(msgs[2].content.contains("[Tool: web_fetch]"));
+        assert_eq!(
+            msgs[2].kind,
+            crate::session_manager::SessionMessageKind::ToolCall
+        );
+        assert_eq!(msgs[2].tool_name.as_deref(), Some("web_fetch"));
     }
 }

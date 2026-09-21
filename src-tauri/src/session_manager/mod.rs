@@ -32,11 +32,25 @@ pub struct SessionMeta {
     pub can_delete: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionMessageKind {
+    Text,
+    Reasoning,
+    ToolCall,
+    ToolResult,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionMessage {
     pub role: String,
     pub content: String,
+    pub kind: SessionMessageKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ts: Option<i64>,
 }

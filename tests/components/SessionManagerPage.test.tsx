@@ -263,6 +263,51 @@ describe("SessionManagerPage", () => {
     await waitFor(() => expect(exportButton).toBeDisabled());
   });
 
+  it("renders thinking, tool command, and tool output in grouped bubbles", async () => {
+    setSessionFixtures(
+      [
+        {
+          providerId: "dsh",
+          sessionId: "dsh-detailed-session",
+          title: "Detailed Session",
+          sourcePath: "/mock/dsh/detailed-session.jsonl",
+        },
+      ],
+      {
+        "dsh:/mock/dsh/detailed-session.jsonl": [
+          { role: "user", content: "run it", kind: "text" },
+          { role: "assistant", content: "hidden thinking", kind: "reasoning" },
+          { role: "assistant", content: "visible answer", kind: "text" },
+          {
+            role: "tool",
+            content: '{"command":"ls -la"}',
+            kind: "toolCall",
+            toolCallId: "call-1",
+            toolName: "bash",
+          },
+          {
+            role: "tool",
+            content: "file-a\nfile-b",
+            kind: "toolResult",
+            toolCallId: "call-1",
+            toolName: "bash",
+          },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("hidden thinking")).toBeInTheDocument();
+    expect(screen.getByText("visible answer")).toBeInTheDocument();
+    const command = screen.getByText("$ ls -la");
+    expect(command).toBeInTheDocument();
+    const toolBubble = command.closest(".rounded-lg.border");
+    expect(toolBubble).not.toHaveClass("bg-purple-500/5");
+    expect(toolBubble).toHaveClass("bg-muted/40");
+    expect(screen.getByText(/file-a\s+file-b/)).toBeInTheDocument();
+  });
+
   it("restores destructive controls without restoring terminal resume", async () => {
     renderPage();
     await screen.findByText("Alpha Session");

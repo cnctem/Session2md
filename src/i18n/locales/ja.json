@@ -985,6 +985,9 @@
     "roleUser": "ユーザー",
     "roleSystem": "システム",
     "roleTool": "ツール",
+    "thinking": "思考",
+    "toolCommand": "実行コマンド",
+    "toolArguments": "呼び出し引数",
     "export": "セッションをエクスポート",
     "exporting": "エクスポート中...",
     "exportTooltip": "会話履歴を Markdown ファイルとしてエクスポート",
@@ -1018,6 +1021,23 @@
       "selectAll": "すべて選択",
       "clearAll": "すべて解除",
       "saveFailed": "Agent の表示設定を保存できませんでした: {{error}}"
+    },
+    "exportContent": {
+      "title": "Markdown エクスポート内容",
+      "description": "既定ではユーザーメッセージと AI の本文だけを出力します。必要に応じて実行記録を追加できます。",
+      "saveFailed": "エクスポート設定を保存できませんでした: {{error}}",
+      "includeThinking": {
+        "label": "思考を含める",
+        "description": "AI メッセージ内の思考内容を保持します。"
+      },
+      "includeToolInputs": {
+        "label": "ツール引数を含める",
+        "description": "ツール名、元のコマンド、呼び出し引数を出力します。"
+      },
+      "includeToolOutputs": {
+        "label": "ツール出力を含める",
+        "description": "ツールの実行結果を出力します。"
+      }
     },
     "directories": {
       "claude": "Claude 設定ディレクトリ",

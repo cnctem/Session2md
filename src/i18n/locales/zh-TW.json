@@ -986,6 +986,9 @@
     "roleUser": "使用者",
     "roleSystem": "系統",
     "roleTool": "工具",
+    "thinking": "思考",
+    "toolCommand": "呼叫命令",
+    "toolArguments": "呼叫參數",
     "export": "匯出工作階段",
     "exporting": "匯出中...",
     "exportTooltip": "將對話紀錄匯出為 Markdown 檔案",
@@ -1019,6 +1022,23 @@
       "selectAll": "全選",
       "clearAll": "全部取消",
       "saveFailed": "儲存 Agent 顯示設定失敗：{{error}}"
+    },
+    "exportContent": {
+      "title": "Markdown 匯出內容",
+      "description": "預設只匯出使用者訊息與 AI 正文，可依需求附加更多執行紀錄。",
+      "saveFailed": "儲存匯出設定失敗：{{error}}",
+      "includeThinking": {
+        "label": "匯出含思考",
+        "description": "在 AI 氣泡中保留 Thinking 內容。"
+      },
+      "includeToolInputs": {
+        "label": "匯出含工具參數",
+        "description": "匯出工具名稱、原始命令或呼叫參數。"
+      },
+      "includeToolOutputs": {
+        "label": "匯出含工具輸出",
+        "description": "匯出工具執行結果。"
+      }
     },
     "directories": {
       "claude": "Claude 設定目錄",
