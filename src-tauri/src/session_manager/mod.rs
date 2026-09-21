@@ -33,7 +33,7 @@ pub struct SessionMeta {
     pub can_delete: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SessionMessageKind {
     Text,

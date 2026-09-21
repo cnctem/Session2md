@@ -176,7 +176,71 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
         .collect::<std::collections::HashSet<_>>();
     let mut block_steps = std::collections::HashSet::new();
     let mut partial_chunks = std::collections::BTreeMap::<(u64, u64, u64, String), String>::new();
+
+    for value in values {
+        let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+        match event_type {
+            "assistant/chunk" => {
+                let Some(step) = dsh_step_key(value) else {
+                    continue;
+                };
+                if canonical_steps.contains(&step) {
+                    continue;
+                }
+                let Some(chunk) = value.get("data").and_then(|data| data.get("chunk")) else {
+                    continue;
+                };
+                if chunk.get("type").and_then(Value::as_str) != Some("block-end") {
+                    continue;
+                }
+                block_steps.insert(step);
+            }
+            "reasoning-chunks" | "text-chunks" => {
+                let Some((turn, step, index)) = dsh_chunk_key(value) else {
+                    continue;
+                };
+                let Some(texts) = value
+                    .get("data")
+                    .and_then(|data| data.get("texts"))
+                    .and_then(Value::as_array)
+                else {
+                    continue;
+                };
+                let text = texts.iter().filter_map(Value::as_str).collect::<String>();
+                if text.is_empty() {
+                    continue;
+                }
+                let kind = if event_type == "reasoning-chunks" {
+                    "reasoning"
+                } else {
+                    "text"
+                };
+                partial_chunks
+                    .entry((turn, step, index, kind.to_string()))
+                    .or_default()
+                    .push_str(&text);
+            }
+            _ => {}
+        }
+    }
+
+    let mut partial_by_step = std::collections::BTreeMap::<(u64, u64), Vec<ContentPart>>::new();
+    for ((turn, step, _index, kind), content) in partial_chunks {
+        if canonical_steps.contains(&(turn, step)) || block_steps.contains(&(turn, step)) {
+            continue;
+        }
+        partial_by_step
+            .entry((turn, step))
+            .or_default()
+            .push(if kind == "reasoning" {
+                ContentPart::reasoning(content)
+            } else {
+                ContentPart::text(content)
+            });
+    }
+
     let mut output = Vec::new();
+    let mut emitted_partial_steps = std::collections::HashSet::new();
     let mut seen_tool_call_ids = std::collections::HashSet::<String>::new();
 
     for value in values {
@@ -213,7 +277,6 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                 if chunk.get("type").and_then(Value::as_str) != Some("block-end") {
                     continue;
                 }
-                block_steps.insert(step);
                 if let Some(block) = chunk.get("block") {
                     collect_tool_call_ids(block, &mut seen_tool_call_ids);
                     output.extend(messages_from_content("assistant", block, ts));
@@ -264,50 +327,18 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                 }
             }
             "reasoning-chunks" | "text-chunks" => {
-                let Some((turn, step, index)) = dsh_chunk_key(value) else {
+                let Some((turn, step, _index)) = dsh_chunk_key(value) else {
                     continue;
                 };
-                let Some(texts) = value
-                    .get("data")
-                    .and_then(|data| data.get("texts"))
-                    .and_then(Value::as_array)
-                else {
-                    continue;
-                };
-                let text = texts.iter().filter_map(Value::as_str).collect::<String>();
-                if text.is_empty() {
-                    continue;
+                let key = (turn, step);
+                if emitted_partial_steps.insert(key) {
+                    if let Some(parts) = partial_by_step.get(&key) {
+                        output.extend(messages_from_parts("assistant", parts, ts));
+                    }
                 }
-                let kind = if event_type == "reasoning-chunks" {
-                    "reasoning"
-                } else {
-                    "text"
-                };
-                partial_chunks
-                    .entry((turn, step, index, kind.to_string()))
-                    .or_default()
-                    .push_str(&text);
             }
             _ => {}
         }
-    }
-
-    let mut partial_by_step = std::collections::BTreeMap::<(u64, u64), Vec<ContentPart>>::new();
-    for ((turn, step, _index, kind), content) in partial_chunks {
-        if canonical_steps.contains(&(turn, step)) || block_steps.contains(&(turn, step)) {
-            continue;
-        }
-        partial_by_step
-            .entry((turn, step))
-            .or_default()
-            .push(if kind == "reasoning" {
-                ContentPart::reasoning(content)
-            } else {
-                ContentPart::text(content)
-            });
-    }
-    for (_, parts) in partial_by_step {
-        output.extend(messages_from_parts("assistant", &parts, None));
     }
 
     output
@@ -638,6 +669,42 @@ mod tests {
             crate::session_manager::SessionMessageKind::Text
         );
         assert_eq!(messages[2].content, "partial answer");
+    }
+
+    #[test]
+    fn keeps_partial_chunks_between_user_turns() {
+        let root = tempdir().expect("root");
+        let path = root.path().join("session.jsonl");
+        let lines = [
+            json!({"type":"user/message","time":1_i64,"data":{"content":[{"type":"text","text":"first question"}]}}),
+            json!({"type":"text-chunks","time":2_i64,"data":{"turn":1,"step":1,"index":0,"texts":["first ","answer"]}}),
+            json!({"type":"user/message","time":3_i64,"data":{"content":[{"type":"text","text":"second question"}]}}),
+            json!({"type":"text-chunks","time":4_i64,"data":{"turn":2,"step":1,"index":0,"texts":["second ","answer"]}}),
+        ];
+        fs::write(
+            &path,
+            lines
+                .into_iter()
+                .map(|line| line.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .expect("write");
+
+        let messages = load_messages(&path).expect("messages");
+
+        assert_eq!(
+            messages
+                .iter()
+                .map(|message| message.content.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "first question",
+                "first answer",
+                "second question",
+                "second answer",
+            ]
+        );
     }
 
     #[test]

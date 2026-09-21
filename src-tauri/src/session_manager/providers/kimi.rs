@@ -4,11 +4,19 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::session_manager::{paths, SessionMessage, SessionMeta};
+use crate::session_manager::{paths, SessionMessage, SessionMessageKind, SessionMeta};
 
 use super::common::{messages_from_content, read_json, read_jsonl, walk_files, ContentPart};
 
 const PROVIDER_ID: &str = "kimi";
+
+type MessageKey = (String, SessionMessageKind, String, Option<String>);
+
+struct OrderedMessage {
+    record_index: usize,
+    part_index: usize,
+    message: SessionMessage,
+}
 
 pub fn session_roots() -> Vec<PathBuf> {
     if let Some(configured) = crate::session2md_settings::directory_override("kimi") {
@@ -36,54 +44,64 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
 pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let wire = wire_path(path)?;
     let values = read_jsonl(&wire)?;
-    let mut messages = visible_records(&values);
-    for loop_message in loop_event_messages(&values) {
-        let duplicate = messages.iter().any(|message| {
-            message.role == loop_message.role
-                && message.kind == loop_message.kind
-                && message.content == loop_message.content
-                && message.tool_call_id == loop_message.tool_call_id
-        });
-        if !duplicate {
-            messages.push(loop_message);
-        }
-    }
-    Ok(messages)
+    let mut messages = canonical_records(&values);
+    let canonical_keys = messages
+        .iter()
+        .map(|entry| message_key(&entry.message))
+        .collect::<HashSet<_>>();
+    messages.extend(loop_event_records(&values, &canonical_keys));
+    messages.sort_by_key(|entry| (entry.record_index, entry.part_index));
+    Ok(messages.into_iter().map(|entry| entry.message).collect())
 }
 
-fn visible_records(values: &[Value]) -> Vec<SessionMessage> {
+fn canonical_records(values: &[Value]) -> Vec<OrderedMessage> {
     let mut output = Vec::new();
-    for value in values {
+    for (record_index, value) in values.iter().enumerate() {
+        let mut part_index = 0;
         let ts = record_time(value);
         if let Some(record_type) = value.get("type").and_then(Value::as_str) {
             match record_type {
                 "turn.prompt" => {
-                    output.extend(messages_from_content(
-                        "user",
-                        value.get("input").unwrap_or(&Value::Null),
-                        ts,
-                    ));
+                    append_ordered(
+                        &mut output,
+                        record_index,
+                        &mut part_index,
+                        messages_from_content(
+                            "user",
+                            value.get("input").unwrap_or(&Value::Null),
+                            ts,
+                        ),
+                    );
                 }
                 "context.append_message" => {
                     if let Some(message) = value.get("message") {
                         let role = message.get("role").and_then(Value::as_str).unwrap_or("");
                         let content = message.get("content").unwrap_or(&Value::Null);
                         let normalized = super::common::normalize_role(role);
+                        let normalized_messages = messages_from_content(role, content, ts);
                         if normalized == "user"
-                            && output.last().is_some_and(|last| {
-                                last.role == "user"
-                                    && last.content
-                                        == super::common::messages_from_content("user", content, ts)
-                                            .first()
-                                            .map(|message| message.content.as_str())
-                                            .unwrap_or_default()
+                            && normalized_messages.first().is_some_and(|candidate| {
+                                output.last().is_some_and(|last| {
+                                    last.message.role == "user"
+                                        && last.message.content == candidate.content
+                                })
                             })
                         {
                             continue;
                         }
-                        output.extend(messages_from_content(role, content, ts));
+                        append_ordered(
+                            &mut output,
+                            record_index,
+                            &mut part_index,
+                            normalized_messages,
+                        );
                         if let Some(tool_calls) = message.get("toolCalls") {
-                            output.extend(messages_from_content("assistant", tool_calls, ts));
+                            append_ordered(
+                                &mut output,
+                                record_index,
+                                &mut part_index,
+                                messages_from_content("assistant", tool_calls, ts),
+                            );
                         }
                     }
                 }
@@ -94,16 +112,28 @@ fn visible_records(values: &[Value]) -> Vec<SessionMessage> {
             if let Some(record_type) = message.get("type").and_then(Value::as_str) {
                 let payload = message.get("payload").unwrap_or(&Value::Null);
                 match record_type {
-                    "TurnBegin" | "SteerInput" => output.extend(messages_from_content(
-                        "user",
-                        payload.get("user_input").unwrap_or(&Value::Null),
-                        ts,
-                    )),
-                    "TextPart" | "ThinkPart" => {
-                        output.extend(messages_from_content("assistant", payload, ts))
-                    }
-                    "ToolCall" => output.extend(messages_from_content("tool", payload, ts)),
-                    "ToolResult" => output.extend(messages_from_content("tool", payload, ts)),
+                    "TurnBegin" | "SteerInput" => append_ordered(
+                        &mut output,
+                        record_index,
+                        &mut part_index,
+                        messages_from_content(
+                            "user",
+                            payload.get("user_input").unwrap_or(&Value::Null),
+                            ts,
+                        ),
+                    ),
+                    "TextPart" | "ThinkPart" => append_ordered(
+                        &mut output,
+                        record_index,
+                        &mut part_index,
+                        messages_from_content("assistant", payload, ts),
+                    ),
+                    "ToolCall" | "ToolResult" => append_ordered(
+                        &mut output,
+                        record_index,
+                        &mut part_index,
+                        messages_from_content("tool", payload, ts),
+                    ),
                     _ => {}
                 }
             }
@@ -112,78 +142,119 @@ fn visible_records(values: &[Value]) -> Vec<SessionMessage> {
     output
 }
 
-fn loop_event_messages(values: &[Value]) -> Vec<SessionMessage> {
-    let mut parts = Vec::new();
-    let mut ts = None;
-    for value in values {
+fn loop_event_records(
+    values: &[Value],
+    canonical_keys: &HashSet<MessageKey>,
+) -> Vec<OrderedMessage> {
+    let mut output = Vec::new();
+    let mut seen = HashSet::new();
+    for (record_index, value) in values.iter().enumerate() {
         if value.get("type").and_then(Value::as_str) != Some("context.append_loop_event") {
             continue;
         }
-        ts = ts.or_else(|| record_time(value));
-        let Some(event) = value.get("event") else {
-            continue;
-        };
-        match event.get("type").and_then(Value::as_str) {
-            Some("content.part") => {
-                if let Some(part) = event.get("part") {
-                    parts.extend(super::common::normalize_content_parts(part));
-                }
+        let mut part_index = 0;
+        for message in loop_event_messages(value) {
+            let key = message_key(&message);
+            if canonical_keys.contains(&key) || !seen.insert(key) {
+                continue;
             }
-            Some("tool.call") => {
-                let arguments = event
-                    .get("args")
-                    .map(|value| match value {
-                        Value::String(value) => value.clone(),
-                        _ => value.to_string(),
-                    })
-                    .or_else(|| {
-                        event
-                            .get("display")
-                            .and_then(|display| display.get("command"))
-                            .and_then(Value::as_str)
-                            .map(str::to_string)
-                    })
-                    .unwrap_or_default();
-                parts.push(ContentPart::tool_call_with_metadata(
-                    event
-                        .get("name")
-                        .and_then(Value::as_str)
-                        .unwrap_or("unknown"),
-                    arguments,
-                    event
-                        .get("toolCallId")
-                        .or_else(|| event.get("tool_call_id"))
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                ));
-            }
-            Some("tool.result") => {
-                let result = event
-                    .get("result")
-                    .and_then(|result| result.get("output"))
-                    .or_else(|| event.get("result"))
-                    .map(|value| match value {
-                        Value::String(value) => value.clone(),
-                        _ => value.to_string(),
-                    })
-                    .unwrap_or_default();
-                parts.push(ContentPart::tool_result_with_metadata(
-                    result,
-                    event
-                        .get("toolCallId")
-                        .or_else(|| event.get("tool_call_id"))
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                    event
-                        .get("name")
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                ));
-            }
-            _ => {}
+            append_ordered(&mut output, record_index, &mut part_index, vec![message]);
         }
     }
+    output
+}
+
+fn loop_event_messages(value: &Value) -> Vec<SessionMessage> {
+    let mut parts = Vec::new();
+    let ts = record_time(value);
+    let Some(event) = value.get("event") else {
+        return Vec::new();
+    };
+    match event.get("type").and_then(Value::as_str) {
+        Some("content.part") => {
+            if let Some(part) = event.get("part") {
+                parts.extend(super::common::normalize_content_parts(part));
+            }
+        }
+        Some("tool.call") => {
+            let arguments = event
+                .get("args")
+                .map(|value| match value {
+                    Value::String(value) => value.clone(),
+                    _ => value.to_string(),
+                })
+                .or_else(|| {
+                    event
+                        .get("display")
+                        .and_then(|display| display.get("command"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
+                .unwrap_or_default();
+            parts.push(ContentPart::tool_call_with_metadata(
+                event
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown"),
+                arguments,
+                event
+                    .get("toolCallId")
+                    .or_else(|| event.get("tool_call_id"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            ));
+        }
+        Some("tool.result") => {
+            let result = event
+                .get("result")
+                .and_then(|result| result.get("output"))
+                .or_else(|| event.get("result"))
+                .map(|value| match value {
+                    Value::String(value) => value.clone(),
+                    _ => value.to_string(),
+                })
+                .unwrap_or_default();
+            parts.push(ContentPart::tool_result_with_metadata(
+                result,
+                event
+                    .get("toolCallId")
+                    .or_else(|| event.get("tool_call_id"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                event
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            ));
+        }
+        _ => {}
+    }
     super::common::messages_from_parts("assistant", &parts, ts)
+}
+
+fn append_ordered(
+    output: &mut Vec<OrderedMessage>,
+    record_index: usize,
+    part_index: &mut usize,
+    messages: Vec<SessionMessage>,
+) {
+    for message in messages {
+        output.push(OrderedMessage {
+            record_index,
+            part_index: *part_index,
+            message,
+        });
+        *part_index += 1;
+    }
+}
+
+fn message_key(message: &SessionMessage) -> MessageKey {
+    (
+        message.role.clone(),
+        message.kind.clone(),
+        message.content.clone(),
+        message.tool_call_id.clone(),
+    )
 }
 
 fn record_time(value: &Value) -> Option<i64> {
@@ -355,12 +426,62 @@ mod tests {
     }
 
     #[test]
+    fn preserves_loop_event_order_across_turns() {
+        let root = tempfile::tempdir().expect("root");
+        fs::write(
+            root.path().join("wire.jsonl"),
+            [
+                r#"{"type":"turn.prompt","input":"first"}"#,
+                r#"{"type":"context.append_loop_event","timestamp":1,"event":{"type":"content.part","part":{"type":"text","text":"first answer"}}}"#,
+                r#"{"type":"context.append_loop_event","timestamp":2,"event":{"type":"tool.call","name":"Bash","toolCallId":"call-1","args":{"command":"pwd"}}}"#,
+                r#"{"type":"context.append_loop_event","timestamp":3,"event":{"type":"tool.result","toolCallId":"call-1","result":{"output":"/tmp"}}}"#,
+                r#"{"type":"turn.prompt","input":"second"}"#,
+                r#"{"type":"context.append_loop_event","timestamp":5,"event":{"type":"content.part","part":{"type":"text","text":"second answer"}}}"#,
+            ]
+            .join("\n"),
+        )
+        .expect("write");
+
+        let messages = load_messages(root.path()).expect("messages");
+
+        assert_eq!(
+            messages
+                .iter()
+                .map(|message| message.content.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "first",
+                "first answer",
+                r#"{"command":"pwd"}"#,
+                "/tmp",
+                "second",
+                "second answer",
+            ]
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .map(|message| message.kind.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                SessionMessageKind::Text,
+                SessionMessageKind::Text,
+                SessionMessageKind::ToolCall,
+                SessionMessageKind::ToolResult,
+                SessionMessageKind::Text,
+                SessionMessageKind::Text,
+            ]
+        );
+    }
+
+    #[test]
     fn merges_loop_tool_calls_with_canonical_messages() {
         let root = tempfile::tempdir().expect("root");
         fs::write(
             root.path().join("wire.jsonl"),
             [
                 r#"{"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"answer"}]}}"#,
+                r#"{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"answer"}}}"#,
                 r#"{"type":"context.append_loop_event","event":{"type":"tool.call","name":"Bash","toolCallId":"call-1","args":{"command":"pwd"}}}"#,
                 r#"{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call-1","result":{"output":"/tmp"}}}"#,
             ]
@@ -369,6 +490,10 @@ mod tests {
         .expect("write");
 
         let messages = load_messages(root.path()).expect("messages");
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0].content, "answer");
+        assert_eq!(messages[1].kind, SessionMessageKind::ToolCall);
+        assert_eq!(messages[2].kind, SessionMessageKind::ToolResult);
         assert!(messages.iter().any(|message| {
             message.kind == crate::session_manager::SessionMessageKind::ToolCall
                 && message.tool_name.as_deref() == Some("Bash")
