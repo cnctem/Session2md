@@ -6,8 +6,11 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { LanguageSettings } from "@/components/settings/LanguageSettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
+import { SessionProviderIcon } from "@/components/sessions/SessionProviderIcon";
+import { getProviderLabel } from "@/components/sessions/utils";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
   TooltipContent,
@@ -22,7 +25,9 @@ import {
 import {
   SESSION_DIRECTORY_IDS,
   SESSION_DIRECTORY_LABEL_KEYS,
+  SESSION_PROVIDER_IDS,
   type SessionDirectoryId,
+  type SessionProviderId,
 } from "@/lib/sessionProviders";
 import {
   session2mdSettingsKey,
@@ -58,9 +63,8 @@ export function Session2mdSettingsPage() {
 
   const saveMutation = useMutation({
     mutationFn: (next: Session2mdSettings) => session2mdSettingsApi.save(next),
-    onSuccess: async (snapshot) => {
+    onSuccess: (snapshot) => {
       queryClient.setQueryData(session2mdSettingsKey, snapshot);
-      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     },
   });
 
@@ -76,6 +80,14 @@ export function Session2mdSettingsPage() {
       ]),
     ) as Record<SessionDirectoryId, string>;
   }, [drafts, settings]);
+
+  const hiddenProviders = useMemo(
+    () => new Set(settings?.hiddenProviders ?? []),
+    [settings?.hiddenProviders],
+  );
+  const allProvidersVisible = hiddenProviders.size === 0;
+  const allProvidersHidden =
+    hiddenProviders.size === SESSION_PROVIDER_IDS.length;
 
   const changeLanguage = (nextLanguage: LanguageOption) => {
     setLanguage(nextLanguage);
@@ -98,7 +110,11 @@ export function Session2mdSettingsPage() {
     }
 
     try {
-      await saveMutation.mutateAsync({ directoryOverrides: nextOverrides });
+      await saveMutation.mutateAsync({
+        directoryOverrides: nextOverrides,
+        hiddenProviders: settings.hiddenProviders,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setDrafts((current) => {
         const next = { ...current };
         delete next[directoryId];
@@ -111,6 +127,49 @@ export function Session2mdSettingsPage() {
         }),
       );
     }
+  };
+
+  const saveProviderVisibility = async (
+    nextHiddenProviders: Set<SessionProviderId>,
+  ) => {
+    if (!settings) return;
+
+    const previousSettings = settings;
+    const hiddenProviderList = SESSION_PROVIDER_IDS.filter((providerId) =>
+      nextHiddenProviders.has(providerId),
+    );
+    queryClient.setQueryData(session2mdSettingsKey, {
+      ...settings,
+      hiddenProviders: hiddenProviderList,
+    });
+
+    try {
+      await saveMutation.mutateAsync({
+        directoryOverrides: settings.directoryOverrides,
+        hiddenProviders: hiddenProviderList,
+      });
+    } catch (error) {
+      queryClient.setQueryData(session2mdSettingsKey, previousSettings);
+      toast.error(
+        t("sessionSettings.providerVisibility.saveFailed", {
+          error: String(error),
+        }),
+      );
+    }
+  };
+
+  const setProviderVisible = async (
+    providerId: SessionProviderId,
+    visible: boolean,
+  ) => {
+    if (!settings) return;
+    const nextHiddenProviders = new Set(settings.hiddenProviders);
+    if (visible) {
+      nextHiddenProviders.delete(providerId);
+    } else {
+      nextHiddenProviders.add(providerId);
+    }
+    await saveProviderVisibility(nextHiddenProviders);
   };
 
   const browseDirectory = async (directoryId: SessionDirectoryId) => {
@@ -160,6 +219,73 @@ export function Session2mdSettingsPage() {
             <TabsContent value="general" className="max-w-2xl space-y-8 py-6">
               <LanguageSettings value={language} onChange={changeLanguage} />
               <ThemeSettings />
+              <section className="space-y-5">
+                <header className="space-y-1">
+                  <h2 className="text-base font-semibold">
+                    {t("sessionSettings.providerVisibility.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("sessionSettings.providerVisibility.description")}
+                  </p>
+                </header>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={saveMutation.isPending || allProvidersVisible}
+                    onClick={() => void saveProviderVisibility(new Set())}
+                  >
+                    {t("sessionSettings.providerVisibility.selectAll")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={saveMutation.isPending || allProvidersHidden}
+                    onClick={() =>
+                      void saveProviderVisibility(new Set(SESSION_PROVIDER_IDS))
+                    }
+                  >
+                    {t("sessionSettings.providerVisibility.clearAll")}
+                  </Button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {SESSION_PROVIDER_IDS.map((providerId) => {
+                    const checkboxId = `session-provider-visible-${providerId}`;
+                    return (
+                      <label
+                        key={providerId}
+                        htmlFor={checkboxId}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                      >
+                        <Checkbox
+                          id={checkboxId}
+                          checked={!hiddenProviders.has(providerId)}
+                          disabled={saveMutation.isPending}
+                          onCheckedChange={(checked) =>
+                            void setProviderVisible(
+                              providerId,
+                              checked === true,
+                            )
+                          }
+                        />
+                        <span aria-hidden="true">
+                          <SessionProviderIcon
+                            providerId={providerId}
+                            size={16}
+                          />
+                        </span>
+                        <span className="min-w-0 truncate">
+                          {getProviderLabel(providerId, t)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
             </TabsContent>
 
             <TabsContent value="advanced" className="max-w-3xl py-6">

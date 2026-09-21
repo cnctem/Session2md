@@ -1,4 +1,9 @@
 import type { AppId } from "@/lib/api/types";
+import type { Session2mdSettingsSnapshot } from "@/lib/api/session2mdSettings";
+import {
+  SESSION_PROVIDER_IDS,
+  type SessionProviderId,
+} from "@/lib/sessionProviders";
 import type {
   McpServer,
   Provider,
@@ -152,6 +157,10 @@ const createDefaultSessionMessages = (): Record<string, SessionMessage[]> => ({
 
 let sessionsState = createDefaultSessions();
 let sessionMessagesState = createDefaultSessionMessages();
+let session2mdSettingsState = {
+  directoryOverrides: {} as Record<string, string>,
+  hiddenProviders: [] as SessionProviderId[],
+};
 let mcpConfigs: McpConfigState = {
   claude: {
     sample: {
@@ -213,6 +222,10 @@ export const resetProviderState = () => {
   };
   sessionsState = createDefaultSessions();
   sessionMessagesState = createDefaultSessionMessages();
+  session2mdSettingsState = {
+    directoryOverrides: {},
+    hiddenProviders: [],
+  };
   settingsState = {
     showInTray: true,
     minimizeToTrayOnClose: true,
@@ -425,6 +438,39 @@ export const deleteSession = (
   sessionsState.splice(index, 1);
   delete sessionMessagesState[sessionMessageKey(providerId, sourcePath)];
   return true;
+};
+
+export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
+  directoryOverrides: deepClone(
+    session2mdSettingsState.directoryOverrides,
+  ) as Session2mdSettingsSnapshot["directoryOverrides"],
+  hiddenProviders: [...session2mdSettingsState.hiddenProviders],
+  resolvedDirectories: Object.fromEntries(
+    SESSION_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      `/mock/${providerId}`,
+    ]),
+  ) as Session2mdSettingsSnapshot["resolvedDirectories"],
+});
+
+export const saveSession2mdSettings = (settings: {
+  directoryOverrides: Record<string, string>;
+  hiddenProviders: SessionProviderId[];
+}) => {
+  session2mdSettingsState = {
+    directoryOverrides: deepClone(settings.directoryOverrides) as Record<
+      string,
+      string
+    >,
+    hiddenProviders: [...settings.hiddenProviders],
+  };
+  return getSession2mdSettings();
+};
+
+export const setHiddenSessionProviders = (
+  providerIds: SessionProviderId[],
+) => {
+  session2mdSettingsState.hiddenProviders = [...providerIds];
 };
 
 export const setSessionFixtures = (

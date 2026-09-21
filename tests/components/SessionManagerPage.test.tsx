@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
 import { sessionsApi } from "@/lib/api/sessions";
 import type { SessionMessage, SessionMeta } from "@/types";
-import { setSessionFixtures } from "../msw/state";
+import { setHiddenSessionProviders, setSessionFixtures } from "../msw/state";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
@@ -400,6 +400,23 @@ describe("SessionManagerPage", () => {
 
     expect(screen.getAllByText("Alpha Session")).not.toHaveLength(0);
     expect(screen.queryByText("Claude Session")).not.toBeInTheDocument();
+  });
+
+  it("hides providers disabled in settings from the list and filter", async () => {
+    setHiddenSessionProviders(["claude"]);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Alpha Session")).toBeInTheDocument();
+    expect(screen.queryByText("Claude Session")).not.toBeInTheDocument();
+
+    const filter = screen.getByRole("combobox", {
+      name: "sessionManager.providerFilterTooltip",
+    });
+    await user.click(filter);
+    expect(
+      screen.queryByRole("option", { name: /Claude/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters to Pi sessions and exports their messages", async () => {

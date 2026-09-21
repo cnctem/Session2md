@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-pub const DIRECTORY_IDS: [&str; 25] = [
+pub const SESSION_PROVIDER_IDS: [&str; 25] = [
     "claude",
     "codex",
     "gemini",
@@ -36,12 +36,15 @@ pub const DIRECTORY_IDS: [&str; 25] = [
 pub struct Session2mdSettings {
     #[serde(default)]
     pub directory_overrides: BTreeMap<String, String>,
+    #[serde(default)]
+    pub hidden_providers: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session2mdSettingsSnapshot {
     pub directory_overrides: BTreeMap<String, String>,
+    pub hidden_providers: BTreeSet<String>,
     pub resolved_directories: BTreeMap<String, String>,
 }
 
@@ -97,13 +100,14 @@ pub fn directory_override(directory_id: &str) -> Option<PathBuf> {
 fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
     Session2mdSettingsSnapshot {
         directory_overrides: settings.directory_overrides,
+        hidden_providers: settings.hidden_providers,
         resolved_directories: crate::session_manager::paths::resolved_directories(),
     }
 }
 
 fn normalize_settings(settings: &mut Session2mdSettings) {
     settings.directory_overrides.retain(|directory_id, value| {
-        if !DIRECTORY_IDS.contains(&directory_id.as_str()) {
+        if !SESSION_PROVIDER_IDS.contains(&directory_id.as_str()) {
             return false;
         }
 
@@ -115,6 +119,9 @@ fn normalize_settings(settings: &mut Session2mdSettings) {
         *value = trimmed.to_string();
         true
     });
+    settings
+        .hidden_providers
+        .retain(|provider_id| SESSION_PROVIDER_IDS.contains(&provider_id.as_str()));
 }
 
 fn settings_path() -> PathBuf {
@@ -144,7 +151,7 @@ fn resolve_user_path(value: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{normalize_settings, Session2mdSettings};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn normalization_keeps_only_known_non_empty_directory_overrides() {
@@ -154,6 +161,7 @@ mod tests {
                 ("unknown".to_string(), "/tmp/unknown".to_string()),
                 ("claude".to_string(), "   ".to_string()),
             ]),
+            hidden_providers: BTreeSet::new(),
         };
 
         normalize_settings(&mut settings);
@@ -162,5 +170,32 @@ mod tests {
             settings.directory_overrides,
             BTreeMap::from([("codex".to_string(), "/tmp/codex".to_string())])
         );
+    }
+
+    #[test]
+    fn normalization_keeps_only_known_hidden_providers() {
+        let mut settings = Session2mdSettings {
+            directory_overrides: BTreeMap::new(),
+            hidden_providers: BTreeSet::from([
+                "codex".to_string(),
+                "unknown".to_string(),
+                "dsh".to_string(),
+            ]),
+        };
+
+        normalize_settings(&mut settings);
+
+        assert_eq!(
+            settings.hidden_providers,
+            BTreeSet::from(["codex".to_string(), "dsh".to_string()])
+        );
+    }
+
+    #[test]
+    fn missing_hidden_providers_defaults_to_empty() {
+        let settings: Session2mdSettings =
+            serde_json::from_str(r#"{"directoryOverrides":{}}"#).expect("settings");
+
+        assert!(settings.hidden_providers.is_empty());
     }
 }

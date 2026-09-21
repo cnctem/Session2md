@@ -897,7 +897,7 @@
     "reasonix": "Reasonix",
     "mimocode": "MiMo Code",
     "zcode": "ZCode",
-    "kimi": "Kimi",
+    "kimi": "Kimi Code",
     "kilocode": "Kilo Code",
     "qoder": "Qoder CLI",
     "workbuddy": "WorkBuddy",
@@ -908,7 +908,7 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
-    "dsh": "DeepSeek"
+    "dsh": "DSH"
   },
   "appSwitcher": {
     "more": "More apps"
@@ -1011,6 +1011,13 @@
     "directoryOverrides": {
       "title": "Configuration Directory Overrides",
       "description": "These paths are used only by Session2md to read local sessions. They do not modify CC Switch or agent applications."
+    },
+    "providerVisibility": {
+      "title": "Agent Visibility",
+      "description": "Choose which agents appear in the session list. Hiding an agent only affects Session2md and does not delete or modify any session data.",
+      "selectAll": "Select all",
+      "clearAll": "Clear all",
+      "saveFailed": "Failed to save agent visibility settings: {{error}}"
     },
     "directories": {
       "claude": "Claude configuration directory",

@@ -23,6 +23,7 @@ import {
   useSessionMessagesQuery,
   useSessionsQuery,
 } from "@/lib/query/sessions";
+import { useSession2mdSettingsQuery } from "@/lib/query/session2mdSettings";
 import { sessionsApi } from "@/lib/api/sessions";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { Button } from "@/components/ui/button";
@@ -89,8 +90,6 @@ type GroupSelectionState = {
   selectedCount: number;
   selectableCount: number;
 };
-
-const PROVIDER_FILTERS: ProviderFilter[] = ["all", ...SESSION_PROVIDER_IDS];
 
 const isDeletableSession = (session: SessionMeta) =>
   Boolean(session.sourcePath) && session.canDelete !== false;
@@ -165,6 +164,7 @@ export function SessionManagerPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch } = useSessionsQuery();
+  const { data: sessionSettings } = useSession2mdSettingsQuery();
   const sessions = data ?? [];
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
   const [search, setSearch] = useState("");
@@ -194,8 +194,27 @@ export function SessionManagerPage() {
   );
   const messageRefs = useRef(new Map<number, HTMLDivElement>());
 
+  const hiddenProviderIds = useMemo(
+    () => new Set<string>(sessionSettings?.hiddenProviders ?? []),
+    [sessionSettings?.hiddenProviders],
+  );
+  const visibleSessions = useMemo(
+    () =>
+      sessions.filter((session) => !hiddenProviderIds.has(session.providerId)),
+    [hiddenProviderIds, sessions],
+  );
+  const providerFilterOptions = useMemo<ProviderFilter[]>(
+    () => [
+      "all",
+      ...SESSION_PROVIDER_IDS.filter(
+        (providerId) => !hiddenProviderIds.has(providerId),
+      ),
+    ],
+    [hiddenProviderIds],
+  );
+
   const { search: searchSessions } = useSessionSearch({
-    sessions,
+    sessions: visibleSessions,
     providerFilter,
   });
   const filteredSessions = useMemo(
@@ -212,15 +231,23 @@ export function SessionManagerPage() {
   );
   const validGroupExpansionKeys = useMemo(
     () => ({
-      providerIds: new Set(sessions.map((session) => session.providerId)),
+      providerIds: new Set(
+        visibleSessions.map((session) => session.providerId),
+      ),
       directoryKeys: new Set(
-        sessions.map((session) =>
+        visibleSessions.map((session) =>
           getSessionDirectoryGroupKey(session.providerId, session.projectDir),
         ),
       ),
     }),
-    [sessions],
+    [visibleSessions],
   );
+
+  useEffect(() => {
+    if (providerFilter !== "all" && hiddenProviderIds.has(providerFilter)) {
+      setProviderFilter("all");
+    }
+  }, [hiddenProviderIds, providerFilter]);
 
   useEffect(() => {
     window.localStorage.setItem(LIST_VIEW_MODE_STORAGE_KEY, listViewMode);
@@ -263,7 +290,7 @@ export function SessionManagerPage() {
 
   useEffect(() => {
     const validKeys = new Set(
-      sessions.map((session) => getSessionKey(session)),
+      visibleSessions.map((session) => getSessionKey(session)),
     );
     setSelectedSessionKeys((current) => {
       const next = new Set(
@@ -271,7 +298,7 @@ export function SessionManagerPage() {
       );
       return next.size === current.size ? current : next;
     });
-  }, [sessions]);
+  }, [visibleSessions]);
 
   const selectedSession = useMemo(
     () =>
@@ -341,12 +368,12 @@ export function SessionManagerPage() {
   );
   const selectedDeletableSessions = useMemo(
     () =>
-      sessions.filter(
+      visibleSessions.filter(
         (session) =>
           isDeletableSession(session) &&
           selectedSessionKeys.has(getSessionKey(session)),
       ),
-    [selectedSessionKeys, sessions],
+    [selectedSessionKeys, visibleSessions],
   );
   const allFilteredSelected =
     deletableFilteredSessions.length > 0 &&
@@ -708,7 +735,7 @@ export function SessionManagerPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDER_FILTERS.map((provider) => (
+                    {providerFilterOptions.map((provider) => (
                       <SelectItem key={provider} value={provider}>
                         <div className="flex items-center gap-2">
                           <SessionProviderIcon

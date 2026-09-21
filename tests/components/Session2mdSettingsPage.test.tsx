@@ -5,7 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SESSION_DIRECTORY_IDS } from "@/lib/sessionProviders";
+import {
+  SESSION_DIRECTORY_IDS,
+  SESSION_PROVIDER_IDS,
+} from "@/lib/sessionProviders";
 
 const settingsApiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -41,6 +44,11 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Configuration Directory Overrides",
             "sessionSettings.directoryOverrides.description":
               "Session-only paths",
+            "sessionSettings.providerVisibility.title": "Agent Visibility",
+            "sessionSettings.providerVisibility.description":
+              "Choose visible agents",
+            "sessionSettings.providerVisibility.selectAll": "Select all",
+            "sessionSettings.providerVisibility.clearAll": "Clear all",
             "sessionSettings.directories.claude": "Claude",
             "sessionSettings.directories.codex": "Codex",
             "sessionSettings.directories.gemini": "Gemini",
@@ -52,6 +60,7 @@ vi.mock("react-i18next", async (importOriginal) => {
             "sessionSettings.directories.dsh": "DeepSeek Harness",
             "sessionSettings.browseDirectory": "Choose directory",
             "sessionSettings.resetDirectory": "Restore default directory",
+            "apps.codex": "Codex",
           }) as Record<string, string>
         )[key] ?? key,
     }),
@@ -87,6 +96,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 const snapshot = {
   directoryOverrides: {},
+  hiddenProviders: [],
   resolvedDirectories: Object.fromEntries(
     SESSION_DIRECTORY_IDS.map((id) => [id, `/home/mock/${id}`]),
   ) as Record<(typeof SESSION_DIRECTORY_IDS)[number], string>,
@@ -110,6 +120,7 @@ describe("Session2mdSettingsPage", () => {
     settingsApiMock.save.mockImplementation(async (next) => ({
       ...snapshot,
       directoryOverrides: next.directoryOverrides,
+      hiddenProviders: next.hiddenProviders,
     }));
   });
 
@@ -154,6 +165,48 @@ describe("Session2mdSettingsPage", () => {
     await waitFor(() =>
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
+        hiddenProviders: [],
+      }),
+    );
+  });
+
+  it("saves hidden providers while preserving directory overrides", async () => {
+    settingsApiMock.get.mockResolvedValue({
+      ...snapshot,
+      directoryOverrides: { codex: "/Volumes/work/codex" },
+    });
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    const codexVisibility = await screen.findByRole("checkbox", {
+      name: "Codex",
+    });
+    expect(codexVisibility).toBeChecked();
+    fireEvent.click(codexVisibility);
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenCalledWith({
+        directoryOverrides: { codex: "/Volumes/work/codex" },
+        hiddenProviders: ["codex"],
+      }),
+    );
+  });
+
+  it("can hide and show all providers", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Clear all" }));
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [...SESSION_PROVIDER_IDS],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
       }),
     );
   });

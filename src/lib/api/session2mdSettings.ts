@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   SESSION_DIRECTORY_IDS,
   type SessionDirectoryId,
+  type SessionProviderId,
 } from "@/lib/sessionProviders";
 
 export { SESSION_DIRECTORY_IDS };
@@ -9,6 +10,7 @@ export type { SessionDirectoryId };
 
 export interface Session2mdSettings {
   directoryOverrides: Partial<Record<SessionDirectoryId, string>>;
+  hiddenProviders: SessionProviderId[];
 }
 
 export interface Session2mdSettingsSnapshot extends Session2mdSettings {

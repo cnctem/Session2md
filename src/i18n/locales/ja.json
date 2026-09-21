@@ -897,7 +897,7 @@
     "reasonix": "Reasonix",
     "mimocode": "MiMo Code",
     "zcode": "ZCode",
-    "kimi": "Kimi",
+    "kimi": "Kimi Code",
     "kilocode": "Kilo Code",
     "qoder": "Qoder CLI",
     "workbuddy": "WorkBuddy",
@@ -908,7 +908,7 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
-    "dsh": "DeepSeek"
+    "dsh": "DSH"
   },
   "appSwitcher": {
     "more": "その他のアプリ"
@@ -1011,6 +1011,13 @@
     "directoryOverrides": {
       "title": "設定ディレクトリの上書き",
       "description": "これらのパスは Session2md がローカルセッションを読むためだけに使用します。CC Switch や Agent アプリケーションは変更しません。"
+    },
+    "providerVisibility": {
+      "title": "Agent の表示",
+      "description": "セッション一覧に表示する Agent を選択します。非表示にしても Session2md の表示だけが変わり、セッションデータは削除・変更されません。",
+      "selectAll": "すべて選択",
+      "clearAll": "すべて解除",
+      "saveFailed": "Agent の表示設定を保存できませんでした: {{error}}"
     },
     "directories": {
       "claude": "Claude 設定ディレクトリ",

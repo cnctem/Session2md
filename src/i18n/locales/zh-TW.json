@@ -898,7 +898,7 @@
     "reasonix": "Reasonix",
     "mimocode": "MiMo Code",
     "zcode": "ZCode",
-    "kimi": "Kimi",
+    "kimi": "Kimi Code",
     "kilocode": "Kilo Code",
     "qoder": "Qoder CLI",
     "workbuddy": "WorkBuddy",
@@ -909,7 +909,7 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
-    "dsh": "DeepSeek"
+    "dsh": "DSH"
   },
   "appSwitcher": {
     "more": "更多應用程式"
@@ -1012,6 +1012,13 @@
     "directoryOverrides": {
       "title": "設定目錄覆寫",
       "description": "這些路徑僅供 Session2md 讀取本機工作階段，不會修改 CC Switch 或 Agent 應用程式。"
+    },
+    "providerVisibility": {
+      "title": "Agent 顯示",
+      "description": "選擇哪些 Agent 的對話要顯示在清單中。隱藏只會影響 Session2md，不會刪除或修改任何對話資料。",
+      "selectAll": "全選",
+      "clearAll": "全部取消",
+      "saveFailed": "儲存 Agent 顯示設定失敗：{{error}}"
     },
     "directories": {
       "claude": "Claude 設定目錄",
