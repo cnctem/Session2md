@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MarkdownMessageContent } from "./MarkdownMessageContent";
 import {
   getMessageGroupCopyText,
   getToolInputDisplay,
@@ -31,6 +32,22 @@ import {
 const COLLAPSE_THRESHOLD = 3000;
 const COLLAPSED_LENGTH = 1500;
 
+const truncateMarkdownPreview = (content: string, maxLength: number) => {
+  const hardCut = content.slice(0, maxLength);
+  const lastNewline = hardCut.lastIndexOf("\n");
+  let preview =
+    lastNewline >= Math.floor(maxLength * 0.6)
+      ? hardCut.slice(0, lastNewline)
+      : hardCut;
+  const fences = Array.from(preview.matchAll(/^ {0,3}(`{3,}|~{3,})/gm));
+
+  if (fences.length % 2 === 1) {
+    preview += `\n${fences[fences.length - 1][1]}`;
+  }
+
+  return `${preview}…`;
+};
+
 interface MessageTextBlockProps {
   blockKey: string;
   content: string;
@@ -38,6 +55,9 @@ interface MessageTextBlockProps {
   onToggleBlock: (blockKey: string, expanded: boolean) => void;
   searchQuery?: string;
   className?: string;
+  renderMarkdown?: boolean;
+  onCopyCode?: (content: string) => void;
+  onOpenLink?: (url: string) => void;
 }
 
 function MessageTextBlock({
@@ -47,6 +67,9 @@ function MessageTextBlock({
   onToggleBlock,
   searchQuery,
   className,
+  renderMarkdown = false,
+  onCopyCode,
+  onOpenLink,
 }: MessageTextBlockProps) {
   const { t } = useTranslation();
   const expanded = expandedBlockOverrides.get(blockKey) ?? false;
@@ -58,20 +81,33 @@ function MessageTextBlock({
     content.toLowerCase().includes(searchQuery.toLowerCase());
   const collapsed = isLong && !expanded && !hasSearchMatch;
   const displayContent = collapsed
-    ? content.slice(0, COLLAPSED_LENGTH) + "…"
+    ? renderMarkdown
+      ? truncateMarkdownPreview(content, COLLAPSED_LENGTH)
+      : content.slice(0, COLLAPSED_LENGTH) + "…"
     : content;
+  const canRenderMarkdown = renderMarkdown && onCopyCode && onOpenLink;
 
   return (
     <>
       <div
         className={cn(
-          "whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed min-w-0",
+          "break-words [overflow-wrap:anywhere] text-sm leading-relaxed min-w-0",
+          !canRenderMarkdown && "whitespace-pre-wrap",
           className,
         )}
       >
-        {searchQuery
-          ? highlightText(displayContent, searchQuery)
-          : displayContent}
+        {canRenderMarkdown ? (
+          <MarkdownMessageContent
+            content={displayContent}
+            searchQuery={searchQuery}
+            onCopyCode={onCopyCode}
+            onOpenLink={onOpenLink}
+          />
+        ) : searchQuery ? (
+          highlightText(displayContent, searchQuery)
+        ) : (
+          displayContent
+        )}
       </div>
       {isLong && !hasSearchMatch && (
         <button
@@ -113,8 +149,11 @@ interface SessionMessageItemProps {
   defaultExpandThinking: boolean;
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
+  renderMarkdown: boolean;
   searchQuery?: string;
   onCopy: (content: string) => void;
+  onCopyCode: (content: string) => void;
+  onOpenLink: (url: string) => void;
   onToggleBlock: (blockKey: string, expanded: boolean) => void;
 }
 
@@ -125,8 +164,11 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   defaultExpandThinking,
   defaultExpandTools,
   defaultExpandSystem,
+  renderMarkdown,
   searchQuery,
   onCopy,
+  onCopyCode,
+  onOpenLink,
   onToggleBlock,
 }: SessionMessageItemProps) {
   const { t } = useTranslation();
@@ -318,6 +360,9 @@ export const SessionMessageItem = memo(function SessionMessageItem({
               expandedBlockOverrides={expandedBlockOverrides}
               onToggleBlock={onToggleBlock}
               searchQuery={searchQuery}
+              renderMarkdown={renderMarkdown}
+              onCopyCode={onCopyCode}
+              onOpenLink={onOpenLink}
             />
           )}
         </>

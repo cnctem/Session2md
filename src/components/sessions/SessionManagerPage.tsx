@@ -554,6 +554,25 @@ export function SessionManagerPage() {
     },
     [copyText, t],
   );
+  const handleCopyCode = useCallback(
+    (content: string) => {
+      void copyText(content, t("sessionManager.codeCopied"));
+    },
+    [copyText, t],
+  );
+  const handleOpenLink = useCallback(
+    (url: string) => {
+      void sessionsApi.openExternalUrl(url).catch((error) => {
+        toast.error(
+          t("sessionManager.openLinkFailed", {
+            error: extractErrorMessage(error),
+            defaultValue: "Failed to open link: {{error}}",
+          }),
+        );
+      });
+    },
+    [t],
+  );
 
   const deletableFilteredSessions = useMemo(
     () => filteredSessions.filter(isDeletableSession),
@@ -1399,8 +1418,13 @@ export function SessionManagerPage() {
                                     sessionSettings?.defaultExpandSystem ??
                                     false
                                   }
+                                  renderMarkdown={
+                                    sessionSettings?.renderMarkdown ?? true
+                                  }
                                   searchQuery={search}
                                   onCopy={handleCopyMessage}
+                                  onCopyCode={handleCopyCode}
+                                  onOpenLink={handleOpenLink}
                                   onToggleBlock={toggleMessageBlock}
                                 />
                               </div>

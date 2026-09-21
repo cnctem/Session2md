@@ -1003,7 +1003,12 @@
     "messageCopied": "已複製訊息內容",
     "conversationHistory": "對話紀錄",
     "expandContent": "展開完整內容",
-    "collapseContent": "收起"
+    "collapseContent": "收起",
+    "codeBlock": "程式碼",
+    "copyCode": "複製程式碼",
+    "codeCopied": "已複製程式碼",
+    "imagePlaceholder": "[圖片：{{alt}}]",
+    "openLinkFailed": "開啟連結失敗：{{error}}"
   },
   "sessionSettings": {
     "title": "設定",
@@ -1038,6 +1043,15 @@
       "expandSystem": {
         "label": "預設展開系統",
         "description": "進入工作階段時自動展開系統訊息。"
+      }
+    },
+    "messagePreview": {
+      "title": "訊息預覽",
+      "description": "控制使用者與 AI 正文氣泡的顯示方式，不會改變匯出的 Markdown。",
+      "saveFailed": "儲存訊息預覽設定失敗：{{error}}",
+      "renderMarkdown": {
+        "label": "渲染 Markdown",
+        "description": "渲染標題、清單、引用、連結與程式碼；關閉後顯示原始 Markdown。"
       }
     },
     "exportContent": {

@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Brain,
+  FileCode2,
   FileText,
   FolderSearch,
   Loader2,
@@ -128,6 +129,7 @@ export function Session2mdSettingsPage() {
         defaultExpandThinking: settings.defaultExpandThinking,
         defaultExpandTools: settings.defaultExpandTools,
         defaultExpandSystem: settings.defaultExpandSystem,
+        renderMarkdown: settings.renderMarkdown,
       });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setDrafts((current) => {
@@ -168,6 +170,7 @@ export function Session2mdSettingsPage() {
         defaultExpandThinking: settings.defaultExpandThinking,
         defaultExpandTools: settings.defaultExpandTools,
         defaultExpandSystem: settings.defaultExpandSystem,
+        renderMarkdown: settings.renderMarkdown,
       });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     } catch (error) {
@@ -214,6 +217,7 @@ export function Session2mdSettingsPage() {
         defaultExpandThinking: nextSettings.defaultExpandThinking,
         defaultExpandTools: nextSettings.defaultExpandTools,
         defaultExpandSystem: nextSettings.defaultExpandSystem,
+        renderMarkdown: nextSettings.renderMarkdown,
       });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
@@ -245,11 +249,41 @@ export function Session2mdSettingsPage() {
         defaultExpandThinking: nextSettings.defaultExpandThinking,
         defaultExpandTools: nextSettings.defaultExpandTools,
         defaultExpandSystem: nextSettings.defaultExpandSystem,
+        renderMarkdown: nextSettings.renderMarkdown,
       });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
         t("sessionSettings.defaultExpansion.saveFailed", {
+          error: String(error),
+        }),
+      );
+    }
+  };
+
+  const saveRenderMarkdown = async (value: boolean) => {
+    if (!settings) return;
+
+    const previousSettings = settings;
+    const nextSettings = { ...settings, renderMarkdown: value };
+    queryClient.setQueryData(session2mdSettingsKey, nextSettings);
+
+    try {
+      await saveMutation.mutateAsync({
+        directoryOverrides: nextSettings.directoryOverrides,
+        hiddenProviders: nextSettings.hiddenProviders,
+        exportThinking: nextSettings.exportThinking,
+        exportToolInputs: nextSettings.exportToolInputs,
+        exportToolOutputs: nextSettings.exportToolOutputs,
+        defaultExpandThinking: nextSettings.defaultExpandThinking,
+        defaultExpandTools: nextSettings.defaultExpandTools,
+        defaultExpandSystem: nextSettings.defaultExpandSystem,
+        renderMarkdown: nextSettings.renderMarkdown,
+      });
+    } catch (error) {
+      queryClient.setQueryData(session2mdSettingsKey, previousSettings);
+      toast.error(
+        t("sessionSettings.messagePreview.saveFailed", {
           error: String(error),
         }),
       );
@@ -303,6 +337,30 @@ export function Session2mdSettingsPage() {
             <TabsContent value="general" className="max-w-2xl space-y-8 py-6">
               <LanguageSettings value={language} onChange={changeLanguage} />
               <ThemeSettings />
+              <section className="space-y-5">
+                <header className="space-y-1">
+                  <h2 className="text-base font-semibold">
+                    {t("sessionSettings.messagePreview.title")}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {t("sessionSettings.messagePreview.description")}
+                  </p>
+                </header>
+
+                <ToggleRow
+                  icon={<FileCode2 className="size-4 text-cyan-500" />}
+                  title={t(
+                    "sessionSettings.messagePreview.renderMarkdown.label",
+                  )}
+                  description={t(
+                    "sessionSettings.messagePreview.renderMarkdown.description",
+                  )}
+                  checked={settings.renderMarkdown}
+                  onCheckedChange={(value) => void saveRenderMarkdown(value)}
+                  disabled={saveMutation.isPending}
+                />
+              </section>
+
               <section className="space-y-5">
                 <header className="space-y-1">
                   <h2 className="text-base font-semibold">

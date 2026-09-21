@@ -140,12 +140,15 @@ export const handlers = [
     success(getSession2mdSettings()),
   ),
 
-  http.post(`${TAURI_ENDPOINT}/save_session2md_settings`, async ({ request }) => {
-    const { settings } = await withJson<{
-      settings: Parameters<typeof saveSession2mdSettings>[0];
-    }>(request);
-    return success(saveSession2mdSettings(settings));
-  }),
+  http.post(
+    `${TAURI_ENDPOINT}/save_session2md_settings`,
+    async ({ request }) => {
+      const { settings } = await withJson<{
+        settings: Parameters<typeof saveSession2mdSettings>[0];
+      }>(request);
+      return success(saveSession2mdSettings(settings));
+    },
+  ),
 
   http.post(`${TAURI_ENDPOINT}/get_session_messages`, async ({ request }) => {
     const { providerId, sourcePath } = await withJson<{
@@ -154,6 +157,8 @@ export const handlers = [
     }>(request);
     return success(getSessionMessages(providerId, sourcePath));
   }),
+
+  http.post(`${TAURI_ENDPOINT}/open_external_url`, () => success(true)),
 
   http.post(`${TAURI_ENDPOINT}/delete_session`, async ({ request }) => {
     const { providerId, sessionId, sourcePath } = await withJson<{

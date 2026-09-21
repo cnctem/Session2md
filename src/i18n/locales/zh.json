@@ -1002,7 +1002,12 @@
     "messageCopied": "已复制消息内容",
     "conversationHistory": "对话记录",
     "expandContent": "展开完整内容",
-    "collapseContent": "收起"
+    "collapseContent": "收起",
+    "codeBlock": "代码",
+    "copyCode": "复制代码",
+    "codeCopied": "代码已复制",
+    "imagePlaceholder": "[图片：{{alt}}]",
+    "openLinkFailed": "打开链接失败：{{error}}"
   },
   "sessionSettings": {
     "title": "设置",
@@ -1037,6 +1042,15 @@
       "expandSystem": {
         "label": "默认展开系统",
         "description": "进入会话时自动展开系统消息。"
+      }
+    },
+    "messagePreview": {
+      "title": "消息预览",
+      "description": "控制用户和 AI 正文气泡的显示方式，不会改变导出的 Markdown。",
+      "saveFailed": "保存消息预览设置失败：{{error}}",
+      "renderMarkdown": {
+        "label": "渲染 Markdown",
+        "description": "渲染标题、列表、引用、链接和代码；关闭后显示原始 Markdown。"
       }
     },
     "exportContent": {

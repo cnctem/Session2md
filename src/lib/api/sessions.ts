@@ -31,6 +31,10 @@ export const sessionsApi = {
     return await invoke("export_session_markdown", { defaultName, markdown });
   },
 
+  async openExternalUrl(url: string): Promise<boolean> {
+    return await invoke("open_external_url", { url });
+  },
+
   async delete(options: DeleteSessionOptions): Promise<boolean> {
     const { providerId, sessionId, sourcePath } = options;
     return await invoke("delete_session", {

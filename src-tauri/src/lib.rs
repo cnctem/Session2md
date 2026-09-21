@@ -6,10 +6,12 @@ mod session_manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::list_sessions,
             commands::get_session_messages,
             commands::export_session_markdown,
+            commands::open_external_url,
             commands::delete_session,
             commands::delete_sessions,
             commands::get_session2md_settings,

@@ -1002,7 +1002,12 @@
     "messageCopied": "メッセージがコピーされました",
     "conversationHistory": "会話履歴",
     "expandContent": "全文を表示",
-    "collapseContent": "折りたたむ"
+    "collapseContent": "折りたたむ",
+    "codeBlock": "コード",
+    "copyCode": "コードをコピー",
+    "codeCopied": "コードをコピーしました",
+    "imagePlaceholder": "[画像: {{alt}}]",
+    "openLinkFailed": "リンクを開けませんでした: {{error}}"
   },
   "sessionSettings": {
     "title": "設定",
@@ -1037,6 +1042,15 @@
       "expandSystem": {
         "label": "システムをデフォルトで展開",
         "description": "セッションを開いたときにシステムメッセージを自動展開します。"
+      }
+    },
+    "messagePreview": {
+      "title": "メッセージプレビュー",
+      "description": "ユーザーと AI の本文メッセージの表示方法を設定します。Markdown エクスポートには影響しません。",
+      "saveFailed": "メッセージプレビュー設定を保存できませんでした: {{error}}",
+      "renderMarkdown": {
+        "label": "Markdown をレンダリング",
+        "description": "見出し、リスト、引用、リンク、コードを整形して表示します。オフにすると元の Markdown を表示します。"
       }
     },
     "exportContent": {

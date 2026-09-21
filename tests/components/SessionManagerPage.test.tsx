@@ -8,6 +8,7 @@ import type { SessionMessage, SessionMeta } from "@/types";
 import {
   setHiddenSessionProviders,
   setSession2mdDefaultExpansion,
+  setSession2mdRenderMarkdown,
   setSessionFixtures,
 } from "../msw/state";
 
@@ -336,6 +337,106 @@ describe("SessionManagerPage", () => {
     expect(
       await screen.findByText("hidden system instructions"),
     ).toBeInTheDocument();
+  });
+
+  it("renders user and assistant message bodies as Markdown by default", async () => {
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "markdown-session",
+          title: "Markdown Session",
+          sourcePath: "/mock/codex/markdown-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/markdown-session.jsonl": [
+          { role: "user", content: "# User heading\n\n- one", kind: "text" },
+          { role: "assistant", content: "**AI answer**", kind: "text" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "User heading" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("AI answer").tagName).toBe("STRONG");
+  });
+
+  it("shows raw Markdown when message rendering is disabled", async () => {
+    setSession2mdRenderMarkdown(false);
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "raw-markdown-session",
+          title: "Raw Markdown Session",
+          sourcePath: "/mock/codex/raw-markdown-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/raw-markdown-session.jsonl": [
+          { role: "user", content: "# Raw heading", kind: "text" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("# Raw heading")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { level: 1, name: "Raw heading" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens Markdown links and copies fenced code independently", async () => {
+    const openExternal = vi
+      .spyOn(sessionsApi, "openExternalUrl")
+      .mockResolvedValueOnce(true);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "rich-markdown-session",
+          title: "Rich Markdown Session",
+          sourcePath: "/mock/codex/rich-markdown-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/rich-markdown-session.jsonl": [
+          {
+            role: "assistant",
+            content: [
+              "[Open docs](https://example.com/docs)",
+              "",
+              "```ts",
+              "const value = 1;",
+              "```",
+            ].join("\n"),
+            kind: "text",
+          },
+        ],
+      },
+    );
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("link", { name: "Open docs" }));
+    expect(openExternal).toHaveBeenCalledWith("https://example.com/docs");
+
+    fireEvent.click(screen.getByRole("button", { name: "复制代码" }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("const value = 1;"),
+    );
+
+    openExternal.mockRestore();
   });
 
   it("uses default expansion settings and allows manual collapse", async () => {

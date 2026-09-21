@@ -66,6 +66,15 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Expand system by default",
             "sessionSettings.defaultExpansion.expandSystem.description":
               "Expand system description",
+            "sessionSettings.messagePreview.title": "Message Preview",
+            "sessionSettings.messagePreview.description":
+              "Message preview options",
+            "sessionSettings.messagePreview.saveFailed":
+              "Save message preview failed",
+            "sessionSettings.messagePreview.renderMarkdown.label":
+              "Render Markdown",
+            "sessionSettings.messagePreview.renderMarkdown.description":
+              "Render markdown description",
             "sessionSettings.exportContent.title": "Markdown Export Content",
             "sessionSettings.exportContent.description": "Export options",
             "sessionSettings.exportContent.includeThinking.label":
@@ -134,6 +143,7 @@ const snapshot = {
   defaultExpandThinking: false,
   defaultExpandTools: false,
   defaultExpandSystem: false,
+  renderMarkdown: true,
   resolvedDirectories: Object.fromEntries(
     SESSION_DIRECTORY_IDS.map((id) => [id, `/home/mock/${id}`]),
   ) as Record<(typeof SESSION_DIRECTORY_IDS)[number], string>,
@@ -164,6 +174,7 @@ describe("Session2mdSettingsPage", () => {
       defaultExpandThinking: next.defaultExpandThinking,
       defaultExpandTools: next.defaultExpandTools,
       defaultExpandSystem: next.defaultExpandSystem,
+      renderMarkdown: next.renderMarkdown,
     }));
   });
 
@@ -215,6 +226,7 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
       }),
     );
   });
@@ -242,6 +254,7 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
       }),
     );
   });
@@ -260,6 +273,7 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
       }),
     );
 
@@ -274,6 +288,7 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
       }),
     );
   });
@@ -294,6 +309,7 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
       }),
     );
   });
@@ -316,6 +332,31 @@ describe("Session2mdSettingsPage", () => {
         defaultExpandThinking: true,
         defaultExpandTools: false,
         defaultExpandSystem: false,
+        renderMarkdown: true,
+      }),
+    );
+  });
+
+  it("defaults Markdown rendering on and saves it independently", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    const renderMarkdown = await screen.findByRole("switch", {
+      name: "Render Markdown",
+    });
+    expect(renderMarkdown).toBeChecked();
+
+    fireEvent.click(renderMarkdown);
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
+        renderMarkdown: false,
       }),
     );
   });
@@ -324,9 +365,14 @@ describe("Session2mdSettingsPage", () => {
     renderWithProviders(<Session2mdSettingsPage />);
 
     const exportTitle = await screen.findByText("Markdown Export Content");
+    const messagePreviewTitle = screen.getByText("Message Preview");
     const defaultExpansionTitle = screen.getByText("Default Expansion");
     const agentTitle = screen.getByText("Agent Visibility");
 
+    expect(
+      messagePreviewTitle.compareDocumentPosition(defaultExpansionTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       defaultExpansionTitle.compareDocumentPosition(exportTitle) &
         Node.DOCUMENT_POSITION_FOLLOWING,

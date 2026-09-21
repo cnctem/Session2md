@@ -17,6 +17,7 @@ export interface Session2mdSettings {
   defaultExpandThinking: boolean;
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
+  renderMarkdown: boolean;
 }
 
 export interface Session2mdSettingsSnapshot extends Session2mdSettings {

@@ -1002,7 +1002,12 @@
     "messageCopied": "Message copied",
     "conversationHistory": "Conversation History",
     "expandContent": "Expand full content",
-    "collapseContent": "Collapse"
+    "collapseContent": "Collapse",
+    "codeBlock": "Code",
+    "copyCode": "Copy code",
+    "codeCopied": "Code copied",
+    "imagePlaceholder": "[Image: {{alt}}]",
+    "openLinkFailed": "Failed to open link: {{error}}"
   },
   "sessionSettings": {
     "title": "Settings",
@@ -1037,6 +1042,15 @@
       "expandSystem": {
         "label": "Expand system by default",
         "description": "Automatically open system messages when viewing a session."
+      }
+    },
+    "messagePreview": {
+      "title": "Message Preview",
+      "description": "Choose how user and AI message bubbles are displayed. This does not change the exported Markdown.",
+      "saveFailed": "Failed to save message preview settings: {{error}}",
+      "renderMarkdown": {
+        "label": "Render Markdown",
+        "description": "Render headings, lists, quotes, links, and code. Turn this off to show the original Markdown."
       }
     },
     "exportContent": {

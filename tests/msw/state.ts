@@ -166,6 +166,7 @@ let session2mdSettingsState = {
   defaultExpandThinking: false,
   defaultExpandTools: false,
   defaultExpandSystem: false,
+  renderMarkdown: true,
 };
 let mcpConfigs: McpConfigState = {
   claude: {
@@ -237,6 +238,7 @@ export const resetProviderState = () => {
     defaultExpandThinking: false,
     defaultExpandTools: false,
     defaultExpandSystem: false,
+    renderMarkdown: true,
   };
   settingsState = {
     showInTray: true,
@@ -463,6 +465,7 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
   defaultExpandThinking: session2mdSettingsState.defaultExpandThinking,
   defaultExpandTools: session2mdSettingsState.defaultExpandTools,
   defaultExpandSystem: session2mdSettingsState.defaultExpandSystem,
+  renderMarkdown: session2mdSettingsState.renderMarkdown,
   resolvedDirectories: Object.fromEntries(
     SESSION_PROVIDER_IDS.map((providerId) => [
       providerId,
@@ -480,6 +483,7 @@ export const saveSession2mdSettings = (settings: {
   defaultExpandThinking: boolean;
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
+  renderMarkdown: boolean;
 }) => {
   session2mdSettingsState = {
     directoryOverrides: deepClone(settings.directoryOverrides) as Record<
@@ -493,12 +497,20 @@ export const saveSession2mdSettings = (settings: {
     defaultExpandThinking: settings.defaultExpandThinking,
     defaultExpandTools: settings.defaultExpandTools,
     defaultExpandSystem: settings.defaultExpandSystem,
+    renderMarkdown: settings.renderMarkdown,
   };
   return getSession2mdSettings();
 };
 
 export const setHiddenSessionProviders = (providerIds: SessionProviderId[]) => {
   session2mdSettingsState.hiddenProviders = [...providerIds];
+};
+
+export const setSession2mdRenderMarkdown = (renderMarkdown: boolean) => {
+  session2mdSettingsState = {
+    ...session2mdSettingsState,
+    renderMarkdown,
+  };
 };
 
 export const setSession2mdDefaultExpansion = (settings: {

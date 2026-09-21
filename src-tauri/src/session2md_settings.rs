@@ -31,7 +31,7 @@ pub const SESSION_PROVIDER_IDS: [&str; 25] = [
     "teleagent",
 ];
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session2mdSettings {
     #[serde(default)]
@@ -50,6 +50,28 @@ pub struct Session2mdSettings {
     pub default_expand_tools: bool,
     #[serde(default)]
     pub default_expand_system: bool,
+    #[serde(default = "default_render_markdown")]
+    pub render_markdown: bool,
+}
+
+impl Default for Session2mdSettings {
+    fn default() -> Self {
+        Self {
+            directory_overrides: BTreeMap::new(),
+            hidden_providers: BTreeSet::new(),
+            export_thinking: false,
+            export_tool_inputs: false,
+            export_tool_outputs: false,
+            default_expand_thinking: false,
+            default_expand_tools: false,
+            default_expand_system: false,
+            render_markdown: true,
+        }
+    }
+}
+
+fn default_render_markdown() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +85,7 @@ pub struct Session2mdSettingsSnapshot {
     pub default_expand_thinking: bool,
     pub default_expand_tools: bool,
     pub default_expand_system: bool,
+    pub render_markdown: bool,
     pub resolved_directories: BTreeMap<String, String>,
 }
 
@@ -125,6 +148,7 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
         default_expand_thinking: settings.default_expand_thinking,
         default_expand_tools: settings.default_expand_tools,
         default_expand_system: settings.default_expand_system,
+        render_markdown: settings.render_markdown,
         resolved_directories: crate::session_manager::paths::resolved_directories(),
     }
 }
@@ -229,5 +253,14 @@ mod tests {
         assert!(!settings.default_expand_thinking);
         assert!(!settings.default_expand_tools);
         assert!(!settings.default_expand_system);
+        assert!(settings.render_markdown);
+    }
+
+    #[test]
+    fn explicit_markdown_rendering_setting_is_preserved() {
+        let settings: Session2mdSettings =
+            serde_json::from_str(r#"{"renderMarkdown":false}"#).expect("settings");
+
+        assert!(!settings.render_markdown);
     }
 }
