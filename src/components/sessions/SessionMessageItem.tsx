@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import {
   Brain,
   ChevronDown,
@@ -31,18 +31,24 @@ const COLLAPSE_THRESHOLD = 3000;
 const COLLAPSED_LENGTH = 1500;
 
 interface MessageTextBlockProps {
+  blockKey: string;
   content: string;
+  expandedBlockKeys: ReadonlySet<string>;
+  onToggleBlock: (blockKey: string) => void;
   searchQuery?: string;
   className?: string;
 }
 
 function MessageTextBlock({
+  blockKey,
   content,
+  expandedBlockKeys,
+  onToggleBlock,
   searchQuery,
   className,
 }: MessageTextBlockProps) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  const expanded = expandedBlockKeys.has(blockKey);
   const isLong = content.length > COLLAPSE_THRESHOLD;
   const hasSearchMatch =
     isLong &&
@@ -70,7 +76,7 @@ function MessageTextBlock({
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
+          onClick={() => onToggleBlock(blockKey)}
           className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           {expanded ? (
@@ -102,15 +108,19 @@ const SectionDivider = () => <div className="my-3 border-t" />;
 interface SessionMessageItemProps {
   group: SessionMessageGroup;
   isActive: boolean;
+  expandedBlockKeys: ReadonlySet<string>;
   searchQuery?: string;
   onCopy: (content: string) => void;
+  onToggleBlock: (blockKey: string) => void;
 }
 
 export const SessionMessageItem = memo(function SessionMessageItem({
   group,
   isActive,
+  expandedBlockKeys,
   searchQuery,
   onCopy,
+  onToggleBlock,
 }: SessionMessageItemProps) {
   const { t } = useTranslation();
   const role = group.role.toLowerCase();
@@ -183,11 +193,14 @@ export const SessionMessageItem = memo(function SessionMessageItem({
                     })}
               </div>
               <MessageTextBlock
+                blockKey={`${group.id}:tool-input`}
                 content={
                   toolInput.language === "bash"
                     ? `$ ${toolInput.text}`
                     : toolInput.text
                 }
+                expandedBlockKeys={expandedBlockKeys}
+                onToggleBlock={onToggleBlock}
                 searchQuery={searchQuery}
                 className="font-mono text-xs"
               />
@@ -196,7 +209,10 @@ export const SessionMessageItem = memo(function SessionMessageItem({
           {hasToolInput && hasToolOutput && <SectionDivider />}
           {hasToolOutput && (
             <MessageTextBlock
+              blockKey={`${group.id}:tool-output`}
               content={group.toolOutput ?? ""}
+              expandedBlockKeys={expandedBlockKeys}
+              onToggleBlock={onToggleBlock}
               searchQuery={searchQuery}
               className="font-mono text-xs"
             />
@@ -211,7 +227,10 @@ export const SessionMessageItem = memo(function SessionMessageItem({
                 {t("sessionManager.thinking", { defaultValue: "Thinking" })}
               </div>
               <MessageTextBlock
+                blockKey={`${group.id}:reasoning`}
                 content={group.reasoning}
+                expandedBlockKeys={expandedBlockKeys}
+                onToggleBlock={onToggleBlock}
                 searchQuery={searchQuery}
                 className="text-muted-foreground"
               />
@@ -220,7 +239,10 @@ export const SessionMessageItem = memo(function SessionMessageItem({
           {hasReasoning && hasContent && <SectionDivider />}
           {hasContent && (
             <MessageTextBlock
+              blockKey={`${group.id}:content`}
               content={group.content}
+              expandedBlockKeys={expandedBlockKeys}
+              onToggleBlock={onToggleBlock}
               searchQuery={searchQuery}
             />
           )}

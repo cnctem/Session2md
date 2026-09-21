@@ -13,16 +13,11 @@ export interface SessionMessageGroup {
   ts?: number;
 }
 
-const appendSection = (current: string, next: string) => {
-  const value = next.trim();
-  if (!value) return current;
-  return current ? `${current}\n\n${value}` : value;
-};
-
-const appendOutput = (current: string, next: string) => {
-  const value = next.trim();
-  if (!value) return current;
-  return current ? `${current}\n${value}` : value;
+type MessageGroupBuffers = {
+  content: string[];
+  reasoning: string[];
+  toolInput: string[];
+  toolOutput: string[];
 };
 
 const getMessageKind = (message: SessionMessage) => message.kind ?? "text";
@@ -31,6 +26,7 @@ export const groupSessionMessages = (
   messages: SessionMessage[],
 ): SessionMessageGroup[] => {
   const groups: SessionMessageGroup[] = [];
+  const groupBuffers = new WeakMap<SessionMessageGroup, MessageGroupBuffers>();
   const toolGroupsById = new Map<string, SessionMessageGroup>();
   let currentAssistant: SessionMessageGroup | null = null;
   let lastTool: SessionMessageGroup | null = null;
@@ -52,7 +48,22 @@ export const groupSessionMessages = (
       ts: message.ts,
     };
     groups.push(group);
+    groupBuffers.set(group, {
+      content: [],
+      reasoning: [],
+      toolInput: [],
+      toolOutput: [],
+    });
     return group;
+  };
+
+  const append = (
+    group: SessionMessageGroup,
+    key: keyof MessageGroupBuffers,
+    value: string,
+  ) => {
+    const trimmed = value.trim();
+    if (trimmed) groupBuffers.get(group)?.[key].push(trimmed);
   };
 
   for (const message of messages) {
@@ -66,21 +77,15 @@ export const groupSessionMessages = (
           currentAssistant = createGroup(message, "message");
         }
         if (kind === "reasoning") {
-          currentAssistant.reasoning = appendSection(
-            currentAssistant.reasoning,
-            message.content,
-          );
+          append(currentAssistant, "reasoning", message.content);
         } else {
-          currentAssistant.content = appendSection(
-            currentAssistant.content,
-            message.content,
-          );
+          append(currentAssistant, "content", message.content);
         }
         currentAssistant.ts ??= message.ts;
       } else {
         flushAssistant();
         const group = createGroup(message, "message");
-        group.content = message.content.trim();
+        append(group, "content", message.content);
       }
       continue;
     }
@@ -96,7 +101,7 @@ export const groupSessionMessages = (
       }
       group.toolName = message.toolName || group.toolName;
       group.toolCallId ||= id;
-      group.toolInput = appendSection(group.toolInput ?? "", message.content);
+      append(group, "toolInput", message.content);
       group.ts ??= message.ts;
       lastTool = group;
       continue;
@@ -116,9 +121,22 @@ export const groupSessionMessages = (
     }
     group.toolName = message.toolName || group.toolName;
     group.toolCallId ||= id;
-    group.toolOutput = appendOutput(group.toolOutput ?? "", message.content);
+    append(group, "toolOutput", message.content);
     group.ts ??= message.ts;
     lastTool = group;
+  }
+
+  for (const group of groups) {
+    const buffers = groupBuffers.get(group);
+    if (!buffers) continue;
+    group.content = buffers.content.join("\n\n");
+    group.reasoning = buffers.reasoning.join("\n\n");
+    group.toolInput = buffers.toolInput.length
+      ? buffers.toolInput.join("\n\n")
+      : undefined;
+    group.toolOutput = buffers.toolOutput.length
+      ? buffers.toolOutput.join("\n")
+      : undefined;
   }
 
   return groups;
@@ -145,30 +163,49 @@ const parseToolArguments = (value?: string): unknown => {
   }
 };
 
-export const getToolInputDisplay = (group: SessionMessageGroup) => {
+export interface ToolInputDisplay {
+  language: "bash" | "json" | "text";
+  text: string;
+}
+
+const toolInputDisplayCache = new WeakMap<
+  SessionMessageGroup,
+  ToolInputDisplay
+>();
+
+export const getToolInputDisplay = (
+  group: SessionMessageGroup,
+): ToolInputDisplay => {
+  const cached = toolInputDisplayCache.get(group);
+  if (cached) return cached;
+
   const parsed = parseToolArguments(group.toolInput);
   const toolName = group.toolName?.toLowerCase() ?? "";
   const isShell = ["bash", "shell", "sh", "zsh"].includes(toolName);
 
+  let display: ToolInputDisplay;
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const object = parsed as Record<string, unknown>;
     if (isShell || "command" in object || "cmd" in object) {
       const command = object.command ?? object.cmd;
       if (typeof command === "string") {
-        return { language: "bash", text: command };
+        display = { language: "bash", text: command };
+      } else if (Array.isArray(command)) {
+        display = { language: "bash", text: command.join(" ") };
+      } else {
+        display = { language: "json", text: JSON.stringify(parsed, null, 2) };
       }
-      if (Array.isArray(command)) {
-        return { language: "bash", text: command.join(" ") };
-      }
+    } else {
+      display = { language: "json", text: JSON.stringify(parsed, null, 2) };
     }
-    return { language: "json", text: JSON.stringify(parsed, null, 2) };
+  } else if (typeof parsed === "string") {
+    display = { language: isShell ? "bash" : "text", text: parsed };
+  } else if (parsed !== null) {
+    display = { language: "json", text: JSON.stringify(parsed, null, 2) };
+  } else {
+    display = { language: "text", text: group.toolInput ?? "" };
   }
 
-  if (typeof parsed === "string") {
-    return { language: isShell ? "bash" : "text", text: parsed };
-  }
-  if (parsed !== null) {
-    return { language: "json", text: JSON.stringify(parsed, null, 2) };
-  }
-  return { language: "text", text: group.toolInput ?? "" };
+  toolInputDisplayCache.set(group, display);
+  return display;
 };

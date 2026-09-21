@@ -6,7 +6,7 @@ authors = ["Jason Young"]
 license = "MIT"
 repository = "https://github.com/farion1231/session2md"
 edition = "2021"
-rust-version = "1.85.0"
+rust-version = "1.95.0"
 
 [lib]
 name = "session2md_lib"
@@ -37,7 +37,7 @@ codegen-units = 1
 lto = "thin"
 opt-level = "s"
 panic = "unwind"
-strip = "symbols"
+strip = "debuginfo"
 
 [dev-dependencies]
 tempfile = "3"

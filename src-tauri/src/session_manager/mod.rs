@@ -2,6 +2,7 @@ pub mod paths;
 pub mod providers;
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use providers::{
@@ -74,39 +75,40 @@ pub struct DeleteSessionOutcome {
     pub error: Option<String>,
 }
 
-pub fn scan_sessions() -> Vec<SessionMeta> {
+pub fn scan_sessions_excluding(hidden_provider_ids: &BTreeSet<String>) -> Vec<SessionMeta> {
     type Scan = fn() -> Vec<SessionMeta>;
-    const SCANNERS: &[Scan] = &[
-        claude::scan_sessions,
-        codex::scan_sessions,
-        gemini::scan_sessions,
-        grokbuild::scan_sessions,
-        opencode::scan_sessions,
-        openclaw::scan_sessions,
-        hermes::scan_sessions,
-        pi::scan_sessions,
-        antigravity::scan_sessions,
-        cline::scan_sessions,
-        continue_session::scan_sessions,
-        crush::scan_sessions,
-        cursor::scan_sessions,
-        dsh::scan_sessions,
-        goose::scan_sessions,
-        kilocode::scan_sessions,
-        kimi::scan_sessions,
-        mimocode::scan_sessions,
-        qoder::scan_sessions,
-        qwen::scan_sessions,
-        reasonix::scan_sessions,
-        teleagent::scan_sessions,
-        workbuddy::scan_sessions,
-        zcode::scan_sessions,
-        zed::scan_sessions,
+    const SCANNERS: &[(&str, Scan)] = &[
+        ("claude", claude::scan_sessions),
+        ("codex", codex::scan_sessions),
+        ("gemini", gemini::scan_sessions),
+        ("grokbuild", grokbuild::scan_sessions),
+        ("opencode", opencode::scan_sessions),
+        ("openclaw", openclaw::scan_sessions),
+        ("hermes", hermes::scan_sessions),
+        ("pi", pi::scan_sessions),
+        ("antigravity", antigravity::scan_sessions),
+        ("cline", cline::scan_sessions),
+        ("continue", continue_session::scan_sessions),
+        ("crush", crush::scan_sessions),
+        ("cursor", cursor::scan_sessions),
+        ("dsh", dsh::scan_sessions),
+        ("goose", goose::scan_sessions),
+        ("kilocode", kilocode::scan_sessions),
+        ("kimi", kimi::scan_sessions),
+        ("mimocode", mimocode::scan_sessions),
+        ("qoder", qoder::scan_sessions),
+        ("qwen", qwen::scan_sessions),
+        ("reasonix", reasonix::scan_sessions),
+        ("teleagent", teleagent::scan_sessions),
+        ("workbuddy", workbuddy::scan_sessions),
+        ("zcode", zcode::scan_sessions),
+        ("zed", zed::scan_sessions),
     ];
     let mut sessions = std::thread::scope(|scope| {
         let handles = SCANNERS
             .iter()
-            .map(|scanner| scope.spawn(*scanner))
+            .filter(|(provider_id, _)| !hidden_provider_ids.contains(*provider_id))
+            .map(|(_, scanner)| scope.spawn(*scanner))
             .collect::<Vec<_>>();
         handles
             .into_iter()
@@ -298,6 +300,16 @@ mod tests {
             .expect_err("outside path should be rejected");
 
         assert!(error.contains("outside provider roots"));
+    }
+
+    #[test]
+    fn skips_all_registered_scanners_when_every_provider_is_hidden() {
+        let hidden = crate::session2md_settings::SESSION_PROVIDER_IDS
+            .iter()
+            .map(|provider_id| provider_id.to_string())
+            .collect::<BTreeSet<_>>();
+
+        assert!(scan_sessions_excluding(&hidden).is_empty());
     }
 
     #[test]

@@ -187,11 +187,11 @@ const formatToolGroupMarkdown = (
   return `## Tool${name !== "Tool" ? `: ${name}` : ""}\n\n${sections.join("\n\n")}`;
 };
 
-export const formatSessionMarkdown = (
-  messages: SessionMessage[],
+export const formatSessionGroupsMarkdown = (
+  groups: SessionMessageGroup[],
   options: SessionMarkdownOptions = {},
 ) => {
-  const sections = groupSessionMessages(messages).flatMap((group) => {
+  const sections = groups.flatMap((group) => {
     const role = group.role.toLowerCase();
     if (role === "tool") {
       const markdown = formatToolGroupMarkdown(group, options);
@@ -214,6 +214,11 @@ export const formatSessionMarkdown = (
 
   return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";
 };
+
+export const formatSessionMarkdown = (
+  messages: SessionMessage[],
+  options: SessionMarkdownOptions = {},
+) => formatSessionGroupsMarkdown(groupSessionMessages(messages), options);
 
 export const getSessionMarkdownFileName = (session: SessionMeta) => {
   const sanitizedTitle = formatSessionTitle(session)

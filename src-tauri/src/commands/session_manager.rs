@@ -6,9 +6,14 @@ use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 pub async fn list_sessions() -> Result<Vec<session_manager::SessionMeta>, String> {
-    let sessions = tauri::async_runtime::spawn_blocking(session_manager::scan_sessions)
-        .await
-        .map_err(|e| format!("Failed to scan sessions: {e}"))?;
+    let hidden_provider_ids = crate::session2md_settings::load_settings()
+        .map(|settings| settings.hidden_providers)
+        .unwrap_or_default();
+    let sessions = tauri::async_runtime::spawn_blocking(move || {
+        session_manager::scan_sessions_excluding(&hidden_provider_ids)
+    })
+    .await
+    .map_err(|e| format!("Failed to scan sessions: {e}"))?;
     Ok(sessions)
 }
 

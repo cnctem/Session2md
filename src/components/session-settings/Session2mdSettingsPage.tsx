@@ -162,6 +162,7 @@ export function Session2mdSettingsPage() {
         exportToolInputs: settings.exportToolInputs,
         exportToolOutputs: settings.exportToolOutputs,
       });
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(

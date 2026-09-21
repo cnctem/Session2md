@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -18,6 +18,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  observeElementRect,
+  useVirtualizer,
+  type Rect,
+  type Virtualizer,
+} from "@tanstack/react-virtual";
 import { useSessionSearch } from "@/hooks/useSessionSearch";
 import {
   useSessionMessagesQuery,
@@ -32,11 +38,6 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -63,7 +64,7 @@ import { SessionTocDialog, SessionTocSidebar } from "./SessionToc";
 import { groupSessionMessages } from "./messageGroups";
 import {
   extractCodexPromptPreview,
-  formatSessionMarkdown,
+  formatSessionGroupsMarkdown,
   formatSessionMessagePreview,
   formatSessionTitle,
   formatTimestamp,
@@ -74,6 +75,8 @@ import {
   getSessionKey,
   groupSessionsByProviderAndDirectory,
   shouldHideCodexMessageFromToc,
+  type SessionDirectoryGroup,
+  type SessionProviderGroup,
 } from "./utils";
 
 type ProviderFilter = "all" | SessionProviderId;
@@ -92,8 +95,37 @@ type GroupSelectionState = {
   selectableCount: number;
 };
 
+type SessionListRow =
+  | {
+      kind: "provider";
+      key: string;
+      group: SessionProviderGroup;
+    }
+  | {
+      kind: "directory";
+      key: string;
+      directory: SessionDirectoryGroup;
+    }
+  | {
+      kind: "session";
+      key: string;
+      session: SessionMeta;
+      indent: number;
+    };
+
 const isDeletableSession = (session: SessionMeta) =>
   Boolean(session.sourcePath) && session.canDelete !== false;
+
+const observeElementRectWithFallback = <T extends Element>(
+  instance: Virtualizer<T, Element>,
+  callback: (rect: Rect) => void,
+) =>
+  observeElementRect(instance, (rect) =>
+    callback({
+      width: rect.width || 340,
+      height: rect.height || 768,
+    }),
+  );
 
 const LIST_VIEW_MODE_STORAGE_KEY = "session2md.sessionManager.listViewMode";
 const GROUP_EXPANSION_STORAGE_KEY =
@@ -193,7 +225,30 @@ export function SessionManagerPage() {
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(
     null,
   );
-  const messageRefs = useRef(new Map<number, HTMLDivElement>());
+  const [expandedBlockKeys, setExpandedBlockKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const sessionListScrollRef = useRef<HTMLDivElement>(null);
+  const messageListScrollRef = useRef<HTMLDivElement>(null);
+  const activeMessageTimeoutRef = useRef<number | null>(null);
+
+  const toggleMessageBlock = useCallback((blockKey: string) => {
+    setExpandedBlockKeys((current) => {
+      const next = new Set(current);
+      if (next.has(blockKey)) next.delete(blockKey);
+      else next.add(blockKey);
+      return next;
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (activeMessageTimeoutRef.current !== null) {
+        window.clearTimeout(activeMessageTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const hiddenProviderIds = useMemo(
     () => new Set<string>(sessionSettings?.hiddenProviders ?? []),
@@ -243,6 +298,76 @@ export function SessionManagerPage() {
     }),
     [visibleSessions],
   );
+
+  const sessionListRows = useMemo<SessionListRow[]>(() => {
+    if (listViewMode === "flat") {
+      return filteredSessions.map((session) => ({
+        kind: "session",
+        key: getSessionKey(session),
+        session,
+        indent: 0,
+      }));
+    }
+
+    const rows: SessionListRow[] = [];
+    for (const providerGroup of groupedSessions) {
+      rows.push({
+        kind: "provider",
+        key: `provider:${providerGroup.providerId}`,
+        group: providerGroup,
+      });
+      if (!expandedProviderGroups.has(providerGroup.providerId)) continue;
+
+      for (const directory of providerGroup.directories) {
+        rows.push({
+          kind: "directory",
+          key: directory.key,
+          directory,
+        });
+        if (!expandedDirectoryGroups.has(directory.key)) continue;
+        rows.push(
+          ...directory.sessions.map((session) => ({
+            kind: "session" as const,
+            key: getSessionKey(session),
+            session,
+            indent: 20,
+          })),
+        );
+      }
+    }
+    return rows;
+  }, [
+    expandedDirectoryGroups,
+    expandedProviderGroups,
+    filteredSessions,
+    groupedSessions,
+    listViewMode,
+  ]);
+
+  const getSessionListScrollElement = useCallback(
+    () =>
+      sessionListScrollRef.current?.closest<HTMLElement>(
+        "[data-radix-scroll-area-viewport]",
+      ) ?? null,
+    [],
+  );
+  const sessionListVirtualizer = useVirtualizer({
+    count: sessionListRows.length,
+    getScrollElement: getSessionListScrollElement,
+    observeElementRect: observeElementRectWithFallback,
+    initialRect: { width: 340, height: 768 },
+    estimateSize: (index) => {
+      const row = sessionListRows[index];
+      if (row?.kind === "provider") return 44;
+      if (row?.kind === "directory") return 36;
+      return 76;
+    },
+    getItemKey: (index) => sessionListRows[index]?.key ?? index,
+    overscan: 8,
+    gap: 4,
+    paddingStart: 8,
+    paddingEnd: 8,
+  });
 
   useEffect(() => {
     if (providerFilter !== "all" && hiddenProviderIds.has(providerFilter)) {
@@ -318,34 +443,76 @@ export function SessionManagerPage() {
     () => groupSessionMessages(messages),
     [messages],
   );
-  const exportMessages = useMemo(
+  const getMessageListScrollElement = useCallback(
+    () =>
+      messageListScrollRef.current?.closest<HTMLElement>(
+        "[data-radix-scroll-area-viewport]",
+      ) ?? null,
+    [],
+  );
+  const messageVirtualizer = useVirtualizer({
+    count: messageGroups.length,
+    getScrollElement: getMessageListScrollElement,
+    observeElementRect: observeElementRectWithFallback,
+    initialRect: { width: 1024, height: 768 },
+    estimateSize: () => 140,
+    getItemKey: (index) => messageGroups[index]?.id ?? index,
+    overscan: 8,
+    gap: 12,
+    paddingStart: 16,
+    paddingEnd: 16,
+  });
+
+  useEffect(() => {
+    setExpandedBlockKeys(new Set());
+    const scrollElement = messageListScrollRef.current?.closest<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (scrollElement) scrollElement.scrollTop = 0;
+  }, [selectedSession?.providerId, selectedSession?.sourcePath]);
+  const exportGroups = useMemo(
     () =>
       isCodexSession
-        ? messages.filter(
-            (message) =>
+        ? messageGroups.filter(
+            (group) =>
               !(
-                message.role.toLowerCase() === "user" &&
-                shouldHideCodexMessageFromToc(message.content)
+                group.role.toLowerCase() === "user" &&
+                shouldHideCodexMessageFromToc(group.content)
               ),
           )
-        : messages,
-    [isCodexSession, messages],
+        : messageGroups,
+    [isCodexSession, messageGroups],
   );
-  const sessionMarkdown = useMemo(
-    () =>
-      formatSessionMarkdown(exportMessages, {
-        includeThinking: sessionSettings?.exportThinking ?? false,
-        includeToolInputs: sessionSettings?.exportToolInputs ?? false,
-        includeToolOutputs: sessionSettings?.exportToolOutputs ?? false,
-      }),
+  const exportOptions = useMemo(
+    () => ({
+      includeThinking: sessionSettings?.exportThinking ?? false,
+      includeToolInputs: sessionSettings?.exportToolInputs ?? false,
+      includeToolOutputs: sessionSettings?.exportToolOutputs ?? false,
+    }),
     [
-      exportMessages,
       sessionSettings?.exportThinking,
       sessionSettings?.exportToolInputs,
       sessionSettings?.exportToolOutputs,
     ],
   );
-  const hasExportableMessages = sessionMarkdown.length > 0;
+  const hasExportableMessages = useMemo(
+    () =>
+      exportGroups.some((group) => {
+        const role = group.role.toLowerCase();
+        if (role === "tool") {
+          return Boolean(
+            (exportOptions.includeToolInputs && group.toolInput?.trim()) ||
+              (exportOptions.includeToolOutputs && group.toolOutput?.trim()),
+          );
+        }
+        if (role !== "user" && role !== "assistant") return false;
+        return Boolean(
+          group.content.trim() ||
+            (exportOptions.includeThinking && group.reasoning.trim()),
+        );
+      }),
+    [exportGroups, exportOptions],
+  );
   const tocItems = useMemo(
     () =>
       messageGroups
@@ -368,14 +535,23 @@ export function SessionManagerPage() {
     [isCodexSession, messageGroups],
   );
 
-  const copyText = async (value: string, successMessage: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success(successMessage);
-    } catch (error) {
-      toast.error(extractErrorMessage(error) || t("common.error"));
-    }
-  };
+  const copyText = useCallback(
+    async (value: string, successMessage: string) => {
+      try {
+        await navigator.clipboard.writeText(value);
+        toast.success(successMessage);
+      } catch (error) {
+        toast.error(extractErrorMessage(error) || t("common.error"));
+      }
+    },
+    [t],
+  );
+  const handleCopyMessage = useCallback(
+    (content: string) => {
+      void copyText(content, t("sessionManager.messageCopied"));
+    },
+    [copyText, t],
+  );
 
   const deletableFilteredSessions = useMemo(
     () => filteredSessions.filter(isDeletableSession),
@@ -577,16 +753,23 @@ export function SessionManagerPage() {
 
   const handleExportMarkdown = async () => {
     if (!selectedSession || isExporting) return;
-    if (!sessionMarkdown) {
+    if (!hasExportableMessages) {
       toast.error(t("sessionManager.exportEmpty"));
       return;
     }
 
     setIsExporting(true);
     try {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      const markdown = formatSessionGroupsMarkdown(exportGroups, exportOptions);
+      if (!markdown) {
+        toast.error(t("sessionManager.exportEmpty"));
+        return;
+      }
+
       const destination = await sessionsApi.exportMarkdown(
         getSessionMarkdownFileName(selectedSession),
-        sessionMarkdown,
+        markdown,
       );
       if (destination) {
         toast.success(t("sessionManager.exportSuccess"), {
@@ -603,13 +786,19 @@ export function SessionManagerPage() {
   };
 
   const scrollToMessage = (index: number) => {
-    messageRefs.current.get(index)?.scrollIntoView({
+    messageVirtualizer.scrollToIndex(index, {
+      align: "center",
       behavior: "smooth",
-      block: "center",
     });
     setActiveMessageIndex(index);
     setTocDialogOpen(false);
-    window.setTimeout(() => setActiveMessageIndex(null), 2000);
+    if (activeMessageTimeoutRef.current !== null) {
+      window.clearTimeout(activeMessageTimeoutRef.current);
+    }
+    activeMessageTimeoutRef.current = window.setTimeout(() => {
+      setActiveMessageIndex(null);
+      activeMessageTimeoutRef.current = null;
+    }, 2000);
   };
 
   const setProviderGroupOpen = (providerId: string, open: boolean) => {
@@ -637,7 +826,6 @@ export function SessionManagerPage() {
 
   const renderSessionItem = (session: SessionMeta) => (
     <SessionItem
-      key={getSessionKey(session)}
       session={session}
       isSelected={selectedKey === getSessionKey(session)}
       selectionMode={selectionMode}
@@ -648,6 +836,119 @@ export function SessionManagerPage() {
       onToggleChecked={(checked) => toggleSessionChecked(session, checked)}
     />
   );
+
+  const renderSessionListRow = (row: SessionListRow) => {
+    if (row.kind === "session") {
+      return (
+        <div style={{ paddingLeft: row.indent }}>
+          {renderSessionItem(row.session)}
+        </div>
+      );
+    }
+
+    if (row.kind === "provider") {
+      const { group } = row;
+      const providerOpen = expandedProviderGroups.has(group.providerId);
+      const providerLabel = getProviderLabel(group.providerId, t);
+      const providerSelection = getGroupSelectionState(group.sessions);
+
+      return (
+        <div className="flex w-full items-center rounded-md border bg-muted/40 px-2.5 py-2 transition-colors hover:bg-muted">
+          {selectionMode && (
+            <Checkbox
+              className="mr-2 shrink-0"
+              checked={providerSelection.checked}
+              disabled={!providerSelection.selectableCount || isDeleting}
+              aria-label={t("sessionManager.selectProviderGroupForBatch", {
+                provider: providerLabel,
+              })}
+              onCheckedChange={(checked) =>
+                toggleSessionGroupChecked(group.sessions, Boolean(checked))
+              }
+            />
+          )}
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            aria-label={t("sessionManager.toggleProviderGroup", {
+              provider: providerLabel,
+            })}
+            onClick={() =>
+              setProviderGroupOpen(group.providerId, !providerOpen)
+            }
+          >
+            {providerOpen ? (
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <SessionProviderIcon providerId={group.providerId} size={16} />
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {providerLabel}
+            </span>
+            <Badge variant="secondary" className="text-[10px]">
+              {group.sessions.length}
+            </Badge>
+          </button>
+        </div>
+      );
+    }
+
+    const { directory } = row;
+    const directoryOpen = expandedDirectoryGroups.has(directory.key);
+    const directorySelection = getGroupSelectionState(directory.sessions);
+
+    return (
+      <div
+        className="flex w-full items-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        style={{ marginLeft: 8 }}
+      >
+        {selectionMode && (
+          <Checkbox
+            className="mr-2 shrink-0"
+            checked={directorySelection.checked}
+            disabled={!directorySelection.selectableCount || isDeleting}
+            aria-label={t("sessionManager.selectDirectoryGroupForBatch", {
+              directory: directory.label,
+            })}
+            onCheckedChange={(checked) =>
+              toggleSessionGroupChecked(directory.sessions, Boolean(checked))
+            }
+          />
+        )}
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          aria-label={t("sessionManager.toggleDirectoryGroup", {
+            directory: directory.label,
+          })}
+          onClick={() => setDirectoryGroupOpen(directory.key, !directoryOpen)}
+        >
+          {directoryOpen ? (
+            <ChevronDown className="size-3.5 shrink-0" />
+          ) : (
+            <ChevronRight className="size-3.5 shrink-0" />
+          )}
+          <FolderOpen className="size-3.5 shrink-0" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                {directory.label}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <p className="break-all font-mono text-xs">
+                {directory.projectDir ?? t("sessionManager.unknownDirectory")}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+          <Badge variant="outline" className="text-[10px]">
+            {directory.sessions.length}
+          </Badge>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <TooltipProvider>
@@ -845,182 +1146,42 @@ export function SessionManagerPage() {
               )}
             </CardHeader>
             <ScrollArea className="min-h-0 flex-1">
-              <div className="space-y-1 p-2">
-                {isLoading ? (
-                  <p className="p-4 text-center text-sm text-muted-foreground">
-                    {t("sessionManager.loadingSessions")}
-                  </p>
-                ) : filteredSessions.length === 0 ? (
-                  <p className="p-4 text-center text-sm text-muted-foreground">
-                    {t("sessionManager.noSessions")}
-                  </p>
-                ) : listViewMode === "flat" ? (
-                  filteredSessions.map(renderSessionItem)
-                ) : (
-                  groupedSessions.map((providerGroup) => {
-                    const providerOpen = expandedProviderGroups.has(
-                      providerGroup.providerId,
-                    );
-                    const providerLabel = getProviderLabel(
-                      providerGroup.providerId,
-                      t,
-                    );
-                    const providerSelection = getGroupSelectionState(
-                      providerGroup.sessions,
-                    );
-
-                    return (
-                      <Collapsible
-                        key={providerGroup.providerId}
-                        open={providerOpen}
-                        onOpenChange={(open) =>
-                          setProviderGroupOpen(providerGroup.providerId, open)
-                        }
-                      >
-                        <div className="flex w-full items-center rounded-md border bg-muted/40 px-2.5 py-2 transition-colors hover:bg-muted">
-                          {selectionMode && (
-                            <Checkbox
-                              className="mr-2 shrink-0"
-                              checked={providerSelection.checked}
-                              disabled={
-                                !providerSelection.selectableCount || isDeleting
-                              }
-                              aria-label={t(
-                                "sessionManager.selectProviderGroupForBatch",
-                                { provider: providerLabel },
-                              )}
-                              onCheckedChange={(checked) =>
-                                toggleSessionGroupChecked(
-                                  providerGroup.sessions,
-                                  Boolean(checked),
-                                )
-                              }
-                            />
-                          )}
-                          <CollapsibleTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                              aria-label={t(
-                                "sessionManager.toggleProviderGroup",
-                                {
-                                  provider: providerLabel,
-                                },
-                              )}
-                            >
-                              {providerOpen ? (
-                                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                              )}
-                              <SessionProviderIcon
-                                providerId={providerGroup.providerId}
-                                size={16}
-                              />
-                              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                {providerLabel}
-                              </span>
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px]"
-                              >
-                                {providerGroup.sessions.length}
-                              </Badge>
-                            </button>
-                          </CollapsibleTrigger>
+              {isLoading ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">
+                  {t("sessionManager.loadingSessions")}
+                </p>
+              ) : filteredSessions.length === 0 ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">
+                  {t("sessionManager.noSessions")}
+                </p>
+              ) : (
+                <div
+                  ref={sessionListScrollRef}
+                  className="relative w-full"
+                  style={{ height: sessionListVirtualizer.getTotalSize() }}
+                >
+                  {sessionListVirtualizer
+                    .getVirtualItems()
+                    .map((virtualRow) => {
+                      const row = sessionListRows[virtualRow.index];
+                      if (!row) return null;
+                      return (
+                        <div
+                          key={virtualRow.key}
+                          ref={sessionListVirtualizer.measureElement}
+                          data-index={virtualRow.index}
+                          data-session-row={row.kind}
+                          className="absolute left-2 right-2 top-0"
+                          style={{
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          {renderSessionListRow(row)}
                         </div>
-                        <CollapsibleContent className="mt-1 space-y-1 pl-2">
-                          {providerGroup.directories.map((directory) => {
-                            const directoryOpen = expandedDirectoryGroups.has(
-                              directory.key,
-                            );
-                            const directorySelection = getGroupSelectionState(
-                              directory.sessions,
-                            );
-
-                            return (
-                              <Collapsible
-                                key={directory.key}
-                                open={directoryOpen}
-                                onOpenChange={(open) =>
-                                  setDirectoryGroupOpen(directory.key, open)
-                                }
-                              >
-                                <div className="flex w-full items-center rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                                  {selectionMode && (
-                                    <Checkbox
-                                      className="mr-2 shrink-0"
-                                      checked={directorySelection.checked}
-                                      disabled={
-                                        !directorySelection.selectableCount ||
-                                        isDeleting
-                                      }
-                                      aria-label={t(
-                                        "sessionManager.selectDirectoryGroupForBatch",
-                                        { directory: directory.label },
-                                      )}
-                                      onCheckedChange={(checked) =>
-                                        toggleSessionGroupChecked(
-                                          directory.sessions,
-                                          Boolean(checked),
-                                        )
-                                      }
-                                    />
-                                  )}
-                                  <CollapsibleTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                      aria-label={t(
-                                        "sessionManager.toggleDirectoryGroup",
-                                        { directory: directory.label },
-                                      )}
-                                    >
-                                      {directoryOpen ? (
-                                        <ChevronDown className="size-3.5 shrink-0" />
-                                      ) : (
-                                        <ChevronRight className="size-3.5 shrink-0" />
-                                      )}
-                                      <FolderOpen className="size-3.5 shrink-0" />
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                                            {directory.label}
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                          side="bottom"
-                                          className="max-w-xs"
-                                        >
-                                          <p className="break-all font-mono text-xs">
-                                            {directory.projectDir ??
-                                              t(
-                                                "sessionManager.unknownDirectory",
-                                              )}
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[10px]"
-                                      >
-                                        {directory.sessions.length}
-                                      </Badge>
-                                    </button>
-                                  </CollapsibleTrigger>
-                                </div>
-                                <CollapsibleContent className="mt-1 space-y-1 pl-3">
-                                  {directory.sessions.map(renderSessionItem)}
-                                </CollapsibleContent>
-                              </Collapsible>
-                            );
-                          })}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })}
+                </div>
+              )}
             </ScrollArea>
           </Card>
 
@@ -1187,39 +1348,51 @@ export function SessionManagerPage() {
                 </CardHeader>
                 <CardContent className="flex min-h-0 flex-1 p-0">
                   <ScrollArea className="min-w-0 flex-1">
-                    <div className="space-y-3 p-4">
-                      {isLoadingMessages ? (
-                        <p className="p-4 text-center text-sm text-muted-foreground">
-                          {t("sessionManager.loadingMessages")}
-                        </p>
-                      ) : messageGroups.length === 0 ? (
-                        <p className="p-4 text-center text-sm text-muted-foreground">
-                          {t("sessionManager.emptySession")}
-                        </p>
-                      ) : (
-                        messageGroups.map((group, index) => (
-                          <div
-                            key={`${group.ts ?? ""}-${index}`}
-                            ref={(node) => {
-                              if (node) messageRefs.current.set(index, node);
-                              else messageRefs.current.delete(index);
-                            }}
-                          >
-                            <SessionMessageItem
-                              group={group}
-                              isActive={activeMessageIndex === index}
-                              searchQuery={search}
-                              onCopy={(content) =>
-                                void copyText(
-                                  content,
-                                  t("sessionManager.messageCopied"),
-                                )
-                              }
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
+                    {isLoadingMessages ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">
+                        {t("sessionManager.loadingMessages")}
+                      </p>
+                    ) : messageGroups.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">
+                        {t("sessionManager.emptySession")}
+                      </p>
+                    ) : (
+                      <div
+                        ref={messageListScrollRef}
+                        className="relative w-full"
+                        style={{ height: messageVirtualizer.getTotalSize() }}
+                      >
+                        {messageVirtualizer
+                          .getVirtualItems()
+                          .map((virtualMessage) => {
+                            const group = messageGroups[virtualMessage.index];
+                            if (!group) return null;
+                            return (
+                              <div
+                                key={virtualMessage.key}
+                                ref={messageVirtualizer.measureElement}
+                                data-index={virtualMessage.index}
+                                data-message-index={virtualMessage.index}
+                                className="absolute left-4 right-4 top-0"
+                                style={{
+                                  transform: `translateY(${virtualMessage.start}px)`,
+                                }}
+                              >
+                                <SessionMessageItem
+                                  group={group}
+                                  isActive={
+                                    activeMessageIndex === virtualMessage.index
+                                  }
+                                  expandedBlockKeys={expandedBlockKeys}
+                                  searchQuery={search}
+                                  onCopy={handleCopyMessage}
+                                  onToggleBlock={toggleMessageBlock}
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
                   </ScrollArea>
                   <SessionTocSidebar
                     items={tocItems}

@@ -494,6 +494,49 @@ describe("SessionManagerPage", () => {
     );
   });
 
+  it("virtualizes large session and message lists", async () => {
+    const sessions: SessionMeta[] = Array.from({ length: 500 }, (_, index) => ({
+      providerId: "codex",
+      sessionId: `virtual-session-${index}`,
+      title: `Session ${index}`,
+      projectDir: `/mock/virtual-${index}`,
+      lastActiveAt: 1_000 - index,
+      sourcePath: `/mock/virtual/session-${index}.jsonl`,
+    }));
+    const selectedMessages: SessionMessage[] = Array.from(
+      { length: 400 },
+      (_, index) => ({
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `virtual message ${index}`,
+        kind: "text",
+      }),
+    );
+    setSessionFixtures(sessions, {
+      "codex:/mock/virtual/session-0.jsonl": selectedMessages,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Session 0")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-session-row="session"]').length,
+      ).toBeGreaterThan(0),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll("[data-message-index]").length,
+      ).toBeGreaterThan(0),
+    );
+
+    expect(
+      document.querySelectorAll('[data-session-row="session"]').length,
+    ).toBeLessThan(sessions.length);
+    expect(
+      document.querySelectorAll("[data-message-index]").length,
+    ).toBeLessThan(selectedMessages.length);
+  });
+
   it("renders provider and directory groups as persisted collapsible sections", async () => {
     const user = userEvent.setup();
     const firstRender = renderPage();

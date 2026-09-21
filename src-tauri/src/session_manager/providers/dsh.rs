@@ -17,20 +17,6 @@ pub fn session_roots() -> Vec<PathBuf> {
     vec![paths::dsh_dir().join("sessions")]
 }
 
-pub fn scan_sessions() -> Vec<SessionMeta> {
-    session_roots()
-        .into_iter()
-        .flat_map(|root| scan_root(&root))
-        .collect()
-}
-
-fn scan_root(root: &Path) -> Vec<SessionMeta> {
-    walk_files(root, is_session_file)
-        .into_iter()
-        .filter_map(|path| parse_session(&path).ok())
-        .collect()
-}
-
 pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     if !is_session_file(path) {
         return Err(format!(
@@ -41,59 +27,125 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let values = read_session_values(path)?;
     let messages = visible_messages(&values);
     if messages.is_empty() {
-        return Err("DeepSeek Harness session has no conversational messages".to_string());
-    }
-    if messages.is_empty() {
         return Err("DeepSeek Harness session has no visible messages".to_string());
     }
     Ok(messages)
 }
 
-fn parse_session(path: &Path) -> Result<SessionMeta, String> {
-    let values = read_session_values(path)?;
-    let header = values.iter().find(|value| {
-        value.get("type").and_then(Value::as_str) == Some("session")
-            && value.get("id").and_then(Value::as_str).is_some()
-    });
-    let header = header.ok_or_else(|| "missing DSH session header".to_string())?;
-    let session_id = header
-        .get("id")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
-    let cwd = header
-        .get("cwd")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .map(str::to_string);
-    let created_at = header
-        .get("createdAt")
-        .and_then(crate::session_manager::providers::utils::parse_timestamp_to_ms);
-    let messages = visible_messages(&values);
-    if messages.is_empty() {
-        return Err("DeepSeek Harness session has no conversational messages".to_string());
+pub fn scan_sessions() -> Vec<SessionMeta> {
+    session_roots()
+        .into_iter()
+        .flat_map(|root| scan_root(&root))
+        .collect()
+}
+
+fn scan_root(root: &Path) -> Vec<SessionMeta> {
+    let paths = walk_files(root, is_session_file);
+    if paths.is_empty() {
+        return Vec::new();
     }
-    let title = values
-        .iter()
-        .rev()
-        .find_map(|value| {
-            (value.get("type").and_then(Value::as_str) == Some("session/title"))
-                .then(|| {
-                    value
-                        .get("data")?
-                        .get("title")?
-                        .as_str()
-                        .map(str::to_string)
-                })
-                .flatten()
-        })
-        .or_else(|| {
-            messages
-                .iter()
-                .find(|message| message.role == "user")
-                .map(|message| super::utils::truncate_summary(&message.content, 80))
-                .filter(|title| !title.is_empty())
-        });
+
+    let worker_count = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        // Each worker may buffer a full decompressed session, so keep the
+        // parallel memory ceiling bounded even on machines with many cores.
+        .min(4)
+        .min(paths.len());
+    if worker_count <= 1 {
+        return paths
+            .iter()
+            .filter_map(|path| parse_session(path).ok())
+            .collect();
+    }
+
+    let next_index = std::sync::atomic::AtomicUsize::new(0);
+    let mut chunks = (0..worker_count)
+        .map(|_| Vec::<SessionMeta>::new())
+        .collect::<Vec<_>>();
+    std::thread::scope(|scope| {
+        for chunk in &mut chunks {
+            let paths = &paths;
+            let next_index = &next_index;
+            scope.spawn(move || loop {
+                let index = next_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let Some(path) = paths.get(index) else {
+                    break;
+                };
+                if let Ok(session) = parse_session(path) {
+                    chunk.push(session);
+                }
+            });
+        }
+    });
+
+    let mut sessions = chunks.into_iter().flatten().collect::<Vec<_>>();
+    sessions.sort_by(|a, b| a.source_path.cmp(&b.source_path));
+    sessions
+}
+
+fn parse_session(path: &Path) -> Result<SessionMeta, String> {
+    let bytes = read_session_bytes(path)?;
+    let text = String::from_utf8_lossy(&bytes);
+    let mut session_id = None::<String>;
+    let mut cwd = None::<String>;
+    let mut created_at = None::<i64>;
+    let mut latest_title = None::<String>;
+    let mut first_user_message = None::<String>;
+
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+
+        match value.get("type").and_then(Value::as_str).unwrap_or("") {
+            "session" if session_id.is_none() => {
+                session_id = value
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_string);
+                cwd = value
+                    .get("cwd")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string);
+                created_at = value
+                    .get("createdAt")
+                    .and_then(crate::session_manager::providers::utils::parse_timestamp_to_ms);
+            }
+            "session/title" => {
+                if let Some(title) = value
+                    .get("data")
+                    .and_then(|data| data.get("title"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|title| !title.is_empty())
+                {
+                    latest_title = Some(title.to_string());
+                }
+            }
+            "user/message" if first_user_message.is_none() => {
+                if let Some(content) = value.get("data").and_then(|data| data.get("content")) {
+                    let text = super::common::visible_content_text(content);
+                    let text = text.trim();
+                    if !text.is_empty() {
+                        first_user_message = Some(text.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let session_id = session_id.ok_or_else(|| "missing DSH session header".to_string())?;
+    let title = latest_title.or_else(|| {
+        first_user_message
+            .map(|message| super::utils::truncate_summary(&message, 80))
+            .filter(|title| !title.is_empty())
+    });
     let metadata = fs::metadata(path)
         .map_err(|error| format!("Failed to inspect DSH session {}: {error}", path.display()))?;
     let mtime = metadata
@@ -306,31 +358,34 @@ fn collect_tool_call_ids(value: &Value, ids: &mut std::collections::HashSet<Stri
 }
 
 fn read_session_values(path: &Path) -> Result<Vec<Value>, String> {
-    let bytes = if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("zstd"))
-    {
-        decompress_zstd(path)?
-    } else {
-        let metadata = fs::metadata(path).map_err(|error| {
-            format!("Failed to inspect DSH session {}: {error}", path.display())
-        })?;
-        if metadata.len() > MAX_SESSION_BYTES {
-            return Err(format!(
-                "DSH session exceeds the {MAX_SESSION_BYTES}-byte safety limit: {}",
-                path.display()
-            ));
-        }
-        fs::read(path)
-            .map_err(|error| format!("Failed to read DSH session {}: {error}", path.display()))?
-    };
+    let bytes = read_session_bytes(path)?;
     let text = String::from_utf8_lossy(&bytes);
     Ok(text
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
         .collect())
+}
+
+fn read_session_bytes(path: &Path) -> Result<Vec<u8>, String> {
+    if path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("zstd"))
+    {
+        return decompress_zstd(path);
+    }
+
+    let metadata = fs::metadata(path)
+        .map_err(|error| format!("Failed to inspect DSH session {}: {error}", path.display()))?;
+    if metadata.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "DSH session exceeds the {MAX_SESSION_BYTES}-byte safety limit: {}",
+            path.display()
+        ));
+    }
+    fs::read(path)
+        .map_err(|error| format!("Failed to read DSH session {}: {error}", path.display()))
 }
 
 fn decompress_zstd(path: &Path) -> Result<Vec<u8>, String> {
@@ -459,6 +514,30 @@ mod tests {
         let sessions = scan_root(root.path());
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].session_id, "dsh-1");
+        assert_eq!(sessions[0].title.as_deref(), Some("hello"));
+        assert_eq!(sessions[0].project_dir.as_deref(), Some("/tmp/project"));
+        assert_eq!(sessions[0].created_at, Some(1_700_000_000_000));
+    }
+
+    #[test]
+    fn scans_session_metadata_without_building_visible_messages() {
+        let root = tempdir().expect("root");
+        let path = root.path().join("session.jsonl");
+        let lines = [
+            r#"{"type":"session","id":"dsh-metadata","cwd":"/tmp/metadata","createdAt":1700000000000}"#,
+            "{malformed json",
+            r#"{"type":"user/message","data":{"content":[{"type":"text","text":"fallback title"}]}}"#,
+            r#"{"type":"tool/result","data":{"message":{"content":[{"type":"text","text":"large tool output"}]}}}"#,
+            r#"{"type":"session/title","data":{"title":"latest title"}}"#,
+        ];
+        fs::write(&path, lines.join("\n")).expect("write session");
+
+        let sessions = scan_root(root.path());
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title.as_deref(), Some("latest title"));
+        assert_eq!(sessions[0].project_dir.as_deref(), Some("/tmp/metadata"));
+        assert_eq!(sessions[0].created_at, Some(1_700_000_000_000));
     }
 
     #[test]
