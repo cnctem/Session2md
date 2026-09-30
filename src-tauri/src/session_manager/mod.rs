@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use providers::{
     antigravity, claude, cline, codex, continue_session, crush, cursor, dsh, gemini, goose,
-    grokbuild, hermes, kilocode, kimi, mimocode, openclaw, opencode, pi, qoder, qwen, reasonix,
-    teleagent, workbuddy, zcode, zed,
+    grokbuild, hermes, kilocode, kimi, mcode, mimocode, openclaw, opencode, pi, qoder, qwen,
+    reasonix, teleagent, workbuddy, zcode, zed,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -95,6 +95,7 @@ pub fn scan_sessions_excluding(hidden_provider_ids: &BTreeSet<String>) -> Vec<Se
         ("goose", goose::scan_sessions),
         ("kilocode", kilocode::scan_sessions),
         ("kimi", kimi::scan_sessions),
+        ("mcode", mcode::scan_sessions),
         ("mimocode", mimocode::scan_sessions),
         ("qoder", qoder::scan_sessions),
         ("qwen", qwen::scan_sessions),
@@ -124,6 +125,9 @@ pub fn scan_sessions_excluding(hidden_provider_ids: &BTreeSet<String>) -> Vec<Se
 }
 
 pub fn load_messages(provider_id: &str, source_path: &str) -> Result<Vec<SessionMessage>, String> {
+    if provider_id == "mcode" {
+        return mcode::load_messages(source_path);
+    }
     if provider_id == "opencode" && source_path.starts_with("sqlite:") {
         return opencode::load_messages_sqlite(source_path);
     }
@@ -167,6 +171,12 @@ pub fn delete_session(
     session_id: &str,
     source_path: &str,
 ) -> Result<bool, String> {
+    if provider_id == "mcode" {
+        return Err(
+            "Delete this session in MiniMax Code so its runtime state and history are removed together"
+                .into(),
+        );
+    }
     if provider_id == "opencode" && source_path.starts_with("sqlite:") {
         return opencode::delete_session_sqlite(session_id, source_path);
     }

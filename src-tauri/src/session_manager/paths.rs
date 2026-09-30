@@ -84,6 +84,21 @@ pub fn kimi_dir() -> PathBuf {
     directory_override_or("kimi", || home_dir().join(".kimi-code"))
 }
 
+pub fn mcode_dir() -> PathBuf {
+    directory_override_or("mcode", || {
+        [
+            std::env::var("MINIMAX_DATA_DIR"),
+            std::env::var("MAVIS_DATA_DIR"),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".minimax"))
+    })
+}
+
 pub fn kilocode_dir() -> PathBuf {
     directory_override_or("kilocode", || xdg_data_home().join("kilo"))
 }
@@ -229,6 +244,7 @@ pub fn resolved_directories() -> BTreeMap<String, String> {
                 .display()
                 .to_string(),
         ),
+        ("mcode".to_string(), mcode_dir().display().to_string()),
         ("cursor".to_string(), cursor_dir().display().to_string()),
         (
             "antigravity".to_string(),

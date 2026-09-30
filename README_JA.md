@@ -18,6 +18,7 @@ Session2md はオープンソースの [CC Switch](https://github.com/farion1231
 - OpenClaw
 - Hermes
 - Pi
+- MiniMax Code
 - DeepSeek Harness
 - Kimi Code
 - ZCode
@@ -53,7 +54,7 @@ Session2md は各ツールのローカルセッションストアを直接読み
 
 ## セッションディレクトリ
 
-初期状態では、各プロバイダーの標準的なローカルディレクトリを使用します。**設定 → 詳細** でプロバイダーごとのディレクトリを確認・上書きでき、保存後にセッション一覧を更新すると反映されます。ポータブル構成や複数プロファイルに便利です。上書きがない場合、Codex は `CODEX_HOME`、Hermes は `HERMES_HOME`、OpenCode は `XDG_DATA_HOME` も利用します。
+初期状態では、各プロバイダーの標準的なローカルディレクトリを使用します。**設定 → 詳細** でプロバイダーごとのディレクトリを確認・上書きでき、保存後にセッション一覧を更新すると反映されます。ポータブル構成や複数プロファイルに便利です。上書きがない場合、Codex は `CODEX_HOME`、Hermes は `HERMES_HOME`、OpenCode は `XDG_DATA_HOME`、MiniMax Code は `MINIMAX_DATA_DIR` と `MAVIS_DATA_DIR` も利用します。
 
 ## ダウンロード
 

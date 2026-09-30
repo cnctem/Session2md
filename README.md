@@ -18,6 +18,7 @@ Session2md discovers sessions from these local tools:
 - OpenClaw
 - Hermes
 - Pi
+- MiniMax Code
 - DeepSeek Harness
 - Kimi Code
 - ZCode
@@ -53,7 +54,7 @@ Deletion is available only for providers marked as deletable in the app and is e
 
 ## Source directories
 
-By default, Session2md follows each provider's normal local directory. Open **Settings → Advanced** to inspect or override the directory used for any provider, then refresh the session list. Overrides are useful for portable setups or alternate profiles. Codex also respects `CODEX_HOME`, Hermes respects `HERMES_HOME`, and OpenCode respects `XDG_DATA_HOME` when no override is configured.
+By default, Session2md follows each provider's normal local directory. Open **Settings → Advanced** to inspect or override the directory used for any provider, then refresh the session list. Overrides are useful for portable setups or alternate profiles. Codex also respects `CODEX_HOME`, Hermes respects `HERMES_HOME`, OpenCode respects `XDG_DATA_HOME`, and MiniMax Code respects `MINIMAX_DATA_DIR` and `MAVIS_DATA_DIR` when no override is configured.
 
 ## Download
 

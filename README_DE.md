@@ -18,6 +18,7 @@ Session2md erkennt Sitzungen aus den folgenden lokal installierten Tools:
 - OpenClaw
 - Hermes
 - Pi
+- MiniMax Code
 - DeepSeek Harness
 - Kimi Code
 - ZCode
@@ -53,7 +54,7 @@ Das Löschen ist nur für Anbieter verfügbar, die in der App als löschbar mark
 
 ## Sitzungsverzeichnisse
 
-Standardmäßig verwendet Session2md die üblichen lokalen Verzeichnisse der Anbieter. Unter **Einstellungen → Erweitert** können die Verzeichnisse angezeigt oder pro Anbieter überschrieben werden; nach dem Speichern muss die Sitzungsliste aktualisiert werden. Das ist für portable Installationen oder mehrere Profile gedacht. Ohne Überschreibung berücksichtigt Codex außerdem `CODEX_HOME`, Hermes `HERMES_HOME` und OpenCode `XDG_DATA_HOME`.
+Standardmäßig verwendet Session2md die üblichen lokalen Verzeichnisse der Anbieter. Unter **Einstellungen → Erweitert** können die Verzeichnisse angezeigt oder pro Anbieter überschrieben werden; nach dem Speichern muss die Sitzungsliste aktualisiert werden. Das ist für portable Installationen oder mehrere Profile gedacht. Ohne Überschreibung berücksichtigt Codex außerdem `CODEX_HOME`, Hermes `HERMES_HOME`, OpenCode `XDG_DATA_HOME` und MiniMax Code `MINIMAX_DATA_DIR` sowie `MAVIS_DATA_DIR`.
 
 ## Download
 

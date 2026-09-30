@@ -13,6 +13,7 @@ pub mod grokbuild;
 pub mod hermes;
 pub mod kilocode;
 pub mod kimi;
+pub mod mcode;
 pub mod mimocode;
 pub mod openclaw;
 pub mod opencode;

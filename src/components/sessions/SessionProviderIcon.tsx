@@ -10,6 +10,7 @@ const PROVIDER_BRAND_ICONS: Record<string, { icon: string; name: string }> = {
   gemini: { icon: "gemini", name: "Gemini CLI" },
   grokbuild: { icon: "grok", name: "Grok Build" },
   hermes: { icon: "hermes", name: "Hermes" },
+  mcode: { icon: "minimax", name: "MiniMax Code" },
   openclaw: { icon: "openclaw", name: "OpenClaw" },
   opencode: { icon: "opencode", name: "OpenCode" },
   pi: { icon: "pi", name: "Pi" },

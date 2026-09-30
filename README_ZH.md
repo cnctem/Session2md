@@ -18,6 +18,7 @@ Session2md 可以从以下本地工具发现会话：
 - OpenClaw
 - Hermes
 - Pi
+- MiniMax Code
 - DeepSeek Harness
 - Kimi Code
 - ZCode
@@ -53,7 +54,7 @@ Session2md 直接读取各工具的本地会话存储，不连接 CC Switch，�
 
 ## 会话目录
 
-默认情况下，Session2md 使用各供应商的标准本地目录。进入 **设置 → 高级** 可以查看或覆盖任意供应商的目录，保存后刷新会话列表即可生效，适合便携配置或多套配置目录。未设置覆盖目录时，Codex 还会读取 `CODEX_HOME`，Hermes 读取 `HERMES_HOME`，OpenCode 读取 `XDG_DATA_HOME`。
+默认情况下，Session2md 使用各供应商的标准本地目录。进入 **设置 → 高级** 可以查看或覆盖任意供应商的目录，保存后刷新会话列表即可生效，适合便携配置或多套配置目录。未设置覆盖目录时，Codex 还会读取 `CODEX_HOME`，Hermes 读取 `HERMES_HOME`，OpenCode 读取 `XDG_DATA_HOME`，MiniMax Code 读取 `MINIMAX_DATA_DIR` 和 `MAVIS_DATA_DIR`。
 
 ## 下载
 

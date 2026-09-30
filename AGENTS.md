@@ -5,7 +5,7 @@ conversation histories and exporting them as Markdown. In addition to Codex,
 Claude Code, Gemini CLI, Grok Build, OpenCode, OpenClaw, Hermes, and Pi, it
 supports Cursor, Antigravity CLI, Reasonix, MiMo Code, ZCode, Kimi CLI/Code,
 Kilo Code, Qoder CLI, WorkBuddy, Qwen Work, Continue, Cline, Goose, Zed, Crush,
-TeleAgent, and DeepSeek Harness.
+TeleAgent, MiniMax Code, and DeepSeek Harness.
 
 ## Product Boundary
 
