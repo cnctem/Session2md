@@ -87,6 +87,7 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.5.1",
     "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "smol-toml": "^1.4.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",

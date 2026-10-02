@@ -14,6 +14,7 @@ import ReactMarkdown, {
   type UrlTransform,
 } from "react-markdown";
 import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,13 @@ const ALLOWED_ELEMENTS = [
   "ol",
   "li",
   "blockquote",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "th",
+  "td",
   "strong",
   "em",
   "a",
@@ -159,6 +167,38 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
           {children}
         </blockquote>
       ),
+      table: ({ children }) => (
+        <div className="my-3 max-w-full overflow-x-auto rounded-md border border-border/80 first:mt-0 last:mb-0">
+          <table className="w-full min-w-max border-collapse text-left text-xs leading-5">
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }) => (
+        <thead className="bg-muted/60">{children}</thead>
+      ),
+      tbody: ({ children }) => <tbody>{children}</tbody>,
+      tr: ({ children }) => (
+        <tr className="border-b border-border/70 last:border-b-0">
+          {children}
+        </tr>
+      ),
+      th: ({ children, style }) => (
+        <th
+          className="border-r border-border/60 px-3 py-2 align-top font-medium last:border-r-0 [&_ol]:my-0 [&_p]:my-0 [&_ul]:my-0"
+          style={style}
+        >
+          {highlightNode(children, searchQuery)}
+        </th>
+      ),
+      td: ({ children, style }) => (
+        <td
+          className="border-r border-border/60 px-3 py-2 align-top last:border-r-0 [&_ol]:my-0 [&_p]:my-0 [&_ul]:my-0"
+          style={style}
+        >
+          {highlightNode(children, searchQuery)}
+        </td>
+      ),
       a: ({ href, children }) => {
         const url = href?.trim();
         if (!url) {
@@ -243,7 +283,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
       <ReactMarkdown
         allowedElements={ALLOWED_ELEMENTS}
         components={components}
-        remarkPlugins={[remarkBreaks]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         skipHtml
         urlTransform={safeMarkdownUrl}
       >

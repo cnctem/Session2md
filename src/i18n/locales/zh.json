@@ -1051,7 +1051,7 @@
       "saveFailed": "保存消息预览设置失败：{{error}}",
       "renderMarkdown": {
         "label": "渲染 Markdown",
-        "description": "渲染标题、列表、引用、链接和代码；关闭后显示原始 Markdown。"
+        "description": "渲染标题、列表、引用、表格、链接和代码；关闭后显示原始 Markdown。"
       }
     },
     "exportContent": {

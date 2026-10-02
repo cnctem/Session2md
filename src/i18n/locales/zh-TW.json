@@ -1052,7 +1052,7 @@
       "saveFailed": "儲存訊息預覽設定失敗：{{error}}",
       "renderMarkdown": {
         "label": "渲染 Markdown",
-        "description": "渲染標題、清單、引用、連結與程式碼；關閉後顯示原始 Markdown。"
+        "description": "渲染標題、清單、引用、表格、連結與程式碼；關閉後顯示原始 Markdown。"
       }
     },
     "exportContent": {

@@ -1051,7 +1051,7 @@
       "saveFailed": "Failed to save message preview settings: {{error}}",
       "renderMarkdown": {
         "label": "Render Markdown",
-        "description": "Render headings, lists, quotes, links, and code. Turn this off to show the original Markdown."
+        "description": "Render headings, lists, quotes, tables, links, and code. Turn this off to show the original Markdown."
       }
     },
     "exportContent": {

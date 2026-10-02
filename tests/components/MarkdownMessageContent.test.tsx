@@ -56,6 +56,33 @@ describe("MarkdownMessageContent", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders GFM tables and highlights cell content", () => {
+    const { container } = render(
+      <MarkdownMessageContent
+        content={[
+          "| Name | Value |",
+          "| :--- | ---: |",
+          "| **alpha** | 42 |",
+          "| beta | 7 |",
+        ].join("\n")}
+        searchQuery="alpha"
+        onCopyCode={vi.fn()}
+        onOpenLink={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(2);
+    expect(screen.getByRole("cell", { name: "42" })).toBeInTheDocument();
+    expect(
+      container.querySelector<HTMLElement>("table th")?.style.textAlign,
+    ).toBe("left");
+    expect(
+      container.querySelector<HTMLElement>("table th + th")?.style.textAlign,
+    ).toBe("right");
+    expect(screen.getByText("alpha").tagName).toBe("MARK");
+  });
+
   it("renders fenced code cards and copies their source", () => {
     const onCopyCode = vi.fn();
     render(

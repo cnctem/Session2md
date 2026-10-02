@@ -1051,7 +1051,7 @@
       "saveFailed": "メッセージプレビュー設定を保存できませんでした: {{error}}",
       "renderMarkdown": {
         "label": "Markdown をレンダリング",
-        "description": "見出し、リスト、引用、リンク、コードを整形して表示します。オフにすると元の Markdown を表示します。"
+        "description": "見出し、リスト、引用、表、リンク、コードを整形して表示します。オフにすると元の Markdown を表示します。"
       }
     },
     "exportContent": {
