@@ -513,17 +513,17 @@ describe("SessionManagerPage", () => {
     setSessionFixtures(
       [
         {
-          providerId: "dsh",
-          sessionId: "dsh-session-1",
-          title: "DSH Session",
-          projectDir: "/mock/dsh",
+          providerId: "qwen",
+          sessionId: "qwen-session-1",
+          title: "Qwen Session",
+          projectDir: "/mock/qwen",
           lastActiveAt: 50,
-          sourcePath: "/mock/dsh/session.jsonl",
+          sourcePath: "/mock/qwen/session.jsonl",
           canDelete: false,
         },
       ],
       {
-        "dsh:/mock/dsh/session.jsonl": [
+        "qwen:/mock/qwen/session.jsonl": [
           { role: "user", content: "hello", ts: 50 },
           { role: "assistant", content: "answer", ts: 51 },
         ],
@@ -531,7 +531,7 @@ describe("SessionManagerPage", () => {
     );
     renderPage();
     fireEvent.click(
-      await screen.findByRole("button", { name: /DSH Session/i }),
+      await screen.findByRole("button", { name: /Qwen Session/i }),
     );
     expect(
       screen.queryByRole("button", { name: "sessionManager.delete" }),
@@ -541,6 +541,39 @@ describe("SessionManagerPage", () => {
         name: "sessionManager.manageBatchTooltip",
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("exposes deletion for DSH sessions", async () => {
+    setSessionFixtures(
+      [
+        {
+          providerId: "dsh",
+          sessionId: "dsh-session-1",
+          title: "DSH Session",
+          projectDir: "/mock/dsh",
+          lastActiveAt: 50,
+          sourcePath: "/mock/dsh/session.v4.jsonl",
+          canDelete: true,
+        },
+      ],
+      {
+        "dsh:/mock/dsh/session.v4.jsonl": [
+          { role: "user", content: "hello", ts: 50 },
+          { role: "assistant", content: "answer", ts: 51 },
+        ],
+      },
+    );
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /DSH Session/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "sessionManager.delete" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "sessionManager.manageBatchTooltip" }),
+    ).toBeInTheDocument();
   });
 
   it("deletes the selected session after confirmation", async () => {

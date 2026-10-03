@@ -303,9 +303,18 @@ export const formatSessionMessagePreview = (
   content: string,
   maxLength = 50,
 ) => {
-  return (
-    content.slice(0, maxLength) + (content.length > maxLength ? "..." : "")
-  );
+  const normalized = content
+    .replace(/\r\n?/g, "\n")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^ {0,3}(?:`{3,}|~{3,})[^\n]*$/gm, " ")
+    .replace(/^ {0,3}#{1,6}\s+/gm, "")
+    .replace(/^ {0,3}>\s?/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const characters = Array.from(normalized);
+  if (characters.length <= maxLength) return normalized;
+  return `${characters.slice(0, Math.max(maxLength, 0)).join("")}...`;
 };
 
 export const highlightText = (text: string, query: string): ReactNode => {

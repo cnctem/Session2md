@@ -237,6 +237,20 @@ describe("session utils", () => {
     );
   });
 
+  it("normalizes Markdown and whitespace in message previews", () => {
+    expect(
+      formatSessionMessagePreview(
+        "## Heading\r\n\r\n[Open docs](https://example.com)\r\n\r\n```ts\r\nconst value = 1;\r\n```",
+      ),
+    ).toBe("Heading Open docs const value = 1;");
+  });
+
+  it("does not split Unicode surrogate pairs in message previews", () => {
+    expect(formatSessionMessagePreview("😀".repeat(20), 5)).toBe(
+      "😀😀😀😀😀...",
+    );
+  });
+
   it("groups sessions by provider and project directory", () => {
     const sessions: SessionMeta[] = [
       {

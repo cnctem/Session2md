@@ -32,6 +32,64 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages)
 }
 
+pub fn delete_session(root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    if !is_session_file(path) {
+        return Err(format!(
+            "Invalid DeepSeek Harness session file: {}",
+            path.display()
+        ));
+    }
+
+    let (meta, is_subagent) = parse_session_with_origin(path)?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "DeepSeek Harness session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+    if is_subagent {
+        return Err("DeepSeek Harness subagent sessions cannot be deleted".to_string());
+    }
+
+    let relative = path.strip_prefix(root).map_err(|_| {
+        format!(
+            "DeepSeek Harness session is outside its root: {}",
+            path.display()
+        )
+    })?;
+    let components = relative.components().collect::<Vec<_>>();
+    if components.len() != 3 {
+        return Err(format!(
+            "Refusing to delete unexpected DeepSeek Harness session layout: {}",
+            path.display()
+        ));
+    }
+
+    let session_dir = path
+        .parent()
+        .ok_or_else(|| format!("DeepSeek Harness session has no parent: {}", path.display()))?;
+    let metadata = fs::symlink_metadata(session_dir).map_err(|error| {
+        format!(
+            "Failed to inspect DeepSeek Harness session directory {}: {error}",
+            session_dir.display()
+        )
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(format!(
+            "DeepSeek Harness session directory is not a real directory: {}",
+            session_dir.display()
+        ));
+    }
+
+    fs::remove_dir_all(session_dir).map_err(|error| {
+        format!(
+            "Failed to delete DeepSeek Harness session directory {}: {error}",
+            session_dir.display()
+        )
+    })?;
+    Ok(true)
+}
+
 pub fn scan_sessions() -> Vec<SessionMeta> {
     session_roots()
         .into_iter()
@@ -40,7 +98,20 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
 }
 
 fn scan_root(root: &Path) -> Vec<SessionMeta> {
-    let paths = walk_files(root, is_session_file);
+    let mut latest_by_directory = std::collections::BTreeMap::<PathBuf, PathBuf>::new();
+    for path in walk_files(root, is_session_file) {
+        let Some(parent) = path.parent() else {
+            continue;
+        };
+        let replace = latest_by_directory
+            .get(parent)
+            .map(|existing| session_file_rank(&path) > session_file_rank(existing))
+            .unwrap_or(true);
+        if replace {
+            latest_by_directory.insert(parent.to_path_buf(), path);
+        }
+    }
+    let paths = latest_by_directory.into_values().collect::<Vec<_>>();
     if paths.is_empty() {
         return Vec::new();
     }
@@ -55,7 +126,7 @@ fn scan_root(root: &Path) -> Vec<SessionMeta> {
     if worker_count <= 1 {
         return paths
             .iter()
-            .filter_map(|path| parse_session(path).ok())
+            .filter_map(|path| scan_session(root, path))
             .collect();
     }
 
@@ -72,7 +143,7 @@ fn scan_root(root: &Path) -> Vec<SessionMeta> {
                 let Some(path) = paths.get(index) else {
                     break;
                 };
-                if let Ok(session) = parse_session(path) {
+                if let Some(session) = scan_session(root, path) {
                     chunk.push(session);
                 }
             });
@@ -84,7 +155,34 @@ fn scan_root(root: &Path) -> Vec<SessionMeta> {
     sessions
 }
 
+fn scan_session(root: &Path, path: &Path) -> Option<SessionMeta> {
+    let mut session = parse_session(path).ok()?;
+    session.can_delete = session.can_delete && is_deletable_layout(root, path);
+    Some(session)
+}
+
+fn is_deletable_layout(root: &Path, path: &Path) -> bool {
+    path.strip_prefix(root)
+        .map(|relative| {
+            relative
+                .components()
+                .filter_map(|component| match component {
+                    std::path::Component::Normal(_) => Some(()),
+                    _ => None,
+                })
+                .count()
+                == 3
+        })
+        .unwrap_or(false)
+}
+
 fn parse_session(path: &Path) -> Result<SessionMeta, String> {
+    let (mut session, is_subagent) = parse_session_with_origin(path)?;
+    session.can_delete = !is_subagent;
+    Ok(session)
+}
+
+fn parse_session_with_origin(path: &Path) -> Result<(SessionMeta, bool), String> {
     let bytes = read_session_bytes(path)?;
     let text = String::from_utf8_lossy(&bytes);
     let mut session_id = None::<String>;
@@ -92,6 +190,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
     let mut created_at = None::<i64>;
     let mut latest_title = None::<String>;
     let mut first_user_message = None::<String>;
+    let mut is_subagent = false;
 
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         let Ok(value) = serde_json::from_str::<Value>(line) else {
@@ -100,6 +199,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
 
         match value.get("type").and_then(Value::as_str).unwrap_or("") {
             "session" if session_id.is_none() => {
+                is_subagent = value.get("origin").and_then(Value::as_str) == Some("subagent");
                 session_id = value
                     .get("id")
                     .and_then(Value::as_str)
@@ -154,18 +254,21 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|duration| duration.as_millis() as i64);
 
-    Ok(SessionMeta {
-        provider_id: PROVIDER_ID.to_string(),
-        session_id,
-        title,
-        summary: None,
-        project_dir: cwd,
-        created_at,
-        last_active_at: mtime.or(created_at),
-        source_path: Some(path.display().to_string()),
-        resume_command: None,
-        can_delete: false,
-    })
+    Ok((
+        SessionMeta {
+            provider_id: PROVIDER_ID.to_string(),
+            session_id,
+            title,
+            summary: None,
+            project_dir: cwd,
+            created_at,
+            last_active_at: mtime.or(created_at),
+            source_path: Some(path.display().to_string()),
+            resume_command: None,
+            can_delete: true,
+        },
+        is_subagent,
+    ))
 }
 
 fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
@@ -481,17 +584,28 @@ fn decompress_zstd(path: &Path) -> Result<Vec<u8>, String> {
 }
 
 fn is_session_file(path: &Path) -> bool {
+    session_file_rank(path).is_some()
+}
+
+fn session_file_rank(path: &Path) -> Option<(u32, bool)> {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
+        return None;
     };
     let name = name.to_ascii_lowercase();
+    let compressed = name.ends_with(".zstd");
     let stem = name.strip_suffix(".zstd").unwrap_or(&name);
-    stem == "session.jsonl"
-        || (stem.starts_with("session.v")
-            && stem.ends_with(".jsonl")
-            && stem[9..stem.len() - 6]
-                .chars()
-                .all(|ch| ch.is_ascii_digit()))
+    let generation = if stem == "session.jsonl" {
+        0
+    } else if stem.starts_with("session.v") && stem.ends_with(".jsonl") {
+        let digits = &stem[9..stem.len() - 6];
+        if digits.is_empty() || !digits.chars().all(|ch| ch.is_ascii_digit()) {
+            return None;
+        }
+        digits.parse::<u32>().ok()?
+    } else {
+        return None;
+    };
+    Some((generation, compressed))
 }
 
 #[cfg(test)]
@@ -515,6 +629,22 @@ mod tests {
                 .join("\n"),
         )
         .expect("write session");
+    }
+
+    fn write_subagent_session(path: &Path) {
+        let lines = [
+            json!({"type":"session","id":"dsh-subagent","origin":"subagent","cwd":"/tmp/project","createdAt":1_700_000_000_000_i64}),
+            json!({"type":"user/message","time":1_700_000_000_100_i64,"data":{"content":[{"type":"text","text":"delegate"}]}}),
+        ];
+        fs::write(
+            path,
+            lines
+                .into_iter()
+                .map(|line| line.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .expect("write subagent session");
     }
 
     #[test]
@@ -548,6 +678,88 @@ mod tests {
         assert_eq!(sessions[0].title.as_deref(), Some("hello"));
         assert_eq!(sessions[0].project_dir.as_deref(), Some("/tmp/project"));
         assert_eq!(sessions[0].created_at, Some(1_700_000_000_000));
+        assert!(sessions[0].can_delete);
+    }
+
+    #[test]
+    fn scans_only_the_latest_generation_per_session_directory() {
+        let root = tempdir().expect("root");
+        let dir = root.path().join("workspace").join("session");
+        fs::create_dir_all(&dir).expect("mkdir");
+        write_session(&dir.join("session.v2.jsonl"));
+        write_session(&dir.join("session.v4.jsonl"));
+
+        let sessions = scan_root(root.path());
+
+        assert_eq!(sessions.len(), 1);
+        assert!(sessions[0]
+            .source_path
+            .as_deref()
+            .is_some_and(|path| path.ends_with("session.v4.jsonl")));
+    }
+
+    #[test]
+    fn deletes_the_verified_session_directory_only() {
+        let root = tempdir().expect("root");
+        let dir = root.path().join("workspace").join("session");
+        let sibling = root.path().join("workspace").join("other");
+        fs::create_dir_all(&dir).expect("mkdir session");
+        fs::create_dir_all(&sibling).expect("mkdir sibling");
+        let path = dir.join("session.v4.jsonl");
+        write_session(&path);
+        fs::write(dir.join("session.lock"), "lock").expect("write sidecar");
+        write_session(&sibling.join("session.jsonl"));
+
+        assert!(delete_session(root.path(), &path, "dsh-1").expect("delete"));
+
+        assert!(!dir.exists());
+        assert!(sibling.join("session.jsonl").exists());
+    }
+
+    #[test]
+    fn refuses_to_delete_a_mismatched_session_id() {
+        let root = tempdir().expect("root");
+        let dir = root.path().join("workspace").join("session");
+        fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("session.jsonl");
+        write_session(&path);
+
+        let error = delete_session(root.path(), &path, "different-id")
+            .expect_err("mismatched id should be rejected");
+
+        assert!(error.contains("session ID mismatch"));
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn refuses_to_delete_a_flat_session_layout() {
+        let root = tempdir().expect("root");
+        let path = root.path().join("session.jsonl");
+        write_session(&path);
+
+        let error = delete_session(root.path(), &path, "dsh-1")
+            .expect_err("flat layout should be rejected");
+
+        assert!(error.contains("unexpected DeepSeek Harness session layout"));
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn subagent_sessions_are_not_deletable() {
+        let root = tempdir().expect("root");
+        let dir = root.path().join("workspace").join("subagent");
+        fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("session.jsonl");
+        write_subagent_session(&path);
+
+        let sessions = scan_root(root.path());
+        assert_eq!(sessions.len(), 1);
+        assert!(!sessions[0].can_delete);
+
+        let error = delete_session(root.path(), &path, "dsh-subagent")
+            .expect_err("subagent should be rejected");
+        assert!(error.contains("subagent sessions cannot be deleted"));
+        assert!(path.exists());
     }
 
     #[test]
@@ -569,6 +781,7 @@ mod tests {
         assert_eq!(sessions[0].title.as_deref(), Some("latest title"));
         assert_eq!(sessions[0].project_dir.as_deref(), Some("/tmp/metadata"));
         assert_eq!(sessions[0].created_at, Some(1_700_000_000_000));
+        assert!(!sessions[0].can_delete);
     }
 
     #[test]

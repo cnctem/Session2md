@@ -44,13 +44,13 @@ Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 - Nach Anbieter filtern und zwischen flacher Liste sowie nach Anbieter/Projektverzeichnis gruppierter Ansicht wechseln.
 - Projektverzeichnis, Quellpfad und verfügbare Wiederaufnahmebefehle des Anbieters kopieren.
 - Die Unterhaltung über den nativen Speicherdialog als Markdown-Datei exportieren.
-- Eine Sitzung löschen oder mehrere Sitzungen auswählen, auch ganze Anbieter- oder Verzeichnisgruppen.
+- Unterstützte Sitzungen löschen, einschließlich DeepSeek-Harness-Datensätzen, oder mehrere Sitzungen und ganze Verzeichnisgruppen auswählen.
 
 ## Daten und Sicherheit
 
 Session2md liest die lokalen Sitzungsdaten der jeweiligen Tools direkt ein. Die App verbindet sich nicht mit CC Switch, startet keinen Proxy, lädt keine Gesprächsinhalte hoch und startet bzw. setzt keine CLI-Sitzung fort. Ein angezeigter Wiederaufnahmebefehl wird nur auf ausdrückliche Nutzeraktion in die Zwischenablage kopiert.
 
-Das Löschen ist nur für Anbieter verfügbar, die in der App als löschbar markiert sind, und ist eine bestätigungspflichtige, destruktive Aktion. Nach der Bestätigung verwendet Session2md eine anbieterspezifische Bereinigung und ändert die ausgewählte lokale Sitzungsdatei oder Datenbank. Gelöschte Sitzungen können von der App nicht wiederhergestellt werden; wichtige Daten sollten vorher gesichert werden. Sprache, Design und Verzeichnisüberschreibungen der App werden separat gespeichert. Beim Export wird ausschließlich die im nativen Speicherdialog ausgewählte Markdown-Datei geschrieben.
+Das Löschen ist nur für Anbieter verfügbar, die in der App als löschbar markiert sind, und ist eine bestätigungspflichtige, destruktive Aktion. Nach der Bestätigung verwendet Session2md eine anbieterspezifische Bereinigung und ändert die ausgewählte lokale Sitzungsdatei oder Datenbank. Bei DeepSeek Harness wird nach Prüfung der gespeicherten Sitzungs-ID das sitzungseigene Verzeichnis entfernt. Gelöschte Sitzungen können von der App nicht wiederhergestellt werden. Vor dem Löschen einer möglicherweise noch schreibenden Sitzung sollte der zugehörige Agent beendet und wichtige Daten sollten gesichert werden. Sprache, Design und Verzeichnisüberschreibungen der App werden separat gespeichert. Beim Export wird ausschließlich die im nativen Speicherdialog ausgewählte Markdown-Datei geschrieben.
 
 ## Sitzungsverzeichnisse
 

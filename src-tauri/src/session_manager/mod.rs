@@ -256,6 +256,7 @@ fn delete_session_with_roots(
                 }
                 "hermes" => hermes::delete_session(&validated_root, &validated_source, session_id),
                 "pi" => pi::delete_session(&validated_root, &validated_source, session_id),
+                "dsh" => dsh::delete_session(&validated_root, &validated_source, session_id),
                 _ => Err(format!("Unsupported provider: {provider_id}")),
             };
         }
@@ -281,6 +282,7 @@ fn provider_roots(provider_id: &str) -> Result<Vec<PathBuf>, String> {
         "grokbuild" => grokbuild::session_roots(),
         "hermes" => vec![paths::hermes_dir().join("sessions")],
         "pi" => pi::session_roots(),
+        "dsh" => dsh::session_roots(),
         _ => return Err(format!("Unsupported provider: {provider_id}")),
     };
     Ok(roots)

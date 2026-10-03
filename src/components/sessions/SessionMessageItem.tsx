@@ -32,8 +32,11 @@ import {
 const COLLAPSE_THRESHOLD = 3000;
 const COLLAPSED_LENGTH = 1500;
 
+const truncateByCodePoint = (content: string, maxLength: number) =>
+  Array.from(content).slice(0, maxLength).join("");
+
 const truncateMarkdownPreview = (content: string, maxLength: number) => {
-  const hardCut = content.slice(0, maxLength);
+  const hardCut = truncateByCodePoint(content, maxLength);
   const lastNewline = hardCut.lastIndexOf("\n");
   let preview =
     lastNewline >= Math.floor(maxLength * 0.6)
@@ -83,7 +86,7 @@ function MessageTextBlock({
   const displayContent = collapsed
     ? renderMarkdown
       ? truncateMarkdownPreview(content, COLLAPSED_LENGTH)
-      : content.slice(0, COLLAPSED_LENGTH) + "…"
+      : truncateByCodePoint(content, COLLAPSED_LENGTH) + "…"
     : content;
   const canRenderMarkdown = renderMarkdown && onCopyCode && onOpenLink;
 
