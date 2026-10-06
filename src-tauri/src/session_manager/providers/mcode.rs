@@ -71,6 +71,7 @@ fn scan(conn: &Connection, data_dir: &Path) -> rusqlite::Result<Vec<SessionMeta>
     rows.collect()
 }
 
+#[cfg(not(windows))]
 fn shell_escape(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }

@@ -48,7 +48,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             };
             let mut parts = normalize_content_parts(message.get("content").unwrap_or(&Value::Null));
             if role == "thinking" {
-                parts = parts.into_iter().map(ContentPart::as_reasoning).collect();
+                parts = parts.into_iter().map(ContentPart::into_reasoning).collect();
             } else if normalized_role == "tool" {
                 parts = parts
                     .into_iter()

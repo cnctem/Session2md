@@ -20,12 +20,14 @@ pub(crate) const MAX_TREE_ENTRIES: usize = 500_000;
 const MAX_TREE_ID_BYTES: usize = 256;
 pub(crate) const MAX_SESSION_BYTES: u64 = 128 * 1024 * 1024;
 
+#[allow(dead_code)] // Retained for optional Pi usage and discovery integrations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SessionLayout {
     Flat,
     ProjectDirectories,
 }
 
+#[allow(dead_code)] // Retained for optional Pi usage and discovery integrations.
 #[derive(Debug, PartialEq, Eq)]
 enum SessionRootResolution {
     Available {
@@ -40,6 +42,7 @@ enum SessionRootResolution {
     },
 }
 
+#[allow(dead_code)] // Reserved for the optional Pi discovery command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum PiSessionDiscovery {
@@ -91,10 +94,12 @@ pub fn session_roots() -> Vec<PathBuf> {
 /// Return candidate JSONL files using Pi's active root and layout rules.
 /// Oversized files remain candidates so the usage importer can report them
 /// instead of silently treating an incomplete import as success.
+#[allow(dead_code)] // Used by the optional Pi usage integration.
 pub(crate) fn session_files() -> Result<Vec<PathBuf>, String> {
     session_files_from_resolution(resolve_session_root())
 }
 
+#[allow(dead_code)] // Exercised by the Pi discovery tests.
 fn session_files_from_resolution(
     resolution: SessionRootResolution,
 ) -> Result<Vec<PathBuf>, String> {
@@ -112,6 +117,7 @@ fn session_files_from_resolution(
     }
 }
 
+#[allow(dead_code)] // Reserved for the optional Pi discovery command.
 pub fn session_discovery() -> PiSessionDiscovery {
     match resolve_session_root() {
         SessionRootResolution::Available { .. } => PiSessionDiscovery::Available,
@@ -129,6 +135,7 @@ fn resolve_session_root() -> SessionRootResolution {
     }
 }
 
+#[allow(dead_code)] // Exercised by the Pi discovery tests.
 fn classify_configured_session_dir(
     value: &str,
     home: &Path,
@@ -167,6 +174,7 @@ fn classify_configured_session_dir(
     }
 }
 
+#[allow(dead_code)] // Exercised by the Pi discovery tests.
 fn resolve_global_session_dir(value: &str, home: &Path) -> Option<PathBuf> {
     let path = if value == "~" {
         home.to_path_buf()

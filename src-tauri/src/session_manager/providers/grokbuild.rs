@@ -96,7 +96,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
                     parts.extend(
                         normalize_content_parts(summary)
                             .into_iter()
-                            .map(ContentPart::as_reasoning),
+                            .map(ContentPart::into_reasoning),
                     );
                 }
             }

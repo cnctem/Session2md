@@ -92,7 +92,7 @@ impl ContentPart {
         }
     }
 
-    pub fn as_reasoning(mut self) -> Self {
+    pub fn into_reasoning(mut self) -> Self {
         if self.kind == ContentPartKind::Text {
             self.kind = ContentPartKind::Reasoning;
         }
@@ -189,7 +189,7 @@ fn normalize_object_part(object: &serde_json::Map<String, Value>) -> Vec<Content
                 ],
             )
             .into_iter()
-            .map(ContentPart::as_reasoning)
+            .map(ContentPart::into_reasoning)
             .collect();
         }
         "tool_use" | "toolCall" | "tool-call" | "tool.call" | "toolRequest" | "function_call"

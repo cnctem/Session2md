@@ -275,7 +275,7 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
     let canonical_steps = values
         .iter()
         .filter(|value| value.get("type").and_then(Value::as_str) == Some("assistant/message"))
-        .filter_map(|value| dsh_step_key(value))
+        .filter_map(dsh_step_key)
         .collect::<std::collections::HashSet<_>>();
     let mut block_steps = std::collections::HashSet::new();
     let mut partial_chunks = std::collections::BTreeMap::<(u64, u64, u64, String), String>::new();
@@ -588,9 +588,7 @@ fn is_session_file(path: &Path) -> bool {
 }
 
 fn session_file_rank(path: &Path) -> Option<(u32, bool)> {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return None;
-    };
+    let name = path.file_name().and_then(|name| name.to_str())?;
     let name = name.to_ascii_lowercase();
     let compressed = name.ends_with(".zstd");
     let stem = name.strip_suffix(".zstd").unwrap_or(&name);

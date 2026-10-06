@@ -767,7 +767,7 @@ mod tests {
         std::fs::create_dir_all(session_diff.parent().expect("diff parent"))
             .expect("create diff dir");
         std::fs::write(
-            &message_dir.join(format!("{message_id}.json")),
+            message_dir.join(format!("{message_id}.json")),
             format!(r#"{{"id":"{message_id}","sessionID":"{session_id}"}}"#),
         )
         .expect("write message");

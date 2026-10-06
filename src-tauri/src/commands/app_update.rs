@@ -32,9 +32,7 @@ pub struct AppUpdateInfo {
 }
 
 fn normalized_version(value: &str) -> &str {
-    value
-        .trim()
-        .trim_start_matches(|character| character == 'v' || character == 'V')
+    value.trim().trim_start_matches(['v', 'V'])
 }
 
 fn parse_version(value: &str) -> Result<Version, String> {

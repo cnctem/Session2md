@@ -537,7 +537,7 @@ mod tests {
         create_db(&path);
         let sessions = scan_database(&path, "mimocode", Family::Mimocode, false);
         assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].can_delete, false);
+        assert!(!sessions[0].can_delete);
         let source = sessions[0].source_path.as_deref().expect("source");
         let messages = load_database(source, "mimocode").expect("messages");
         assert_eq!(messages.len(), 3);

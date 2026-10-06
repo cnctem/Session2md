@@ -80,10 +80,10 @@ fn scan_database(path: &Path) -> Vec<SessionMeta> {
                 .get("parent_session_id")
                 .and_then(Value::as_str)
                 .is_none_or(str::is_empty)
-                && !session
+                && session
                     .get("title")
                     .and_then(Value::as_str)
-                    .is_some_and(|title| title == "Generate a title")
+                    .is_none_or(|title| title != "Generate a title")
         })
         .filter_map(|session| {
             let id = session.get("id").and_then(Value::as_str)?;

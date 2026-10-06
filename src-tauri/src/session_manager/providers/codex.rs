@@ -277,7 +277,7 @@ fn map_codex_response_item(
             if let Some(content) = payload.get("content") {
                 parts.extend(super::common::normalize_content_parts(content));
             }
-            parts = parts.into_iter().map(ContentPart::as_reasoning).collect();
+            parts = parts.into_iter().map(ContentPart::into_reasoning).collect();
             messages.extend(messages_from_parts("assistant", &parts, ts));
         }
         "function_call" | "custom_tool_call" | "tool_call" => {
