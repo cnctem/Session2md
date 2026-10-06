@@ -1,6 +1,6 @@
 {
   "name": "session2md",
-  "version": "3.20.0",
+  "version": "3.0.0",
   "description": "Read local AI sessions and export conversations as Markdown",
   "type": "module",
   "scripts": {

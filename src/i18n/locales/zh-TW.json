@@ -1110,6 +1110,29 @@
       "crush": "Crush 資料目錄",
       "teleagent": "TeleAgent 資料目錄",
       "dsh": "DeepSeek Harness 資料目錄"
+    },
+    "about": {
+      "title": "關於 Session2md",
+      "description": "查看應用程式概覽、目前版本與更新狀態。",
+      "appDescription": "Session2md 是一款本機優先的桌面應用程式，用於瀏覽 AI CLI 的本機工作階段，並將對話匯出為 Markdown。基於 cc-switch 製作。",
+      "localFirstDescription": "應用程式直接讀取本機工作階段記錄，支援 Codex、Claude Code、Gemini CLI、Cursor、Kimi 等多種 Agent。除非你主動匯出，工作階段內容不會上傳，也不會離開你的電腦。",
+      "github": "GitHub",
+      "releases": "Releases",
+      "openLinkFailed": "開啟連結失敗，請重試。",
+      "checkFailed": "檢查更新失敗，請確認網路連線後重試。",
+      "notChecked": "尚未檢查更新",
+      "checking": "正在檢查更新…",
+      "upToDate": "目前已是最新版本",
+      "updateAvailable": "發現新版本 {{version}}",
+      "updates": {
+        "title": "軟體更新",
+        "description": "應用程式啟動後會自動檢查 GitHub Releases。下載按鈕會開啟目前平台對應版本的 GitHub 資源連結。",
+        "publishedAt": "發佈於 {{date}}",
+        "checkNow": "檢查更新",
+        "recheck": "重新檢查",
+        "download": "下載 {{version}}",
+        "viewRelease": "查看 Release"
+      }
     }
   },
   "console": {

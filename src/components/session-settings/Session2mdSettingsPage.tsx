@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { LanguageSettings } from "@/components/settings/LanguageSettings";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
+import { Session2mdAboutSection } from "@/components/session-settings/Session2mdAboutSection";
 import { SessionProviderIcon } from "@/components/sessions/SessionProviderIcon";
 import { getProviderLabel } from "@/components/sessions/utils";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ import {
   useSession2mdSettingsQuery,
 } from "@/lib/query/session2mdSettings";
 import i18n from "@/i18n";
+import type { AppUpdateController } from "@/hooks/useAppUpdate";
 
 type LanguageOption = "zh" | "zh-TW" | "en" | "ja";
 
@@ -75,7 +77,22 @@ const buildSettingsPayload = (
   ...overrides,
 });
 
-export function Session2mdSettingsPage() {
+interface Session2mdSettingsPageProps {
+  update?: AppUpdateController;
+}
+
+const FALLBACK_APP_UPDATE: AppUpdateController = {
+  currentVersion: "",
+  updateInfo: null,
+  isChecking: false,
+  hasChecked: false,
+  error: null,
+  check: async () => null,
+};
+
+export function Session2mdSettingsPage({
+  update = FALLBACK_APP_UPDATE,
+}: Session2mdSettingsPageProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: settings, isLoading, isError } = useSession2mdSettingsQuery();
@@ -313,6 +330,7 @@ export function Session2mdSettingsPage() {
               <TabsTrigger value="advanced">
                 {t("settings.tabAdvanced")}
               </TabsTrigger>
+              <TabsTrigger value="about">{t("common.about")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="general" className="max-w-2xl space-y-8 py-6">
@@ -623,6 +641,10 @@ export function Session2mdSettingsPage() {
                   ))}
                 </div>
               </section>
+            </TabsContent>
+
+            <TabsContent value="about" className="mt-0">
+              <Session2mdAboutSection update={update} />
             </TabsContent>
           </Tabs>
         </div>

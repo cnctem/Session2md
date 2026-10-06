@@ -24,6 +24,9 @@ vi.mock("react-i18next", async (importOriginal) => {
         (
           ({
             "common.settings": "Settings",
+            "common.about": "About",
+            "common.version": "Version",
+            "common.loading": "Loading",
             "sessionManager.title": "Session Manager",
             "sessionSettings.title": "Settings",
             "sessionSettings.backToSessions": "Back to Session Manager",
@@ -93,6 +96,17 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Include tool output",
             "sessionSettings.exportContent.includeToolOutputs.description":
               "Include output description",
+            "sessionSettings.about.title": "About Session2md",
+            "sessionSettings.about.description": "App information",
+            "sessionSettings.about.appDescription": "Session2md summary",
+            "sessionSettings.about.localFirstDescription":
+              "Local-first summary",
+            "sessionSettings.about.github": "GitHub",
+            "sessionSettings.about.releases": "Releases",
+            "sessionSettings.about.notChecked": "Updates have not been checked",
+            "sessionSettings.about.updates.title": "Software Updates",
+            "sessionSettings.about.updates.description": "Update description",
+            "sessionSettings.about.updates.checkNow": "Check for updates",
             "sessionSettings.directories.claude": "Claude",
             "sessionSettings.directories.codex": "Codex",
             "sessionSettings.directories.gemini": "Gemini",
@@ -452,5 +466,16 @@ describe("Session2mdSettingsPage", () => {
     expect(await screen.findByLabelText("DeepSeek Harness")).toHaveValue(
       "/home/mock/dsh",
     );
+  });
+
+  it("shows the About section as the third settings tab", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "About" }), {
+      button: 0,
+    });
+
+    expect(await screen.findByText("About Session2md")).toBeInTheDocument();
+    expect(screen.getByText("Software Updates")).toBeInTheDocument();
   });
 });

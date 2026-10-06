@@ -1109,6 +1109,29 @@
       "crush": "Crush 数据目录",
       "teleagent": "TeleAgent 数据目录",
       "dsh": "DeepSeek Harness 数据目录"
+    },
+    "about": {
+      "title": "关于 Session2md",
+      "description": "查看应用概览、当前版本和更新状态。",
+      "appDescription": "Session2md 是一款本地优先的桌面应用，用于浏览 AI CLI 的本地会话，并将对话导出为 Markdown。基于 cc-switch 开发。",
+      "localFirstDescription": "应用直接读取本机会话记录，支持 Codex、Claude Code、Gemini CLI、Cursor、Kimi 等多种 Agent。会话内容不会上传，也不会离开你的电脑，除非你主动导出。",
+      "github": "GitHub",
+      "releases": "Releases",
+      "openLinkFailed": "打开链接失败，请重试。",
+      "checkFailed": "检查更新失败，请检查网络连接后重试。",
+      "notChecked": "尚未检查更新",
+      "checking": "正在检查更新…",
+      "upToDate": "当前已是最新版本",
+      "updateAvailable": "发现新版本 {{version}}",
+      "updates": {
+        "title": "软件更新",
+        "description": "应用启动后会自动检查 GitHub Releases。下载按钮会打开当前平台对应版本的 GitHub 资源链接。",
+        "publishedAt": "发布于 {{date}}",
+        "checkNow": "检查更新",
+        "recheck": "重新检查",
+        "download": "下载 {{version}}",
+        "viewRelease": "查看 Release"
+      }
     }
   },
   "console": {

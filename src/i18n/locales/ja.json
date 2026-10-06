@@ -1109,6 +1109,29 @@
       "crush": "Crush データディレクトリ",
       "teleagent": "TeleAgent データディレクトリ",
       "dsh": "DeepSeek Harness データディレクトリ"
+    },
+    "about": {
+      "title": "Session2md について",
+      "description": "アプリの概要、現在のバージョン、更新状態を確認できます。",
+      "appDescription": "Session2md は、ローカルの AI CLI 会話を閲覧し、Markdown としてエクスポートするためのローカル優先デスクトップアプリです。cc-switch ベース。",
+      "localFirstDescription": "Codex、Claude Code、Gemini CLI、Cursor、Kimi など、さまざまな Agent のローカルセッション履歴を直接読み取ります。明示的にエクスポートしない限り、セッション内容がアップロードされたり、PC の外へ送信されたりすることはありません。",
+      "github": "GitHub",
+      "releases": "Releases",
+      "openLinkFailed": "リンクを開けませんでした。もう一度お試しください。",
+      "checkFailed": "更新を確認できませんでした。ネットワーク接続を確認してもう一度お試しください。",
+      "notChecked": "更新はまだ確認されていません",
+      "checking": "更新を確認しています…",
+      "upToDate": "最新バージョンを使用しています",
+      "updateAvailable": "新しいバージョン {{version}} があります",
+      "updates": {
+        "title": "ソフトウェア更新",
+        "description": "起動時に GitHub Releases を自動確認します。ダウンロードボタンは、このバージョンと現在のプラットフォームに対応する GitHub アセットを開きます。",
+        "publishedAt": "公開日 {{date}}",
+        "checkNow": "更新を確認",
+        "recheck": "再確認",
+        "download": "{{version}} をダウンロード",
+        "viewRelease": "Release を表示"
+      }
     }
   },
   "console": {

@@ -1109,6 +1109,29 @@
       "crush": "Crush directory",
       "teleagent": "TeleAgent directory",
       "dsh": "DeepSeek Harness directory"
+    },
+    "about": {
+      "title": "About Session2md",
+      "description": "View an overview of the app, the current version, and update status.",
+      "appDescription": "Session2md is a local-first desktop app for browsing local AI CLI conversations and exporting them as Markdown. based on cc-switch.",
+      "localFirstDescription": "Session2md reads local session histories for Codex, Claude Code, Gemini CLI, Cursor, Kimi, and many other agents. Session content is not uploaded and stays on your computer unless you explicitly export it.",
+      "github": "GitHub",
+      "releases": "Releases",
+      "openLinkFailed": "Unable to open the link. Please try again.",
+      "checkFailed": "Unable to check for updates. Check your network connection and try again.",
+      "notChecked": "Updates have not been checked yet",
+      "checking": "Checking for updates…",
+      "upToDate": "You are running the latest version",
+      "updateAvailable": "Version {{version}} is available",
+      "updates": {
+        "title": "Software Updates",
+        "description": "Session2md checks GitHub Releases automatically at startup. The download button opens the GitHub asset for this version and platform.",
+        "publishedAt": "Published {{date}}",
+        "checkNow": "Check for updates",
+        "recheck": "Check again",
+        "download": "Download {{version}}",
+        "viewRelease": "View release"
+      }
     }
   },
   "console": {

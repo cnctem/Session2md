@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
 import { Button } from "@/components/ui/button";
+import { useAppUpdate } from "@/hooks/useAppUpdate";
 import {
   Tooltip,
   TooltipContent,
@@ -15,6 +16,7 @@ function App() {
   const { t } = useTranslation();
   const [page, setPage] = useState<"sessions" | "settings">("sessions");
   const isSettingsPage = page === "settings";
+  const appUpdate = useAppUpdate();
 
   return (
     <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground">
@@ -63,7 +65,11 @@ function App() {
         </div>
       </header>
       <main className="min-h-0 flex-1">
-        {isSettingsPage ? <Session2mdSettingsPage /> : <SessionManagerPage />}
+        {isSettingsPage ? (
+          <Session2mdSettingsPage update={appUpdate} />
+        ) : (
+          <SessionManagerPage />
+        )}
       </main>
     </div>
   );

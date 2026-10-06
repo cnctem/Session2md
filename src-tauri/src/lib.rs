@@ -15,6 +15,7 @@ pub fn run() {
             commands::delete_sessions,
             commands::get_session2md_settings,
             commands::save_session2md_settings,
+            commands::check_app_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Session2md");
