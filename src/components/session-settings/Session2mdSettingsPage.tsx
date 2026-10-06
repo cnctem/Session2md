@@ -392,20 +392,6 @@ export function Session2mdSettingsPage({
 
                 <div className="space-y-3">
                   <ToggleRow
-                    icon={<FileQuestion className="size-4 text-amber-500" />}
-                    title={t(
-                      "sessionSettings.exportContent.promptBeforeExport.label",
-                    )}
-                    description={t(
-                      "sessionSettings.exportContent.promptBeforeExport.description",
-                    )}
-                    checked={settings.promptBeforeExport}
-                    onCheckedChange={(value) =>
-                      void saveExportOption("promptBeforeExport", value)
-                    }
-                    disabled={saveMutation.isPending}
-                  />
-                  <ToggleRow
                     icon={<Brain className="size-4 text-blue-500" />}
                     title={t(
                       "sessionSettings.defaultExpansion.expandThinking.label",
@@ -472,6 +458,20 @@ export function Session2mdSettingsPage({
                 </header>
 
                 <div className="space-y-3">
+                  <ToggleRow
+                    icon={<FileQuestion className="size-4 text-amber-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.promptBeforeExport.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.promptBeforeExport.description",
+                    )}
+                    checked={settings.promptBeforeExport}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("promptBeforeExport", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
                   <ToggleRow
                     icon={<Brain className="size-4 text-blue-500" />}
                     title={t(
