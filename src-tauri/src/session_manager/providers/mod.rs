@@ -6,6 +6,7 @@ mod common;
 pub mod continue_session;
 pub mod crush;
 pub mod cursor;
+pub mod deveco;
 pub mod dsh;
 pub mod gemini;
 pub mod goose;

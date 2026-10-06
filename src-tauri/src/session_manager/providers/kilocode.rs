@@ -16,7 +16,7 @@ pub fn database_path() -> PathBuf {
 }
 
 pub fn scan_sessions() -> Vec<SessionMeta> {
-    opencode_family::scan_database(&database_path(), PROVIDER_ID, Family::Kilocode)
+    opencode_family::scan_database(&database_path(), PROVIDER_ID, Family::Kilocode, false)
 }
 
 pub fn load_messages(source: &str) -> Result<Vec<SessionMessage>, String> {

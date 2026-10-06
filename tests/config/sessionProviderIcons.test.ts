@@ -8,6 +8,7 @@ describe("session provider icons", () => {
       "antigravity",
       "reasonix",
       "mimocode",
+      "deveco",
       "zcode",
       "kimi",
       "kilocode",

@@ -76,6 +76,10 @@ pub fn mimocode_dir() -> PathBuf {
     directory_override_or("mimocode", || xdg_data_home().join("mimocode"))
 }
 
+pub fn deveco_dir() -> PathBuf {
+    directory_override_or("deveco", || xdg_data_home().join("deveco"))
+}
+
 pub fn zcode_dir() -> PathBuf {
     directory_override_or("zcode", || home_dir().join(".zcode"))
 }
@@ -252,6 +256,7 @@ pub fn resolved_directories() -> BTreeMap<String, String> {
         ),
         ("reasonix".to_string(), reasonix_dir().display().to_string()),
         ("mimocode".to_string(), mimocode_dir().display().to_string()),
+        ("deveco".to_string(), deveco_dir().display().to_string()),
         ("zcode".to_string(), zcode_dir().display().to_string()),
         ("kimi".to_string(), kimi_dir().display().to_string()),
         ("kilocode".to_string(), kilocode_dir().display().to_string()),

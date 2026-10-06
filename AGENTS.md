@@ -3,16 +3,18 @@
 Session2md is a standalone Tauri desktop app for browsing local Agent CLI
 conversation histories and exporting them as Markdown. In addition to Codex,
 Claude Code, Gemini CLI, Grok Build, OpenCode, OpenClaw, Hermes, and Pi, it
-supports Cursor, Antigravity CLI, Reasonix, MiMo Code, ZCode, Kimi CLI/Code,
-Kilo Code, Qoder CLI, WorkBuddy, Qwen Work, Continue, Cline, Goose, Zed, Crush,
-TeleAgent, MiniMax Code, and DeepSeek Harness.
+supports Cursor, Antigravity CLI, Reasonix, MiMo Code, DevEco Code, ZCode,
+Kimi CLI/Code, Kilo Code, Qoder CLI, WorkBuddy, Qwen Work, Continue, Cline,
+Goose, Zed, Crush, TeleAgent, MiniMax Code, and DeepSeek Harness.
 
 ## Product Boundary
 
-- Source session stores are read-only. Do not modify, resume, migrate, delete,
-  or otherwise write to an agent's session files or configuration.
-- The only user-data write in this app is an explicitly selected Markdown export
-  through the native save dialog.
+- Source session stores are read-only except for an explicit session deletion
+  that the user confirms in the app and that the provider supports. Do not
+  modify, resume, migrate, or otherwise write to an agent's session files or
+  configuration.
+- Other user-data writes are an explicitly selected Markdown export through the
+  native save dialog and Session2md's own settings.
 - This repository was separated from CC Switch and still contains inherited
   modules. Keep Session2md work within the session browser and its settings
   unless the task explicitly requires a wider CC Switch feature.

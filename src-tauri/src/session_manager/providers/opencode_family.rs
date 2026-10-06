@@ -1,5 +1,7 @@
 use std::path::Path;
+use std::time::Duration;
 
+use rusqlite::{params_from_iter, Connection, OpenFlags, TransactionBehavior};
 use serde_json::Value;
 
 use crate::session_manager::{SessionMessage, SessionMeta};
@@ -11,13 +13,19 @@ use super::common::{
 
 #[derive(Debug, Clone, Copy)]
 pub enum Family {
+    Deveco,
     Mimocode,
     Kilocode,
     Zcode,
     Teleagent,
 }
 
-pub fn scan_database(db_path: &Path, provider_id: &str, family: Family) -> Vec<SessionMeta> {
+pub fn scan_database(
+    db_path: &Path,
+    provider_id: &str,
+    family: Family,
+    can_delete: bool,
+) -> Vec<SessionMeta> {
     let Ok(conn) = open_sqlite_readonly(db_path) else {
         return Vec::new();
     };
@@ -41,8 +49,126 @@ pub fn scan_database(db_path: &Path, provider_id: &str, family: Family) -> Vec<S
     };
     rows.flatten()
         .filter(|session| !is_filtered_session(session, family))
-        .filter_map(|session| session_to_meta(&conn, db_path, provider_id, &session))
+        .filter_map(|session| session_to_meta(&conn, db_path, provider_id, &session, can_delete))
         .collect()
+}
+
+pub fn delete_database(
+    session_id: &str,
+    source: &str,
+    expected_db_path: &Path,
+    provider_id: &str,
+    family: Family,
+) -> Result<bool, String> {
+    let (db_path, ref_session_id) = super::common::parse_sqlite_source(source)
+        .ok_or_else(|| format!("Invalid {provider_id} SQLite source reference: {source}"))?;
+    if ref_session_id != session_id {
+        return Err(format!(
+            "{provider_id} SQLite session ID mismatch: expected {session_id}, found {ref_session_id}"
+        ));
+    }
+
+    let db_path = db_path
+        .canonicalize()
+        .map_err(|error| format!("Failed to canonicalize {provider_id} database path: {error}"))?;
+    let expected_db_path = expected_db_path.canonicalize().map_err(|error| {
+        format!("Failed to canonicalize expected {provider_id} database path: {error}")
+    })?;
+    if db_path != expected_db_path {
+        return Err(format!(
+            "SQLite path does not match expected {provider_id} database"
+        ));
+    }
+
+    let mut conn = Connection::open_with_flags(
+        &db_path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_URI,
+    )
+    .map_err(|error| format!("Failed to open {provider_id} database: {error}"))?;
+    conn.busy_timeout(Duration::from_secs(5))
+        .map_err(|error| format!("Failed to configure {provider_id} database timeout: {error}"))?;
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .map_err(|error| format!("Failed to enable foreign keys: {error}"))?;
+    let foreign_keys: i64 = conn
+        .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+        .map_err(|error| format!("Failed to verify foreign keys: {error}"))?;
+    if foreign_keys != 1 {
+        return Err("Refusing to delete session without foreign-key cascades".to_string());
+    }
+
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|error| format!("Failed to begin {provider_id} delete transaction: {error}"))?;
+
+    let session_ids = {
+        let mut statement = tx
+            .prepare(
+                "WITH RECURSIVE descendants(id) AS (
+                    SELECT id FROM session WHERE id = ?1
+                    UNION
+                    SELECT session.id
+                    FROM session
+                    JOIN descendants ON session.parent_id = descendants.id
+                )
+                SELECT id FROM descendants",
+            )
+            .map_err(|error| {
+                format!("Failed to query {provider_id} session descendants: {error}")
+            })?;
+        let rows = statement
+            .query_map([session_id], |row| row.get::<_, String>(0))
+            .map_err(|error| {
+                format!("Failed to read {provider_id} session descendants: {error}")
+            })?;
+        rows.filter_map(Result::ok).collect::<Vec<_>>()
+    };
+
+    if session_ids.is_empty() {
+        return Ok(false);
+    }
+
+    if matches!(family, Family::Mimocode) {
+        for (table, column) in [
+            ("history_fts", "session_id"),
+            ("external_import", "session_id"),
+            ("claude_import", "session_id"),
+        ] {
+            delete_matching_rows(&tx, table, column, &session_ids, provider_id)?;
+        }
+    }
+
+    delete_matching_rows(&tx, "event", "aggregate_id", &session_ids, provider_id)?;
+    delete_matching_rows(
+        &tx,
+        "event_sequence",
+        "aggregate_id",
+        &session_ids,
+        provider_id,
+    )?;
+    let deleted = delete_matching_rows(&tx, "session", "id", &session_ids, provider_id)?;
+
+    tx.commit()
+        .map_err(|error| format!("Failed to commit {provider_id} session deletion: {error}"))?;
+    Ok(deleted > 0)
+}
+
+fn delete_matching_rows(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    ids: &[String],
+    provider_id: &str,
+) -> Result<usize, String> {
+    if !table_columns(conn, table).contains(column) {
+        return Ok(0);
+    }
+
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let sql = format!("DELETE FROM {table} WHERE {column} IN ({placeholders})");
+    conn.execute(&sql, params_from_iter(ids.iter().map(String::as_str)))
+        .map_err(|error| format!("Failed to delete {provider_id} rows from {table}: {error}"))
 }
 
 pub fn load_database(source: &str, provider_id: &str) -> Result<Vec<SessionMessage>, String> {
@@ -154,6 +280,7 @@ fn session_to_meta(
     db_path: &Path,
     provider_id: &str,
     session: &Value,
+    can_delete: bool,
 ) -> Option<SessionMeta> {
     let session_id = session.get("id").and_then(Value::as_str)?.to_string();
     let source = sqlite_source(db_path, &session_id);
@@ -186,7 +313,7 @@ fn session_to_meta(
         last_active_at: updated_at,
         source_path: Some(source),
         resume_command: None,
-        can_delete: false,
+        can_delete,
     })
 }
 
@@ -317,12 +444,98 @@ mod tests {
         .expect("assistant part");
     }
 
+    fn create_delete_db(path: &Path) {
+        let conn = Connection::open(path).expect("db");
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             CREATE TABLE session (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                directory TEXT,
+                parent_id TEXT,
+                time_created INTEGER,
+                time_updated INTEGER
+             );
+             CREATE TABLE message (
+                id TEXT PRIMARY KEY,
+                session_id TEXT REFERENCES session(id) ON DELETE CASCADE,
+                time_created INTEGER,
+                data TEXT
+             );
+             CREATE TABLE part (
+                id TEXT PRIMARY KEY,
+                message_id TEXT REFERENCES message(id) ON DELETE CASCADE,
+                session_id TEXT,
+                time_created INTEGER,
+                data TEXT
+             );
+             CREATE TABLE todo (
+                session_id TEXT REFERENCES session(id) ON DELETE CASCADE,
+                content TEXT
+             );
+             CREATE TABLE event_sequence (
+                aggregate_id TEXT PRIMARY KEY,
+                seq INTEGER NOT NULL
+             );
+             CREATE TABLE event (
+                id TEXT PRIMARY KEY,
+                aggregate_id TEXT REFERENCES event_sequence(aggregate_id) ON DELETE CASCADE,
+                seq INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                data TEXT NOT NULL
+             );
+             CREATE TABLE history_fts (
+                part_id TEXT PRIMARY KEY,
+                session_id TEXT,
+                body TEXT
+             );
+             CREATE TABLE external_import (
+                source TEXT,
+                source_key TEXT,
+                session_id TEXT,
+                source_path TEXT
+             );
+             CREATE TABLE claude_import (
+                source_uuid TEXT PRIMARY KEY,
+                session_id TEXT,
+                source_path TEXT
+             );
+             INSERT INTO session VALUES
+                ('ses-root','Root','/tmp/root',NULL,1000,2000),
+                ('ses-child','Child','/tmp/root','ses-root',1000,2000),
+                ('ses-keep','Keep','/tmp/keep',NULL,1000,2000);
+             INSERT INTO message VALUES
+                ('msg-root','ses-root',1000,'{\"role\":\"user\"}'),
+                ('msg-child','ses-child',1000,'{\"role\":\"user\"}'),
+                ('msg-keep','ses-keep',1000,'{\"role\":\"user\"}');
+             INSERT INTO part VALUES
+                ('part-root','msg-root','ses-root',1000,'{\"type\":\"text\",\"text\":\"root\"}'),
+                ('part-child','msg-child','ses-child',1000,'{\"type\":\"text\",\"text\":\"child\"}'),
+                ('part-keep','msg-keep','ses-keep',1000,'{\"type\":\"text\",\"text\":\"keep\"}');
+             INSERT INTO todo VALUES ('ses-root','do it'), ('ses-keep','keep it');
+             INSERT INTO event_sequence VALUES ('ses-root',0), ('ses-child',0), ('ses-keep',0);
+             INSERT INTO event VALUES
+                ('event-root','ses-root',0,'session.created.1','{}'),
+                ('event-child','ses-child',0,'session.created.1','{}'),
+                ('event-keep','ses-keep',0,'session.created.1','{}');
+             INSERT INTO history_fts VALUES
+                ('part-root','ses-root','root'),
+                ('part-child','ses-child','child'),
+                ('part-keep','ses-keep','keep');
+             INSERT INTO external_import VALUES
+                ('opencode','root','ses-root','/tmp/source-root'),
+                ('opencode','keep','ses-keep','/tmp/source-keep');
+             INSERT INTO claude_import VALUES ('root','ses-root','/tmp/claude-root');",
+        )
+        .expect("schema");
+    }
+
     #[test]
     fn reads_visible_text_from_opencode_family_database() {
         let root = tempdir().expect("root");
         let path = root.path().join("mimocode.db");
         create_db(&path);
-        let sessions = scan_database(&path, "mimocode", Family::Mimocode);
+        let sessions = scan_database(&path, "mimocode", Family::Mimocode, false);
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].can_delete, false);
         let source = sessions[0].source_path.as_deref().expect("source");
@@ -336,5 +549,56 @@ mod tests {
             message.kind == crate::session_manager::SessionMessageKind::Text
                 && message.content == "answer"
         }));
+    }
+
+    #[test]
+    fn deletes_session_descendants_and_provider_owned_rows() {
+        let root = tempdir().expect("root");
+        let path = root.path().join("mimocode.db");
+        create_delete_db(&path);
+
+        let sessions = scan_database(&path, "mimocode", Family::Mimocode, true);
+        assert_eq!(sessions.len(), 3);
+        let source = sqlite_source(&path, "ses-root");
+        assert!(
+            delete_database("ses-root", &source, &path, "mimocode", Family::Mimocode,)
+                .expect("delete session")
+        );
+
+        let conn = Connection::open(&path).expect("db");
+        let remaining_sessions: i64 = conn
+            .query_row("SELECT count(*) FROM session", [], |row| row.get(0))
+            .expect("remaining sessions");
+        let remaining_messages: i64 = conn
+            .query_row("SELECT count(*) FROM message", [], |row| row.get(0))
+            .expect("remaining messages");
+        let remaining_parts: i64 = conn
+            .query_row("SELECT count(*) FROM part", [], |row| row.get(0))
+            .expect("remaining parts");
+        let remaining_events: i64 = conn
+            .query_row("SELECT count(*) FROM event", [], |row| row.get(0))
+            .expect("remaining events");
+        let remaining_history: i64 = conn
+            .query_row("SELECT count(*) FROM history_fts", [], |row| row.get(0))
+            .expect("remaining history");
+        let remaining_imports: i64 = conn
+            .query_row("SELECT count(*) FROM external_import", [], |row| row.get(0))
+            .expect("remaining imports");
+        let remaining_claude_imports: i64 = conn
+            .query_row("SELECT count(*) FROM claude_import", [], |row| row.get(0))
+            .expect("remaining claude imports");
+
+        assert_eq!(remaining_sessions, 1);
+        assert_eq!(remaining_messages, 1);
+        assert_eq!(remaining_parts, 1);
+        assert_eq!(remaining_events, 1);
+        assert_eq!(remaining_history, 1);
+        assert_eq!(remaining_imports, 1);
+        assert_eq!(remaining_claude_imports, 0);
+        assert_eq!(
+            conn.query_row("SELECT id FROM session", [], |row| row.get::<_, String>(0))
+                .expect("remaining session ID"),
+            "ses-keep"
+        );
     }
 }

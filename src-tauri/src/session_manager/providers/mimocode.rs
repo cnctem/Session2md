@@ -11,9 +11,19 @@ pub fn database_path() -> PathBuf {
 }
 
 pub fn scan_sessions() -> Vec<SessionMeta> {
-    opencode_family::scan_database(&database_path(), PROVIDER_ID, Family::Mimocode)
+    opencode_family::scan_database(&database_path(), PROVIDER_ID, Family::Mimocode, true)
 }
 
 pub fn load_messages(source: &str) -> Result<Vec<SessionMessage>, String> {
     opencode_family::load_database(source, PROVIDER_ID)
+}
+
+pub fn delete_session(session_id: &str, source: &str) -> Result<bool, String> {
+    opencode_family::delete_database(
+        session_id,
+        source,
+        &database_path(),
+        PROVIDER_ID,
+        Family::Mimocode,
+    )
 }

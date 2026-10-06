@@ -32,6 +32,7 @@ Session2md 可以从以下本地工具发现会话：
 - Goose
 - Zed
 - MiMo Code
+- DevEco Code
 - Reasonix
 - Continue
 - Crush
@@ -44,7 +45,7 @@ Session2md 可以从以下本地工具发现会话：
 - 按供应商筛选，并在平铺列表或“供应商/项目目录”分组视图之间切换。
 - 复制项目目录、源路径，以及部分供应商提供的恢复命令。
 - 通过系统保存对话框将当前对话导出为 Markdown 文件。
-- 删除受支持的会话（包括 DeepSeek Harness 记录），或多选并按项目目录整组删除。只读来源不提供删除入口。
+- 删除受支持的会话（包括 DevEco Code、MiMo Code 和 DeepSeek Harness 记录），或多选并按项目目录整组删除。只读来源不提供删除入口。
 
 ## 数据与安全
 

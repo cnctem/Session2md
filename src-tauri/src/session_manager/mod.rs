@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use providers::{
-    antigravity, claude, cline, codex, continue_session, crush, cursor, dsh, gemini, goose,
+    antigravity, claude, cline, codex, continue_session, crush, cursor, deveco, dsh, gemini, goose,
     grokbuild, hermes, kilocode, kimi, mcode, mimocode, openclaw, opencode, pi, qoder, qwen,
     reasonix, teleagent, workbuddy, zcode, zed,
 };
@@ -91,6 +91,7 @@ pub fn scan_sessions_excluding(hidden_provider_ids: &BTreeSet<String>) -> Vec<Se
         ("continue", continue_session::scan_sessions),
         ("crush", crush::scan_sessions),
         ("cursor", cursor::scan_sessions),
+        ("deveco", deveco::scan_sessions),
         ("dsh", dsh::scan_sessions),
         ("goose", goose::scan_sessions),
         ("kilocode", kilocode::scan_sessions),
@@ -153,6 +154,7 @@ pub fn load_messages(provider_id: &str, source_path: &str) -> Result<Vec<Session
         "zed" => zed::load_messages(source_path),
         "crush" => crush::load_messages(source_path),
         "cursor" => cursor::load_messages(path),
+        "deveco" => deveco::load_messages(source_path),
         "cline" => cline::load_messages(path),
         "continue" => continue_session::load_messages(path),
         "dsh" => dsh::load_messages(path),
@@ -179,6 +181,12 @@ pub fn delete_session(
     }
     if provider_id == "opencode" && source_path.starts_with("sqlite:") {
         return opencode::delete_session_sqlite(session_id, source_path);
+    }
+    if provider_id == "deveco" {
+        return deveco::delete_session(session_id, source_path);
+    }
+    if provider_id == "mimocode" {
+        return mimocode::delete_session(session_id, source_path);
     }
     if provider_id == "hermes" && source_path.starts_with("sqlite:") {
         return hermes::delete_session_sqlite(session_id, source_path);

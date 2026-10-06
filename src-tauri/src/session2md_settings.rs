@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-pub const SESSION_PROVIDER_IDS: [&str; 26] = [
+pub const SESSION_PROVIDER_IDS: [&str; 27] = [
     "codex",
     "claude",
     "gemini",
@@ -26,6 +26,7 @@ pub const SESSION_PROVIDER_IDS: [&str; 26] = [
     "goose",
     "zed",
     "mimocode",
+    "deveco",
     "reasonix",
     "continue",
     "crush",

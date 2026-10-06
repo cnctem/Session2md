@@ -32,7 +32,9 @@ pub fn database_paths() -> Vec<PathBuf> {
 pub fn scan_sessions() -> Vec<SessionMeta> {
     database_paths()
         .iter()
-        .flat_map(|path| opencode_family::scan_database(path, PROVIDER_ID, Family::Teleagent))
+        .flat_map(|path| {
+            opencode_family::scan_database(path, PROVIDER_ID, Family::Teleagent, false)
+        })
         .collect()
 }
 

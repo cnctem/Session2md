@@ -32,6 +32,7 @@ Session2md discovers sessions from these local tools:
 - Goose
 - Zed
 - MiMo Code
+- DevEco Code
 - Reasonix
 - Continue
 - Crush
@@ -44,7 +45,7 @@ For each discovered session you can:
 - Filter by provider and switch between a flat list or provider/project-directory groups.
 - Copy the project directory, source path, or an available provider resume command.
 - Export the loaded conversation to a Markdown file through the native save dialog.
-- Delete supported sessions, including DeepSeek Harness records, or select multiple sessions and whole directory groups. Read-only providers do not expose deletion.
+- Delete supported sessions, including DevEco Code, MiMo Code, and DeepSeek Harness records, or select multiple sessions and whole directory groups. Read-only providers do not expose deletion.
 
 ## Data and safety
 

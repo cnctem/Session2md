@@ -18,6 +18,7 @@ const PROVIDER_BRAND_ICONS: Record<string, { icon: string; name: string }> = {
   antigravity: { icon: "antigravity", name: "Antigravity" },
   reasonix: { icon: "reasonix", name: "Reasonix" },
   mimocode: { icon: "mimocode", name: "MiMo Code" },
+  deveco: { icon: "deveco", name: "DevEco Code" },
   zcode: { icon: "zcode", name: "ZCode" },
   kimi: { icon: "kimi", name: "Kimi" },
   kilocode: { icon: "kilocode", name: "Kilo Code" },

@@ -129,6 +129,7 @@ export const icons: Record<string, string> = {
   zed: `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="currentColor" fill-opacity=".14"/><text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="currentColor">Z</text></svg>`,
   antigravity: _antigravitySvg,
   mimocode: `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="currentColor" fill-opacity=".14"/><text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="currentColor">M</text></svg>`,
+  deveco: `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="currentColor" fill-opacity=".14"/><text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700" fill="currentColor">D</text></svg>`,
 };
 
 export const iconUrls: Record<string, string> = {

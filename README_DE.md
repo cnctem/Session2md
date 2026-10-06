@@ -32,6 +32,7 @@ Session2md erkennt Sitzungen aus den folgenden lokal installierten Tools:
 - Goose
 - Zed
 - MiMo Code
+- DevEco Code
 - Reasonix
 - Continue
 - Crush
@@ -44,7 +45,7 @@ Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 - Nach Anbieter filtern und zwischen flacher Liste sowie nach Anbieter/Projektverzeichnis gruppierter Ansicht wechseln.
 - Projektverzeichnis, Quellpfad und verfügbare Wiederaufnahmebefehle des Anbieters kopieren.
 - Die Unterhaltung über den nativen Speicherdialog als Markdown-Datei exportieren.
-- Unterstützte Sitzungen löschen, einschließlich DeepSeek-Harness-Datensätzen, oder mehrere Sitzungen und ganze Verzeichnisgruppen auswählen.
+- Unterstützte Sitzungen löschen, einschließlich DevEco-Code-, MiMo-Code- und DeepSeek-Harness-Datensätzen, oder mehrere Sitzungen und ganze Verzeichnisgruppen auswählen.
 
 ## Daten und Sicherheit
 

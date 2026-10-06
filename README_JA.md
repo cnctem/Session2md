@@ -32,6 +32,7 @@ Session2md はオープンソースの [CC Switch](https://github.com/farion1231
 - Goose
 - Zed
 - MiMo Code
+- DevEco Code
 - Reasonix
 - Continue
 - Crush
@@ -44,7 +45,7 @@ Session2md はオープンソースの [CC Switch](https://github.com/farion1231
 - プロバイダーで絞り込み、フラット表示またはプロバイダー/プロジェクトディレクトリ別のグループ表示に切り替える。
 - プロジェクトディレクトリ、ソースパス、利用可能なプロバイダーの再開コマンドをコピーする。
 - OS の保存ダイアログから会話を Markdown ファイルに書き出す。
-- 対応セッション（DeepSeek Harness の記録を含む）を削除する。または複数選択し、プロジェクトディレクトリ単位で削除する。読み取り専用プロバイダーには削除 UI を表示しません。
+- 対応セッション（DevEco Code、MiMo Code、DeepSeek Harness の記録を含む）を削除する。または複数選択し、プロジェクトディレクトリ単位で削除する。読み取り専用プロバイダーには削除 UI を表示しません。
 
 ## データと安全性
 
