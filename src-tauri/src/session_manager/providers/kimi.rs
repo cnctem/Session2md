@@ -54,6 +54,76 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     Ok(messages.into_iter().map(|entry| entry.message).collect())
 }
 
+pub fn delete_session(root: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
+    if !is_valid_session_id(session_id) {
+        return Err("Invalid Kimi session ID".to_string());
+    }
+
+    let root = root.canonicalize().map_err(|error| {
+        format!(
+            "Failed to resolve Kimi session root {}: {error}",
+            root.display()
+        )
+    })?;
+    let source = path.canonicalize().map_err(|error| {
+        format!(
+            "Failed to resolve Kimi session directory {}: {error}",
+            path.display()
+        )
+    })?;
+
+    let relative = source.strip_prefix(&root).map_err(|_| {
+        format!(
+            "Refusing to delete Kimi session outside its root: {}",
+            source.display()
+        )
+    })?;
+    // Current Kimi Code uses sessions/<workspaceId>/<sessionId>; older layouts
+    // placed the session directory directly under the sessions root.
+    let component_count = relative.components().count();
+    if !matches!(component_count, 1 | 2) {
+        return Err(format!(
+            "Refusing to delete unexpected Kimi session layout: {}",
+            source.display()
+        ));
+    }
+    if source.file_name().and_then(|name| name.to_str()) != Some(session_id) {
+        return Err(format!(
+            "Kimi session directory does not match ID {session_id}: {}",
+            source.display()
+        ));
+    }
+
+    let metadata = fs::symlink_metadata(&source).map_err(|error| {
+        format!(
+            "Failed to inspect Kimi session directory {}: {error}",
+            source.display()
+        )
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(format!(
+            "Kimi session path is not a real directory: {}",
+            source.display()
+        ));
+    }
+
+    let meta = parse_session(&source)?;
+    if meta.session_id != session_id {
+        return Err(format!(
+            "Kimi session ID mismatch: expected {session_id}, found {}",
+            meta.session_id
+        ));
+    }
+
+    fs::remove_dir_all(&source).map_err(|error| {
+        format!(
+            "Failed to delete Kimi session directory {}: {error}",
+            source.display()
+        )
+    })?;
+    Ok(true)
+}
+
 fn canonical_records(values: &[Value]) -> Vec<OrderedMessage> {
     let mut output = Vec::new();
     for (record_index, value) in values.iter().enumerate() {
@@ -304,13 +374,15 @@ fn parse_session(dir: &Path) -> Result<SessionMeta, String> {
         .and_then(|metadata| metadata.modified().ok())
         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|duration| duration.as_millis() as i64);
+    let session_id = dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_string();
     Ok(SessionMeta {
         provider_id: PROVIDER_ID.to_string(),
-        session_id: dir
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default()
-            .to_string(),
+        can_delete: is_valid_session_id(&session_id),
+        session_id,
         title,
         summary: None,
         project_dir: cwd,
@@ -318,8 +390,17 @@ fn parse_session(dir: &Path) -> Result<SessionMeta, String> {
         last_active_at: last_active_at.or(created_at),
         source_path: Some(dir.display().to_string()),
         resume_command: None,
-        can_delete: false,
     })
+}
+
+fn is_valid_session_id(session_id: &str) -> bool {
+    !session_id.is_empty()
+        && session_id.len() <= 200
+        && session_id != "."
+        && session_id != ".."
+        && session_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 fn wire_path(dir: &Path) -> Result<PathBuf, String> {
@@ -370,6 +451,18 @@ fn find_kimi_dirs(root: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn write_session(root: &Path, workspace_id: &str, session_id: &str) -> PathBuf {
+        let dir = root.join(workspace_id).join(session_id);
+        let agent_dir = dir.join("agents").join("main");
+        fs::create_dir_all(&agent_dir).expect("create session");
+        fs::write(
+            agent_dir.join("wire.jsonl"),
+            r#"{"type":"turn.prompt","input":"hello"}"#,
+        )
+        .expect("write session");
+        dir
+    }
 
     #[test]
     fn reads_new_and_old_kimi_visible_records() {
@@ -505,5 +598,49 @@ mod tests {
                 && message.tool_call_id.as_deref() == Some("call-1")
                 && message.content == "/tmp"
         }));
+    }
+
+    #[test]
+    fn deletes_the_verified_session_directory_only() {
+        let root = tempfile::tempdir().expect("root");
+        let session = write_session(root.path(), "wd_project_hash", "session_delete");
+        let sibling = write_session(root.path(), "wd_project_hash", "session_keep");
+
+        let meta = parse_session(&session).expect("metadata");
+        assert!(meta.can_delete);
+        assert!(delete_session(root.path(), &session, "session_delete").expect("delete"));
+
+        assert!(!session.exists());
+        assert!(sibling
+            .join("agents")
+            .join("main")
+            .join("wire.jsonl")
+            .exists());
+    }
+
+    #[test]
+    fn refuses_to_delete_a_mismatched_session_id() {
+        let root = tempfile::tempdir().expect("root");
+        let session = write_session(root.path(), "wd_project_hash", "session_expected");
+
+        let error = delete_session(root.path(), &session, "session_other")
+            .expect_err("mismatched ID should be rejected");
+
+        assert!(error.contains("does not match ID"));
+        assert!(session.exists());
+    }
+
+    #[test]
+    fn refuses_to_delete_unexpected_nested_layout() {
+        let root = tempfile::tempdir().expect("root");
+        let parent = root.path().join("nested").join("extra");
+        fs::create_dir_all(&parent).expect("create parent");
+        let session = write_session(&parent, "wd_project_hash", "session_nested");
+
+        let error = delete_session(root.path(), &session, "session_nested")
+            .expect_err("nested layout should be rejected");
+
+        assert!(error.contains("unexpected Kimi session layout"));
+        assert!(session.exists());
     }
 }

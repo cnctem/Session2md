@@ -255,6 +255,7 @@ fn delete_session_with_roots(
                     grokbuild::delete_session(&validated_root, &validated_source, session_id)
                 }
                 "hermes" => hermes::delete_session(&validated_root, &validated_source, session_id),
+                "kimi" => kimi::delete_session(&validated_root, &validated_source, session_id),
                 "pi" => pi::delete_session(&validated_root, &validated_source, session_id),
                 "dsh" => dsh::delete_session(&validated_root, &validated_source, session_id),
                 _ => Err(format!("Unsupported provider: {provider_id}")),
@@ -281,6 +282,7 @@ fn provider_roots(provider_id: &str) -> Result<Vec<PathBuf>, String> {
         "gemini" => vec![paths::gemini_dir().join("tmp")],
         "grokbuild" => grokbuild::session_roots(),
         "hermes" => vec![paths::hermes_dir().join("sessions")],
+        "kimi" => kimi::session_roots(),
         "pi" => pi::session_roots(),
         "dsh" => dsh::session_roots(),
         _ => return Err(format!("Unsupported provider: {provider_id}")),
@@ -322,6 +324,26 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert!(scan_sessions_excluding(&hidden).is_empty());
+    }
+
+    #[test]
+    fn deletes_kimi_session_through_provider_dispatch() {
+        let root = tempdir().expect("root");
+        let session = root.path().join("wd-project-hash").join("session-delete");
+        let agent_dir = session.join("agents").join("main");
+        std::fs::create_dir_all(&agent_dir).expect("create session");
+        std::fs::write(
+            agent_dir.join("wire.jsonl"),
+            r#"{"type":"turn.prompt","input":"hello"}"#,
+        )
+        .expect("write session");
+
+        let deleted =
+            delete_session_with_roots("kimi", "session-delete", &session, &[root.path().into()])
+                .expect("delete Kimi session");
+
+        assert!(deleted);
+        assert!(!session.exists());
     }
 
     #[test]
