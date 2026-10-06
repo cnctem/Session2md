@@ -993,6 +993,11 @@
     "export": "Export Session",
     "exporting": "Exporting...",
     "exportTooltip": "Export the conversation as a Markdown file",
+    "exportOptions": {
+      "title": "Export Options",
+      "description": "Choose what to include in this Markdown export. Changes apply only to this export.",
+      "confirm": "Export"
+    },
     "exportSuccess": "Session exported",
     "exportEmpty": "This session has no conversation content to export",
     "exportFailed": "Failed to export session: {{error}}",
@@ -1059,6 +1064,10 @@
       "title": "Markdown Export Content",
       "description": "By default only user messages and assistant text are exported. Additional execution details can be included.",
       "saveFailed": "Failed to save export settings: {{error}}",
+      "promptBeforeExport": {
+        "label": "Ask before every export",
+        "description": "Choose what to include each time you export. Initial selections use the settings below."
+      },
       "includeThinking": {
         "label": "Include thinking",
         "description": "Keep thinking content inside assistant messages."

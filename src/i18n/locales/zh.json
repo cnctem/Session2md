@@ -993,6 +993,11 @@
     "export": "导出会话",
     "exporting": "导出中...",
     "exportTooltip": "将对话记录导出为 Markdown 文件",
+    "exportOptions": {
+      "title": "导出选项",
+      "description": "选择本次 Markdown 导出要包含的内容；修改仅对本次导出生效。",
+      "confirm": "导出"
+    },
     "exportSuccess": "会话已导出",
     "exportEmpty": "该会话没有可导出的对话内容",
     "exportFailed": "导出会话失败: {{error}}",
@@ -1059,6 +1064,10 @@
       "title": "Markdown 导出内容",
       "description": "默认仅导出用户消息和 AI 正文，可按需附加更多执行记录。",
       "saveFailed": "保存导出设置失败：{{error}}",
+      "promptBeforeExport": {
+        "label": "每次导出前询问",
+        "description": "点击导出时先选择本次要包含的内容，选项默认使用下方设置。"
+      },
       "includeThinking": {
         "label": "导出含思考",
         "description": "在 AI 气泡中保留 Thinking 内容。"

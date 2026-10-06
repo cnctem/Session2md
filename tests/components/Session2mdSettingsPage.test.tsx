@@ -77,6 +77,10 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Render markdown description",
             "sessionSettings.exportContent.title": "Markdown Export Content",
             "sessionSettings.exportContent.description": "Export options",
+            "sessionSettings.exportContent.promptBeforeExport.label":
+              "Ask before every export",
+            "sessionSettings.exportContent.promptBeforeExport.description":
+              "Ask before export description",
             "sessionSettings.exportContent.includeThinking.label":
               "Include thinking",
             "sessionSettings.exportContent.includeThinking.description":
@@ -137,6 +141,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 const snapshot = {
   directoryOverrides: {},
   hiddenProviders: [],
+  promptBeforeExport: true,
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
@@ -168,6 +173,7 @@ describe("Session2mdSettingsPage", () => {
       ...snapshot,
       directoryOverrides: next.directoryOverrides,
       hiddenProviders: next.hiddenProviders,
+      promptBeforeExport: next.promptBeforeExport,
       exportThinking: next.exportThinking,
       exportToolInputs: next.exportToolInputs,
       exportToolOutputs: next.exportToolOutputs,
@@ -220,6 +226,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: [],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -248,6 +255,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: ["codex"],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -267,6 +275,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [...SESSION_PROVIDER_IDS],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -282,6 +291,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -303,7 +313,33 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        promptBeforeExport: true,
         exportThinking: true,
+        exportToolInputs: false,
+        exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
+        renderMarkdown: true,
+      }),
+    );
+  });
+
+  it("defaults prompt before export on and saves it independently", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    const promptBeforeExport = await screen.findByRole("switch", {
+      name: "Ask before every export",
+    });
+    expect(promptBeforeExport).toBeChecked();
+
+    fireEvent.click(promptBeforeExport);
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
+        promptBeforeExport: false,
+        exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
         defaultExpandThinking: false,
@@ -326,6 +362,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -350,6 +387,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
@@ -379,6 +417,16 @@ describe("Session2mdSettingsPage", () => {
     ).toBeTruthy();
     expect(
       exportTitle.compareDocumentPosition(agentTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const promptBeforeExport = screen.getByRole("switch", {
+      name: "Ask before every export",
+    });
+    const includeThinking = screen.getByRole("switch", {
+      name: /Include thinking/,
+    });
+    expect(
+      promptBeforeExport.compareDocumentPosition(includeThinking) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(

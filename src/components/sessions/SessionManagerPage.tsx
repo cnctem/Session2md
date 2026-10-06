@@ -58,6 +58,10 @@ import {
   type SessionProviderId,
 } from "@/lib/sessionProviders";
 import { SessionItem } from "./SessionItem";
+import {
+  SessionExportDialog,
+  type SessionExportOptions,
+} from "./SessionExportDialog";
 import { SessionMessageItem } from "./SessionMessageItem";
 import { SessionProviderIcon } from "./SessionProviderIcon";
 import { SessionTocDialog, SessionTocSidebar } from "./SessionToc";
@@ -213,6 +217,7 @@ export function SessionManagerPage() {
     Set<string>
   >(() => initialGroupExpansionState.expandedDirectoryKeys);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSessionKeys, setSelectedSessionKeys] = useState<Set<string>>(
     () => new Set(),
@@ -467,6 +472,7 @@ export function SessionManagerPage() {
 
   useEffect(() => {
     setExpandedBlockOverrides(new Map());
+    setExportDialogOpen(false);
     const scrollElement = messageListScrollRef.current?.closest<HTMLElement>(
       "[data-radix-scroll-area-viewport]",
     );
@@ -497,23 +503,37 @@ export function SessionManagerPage() {
       sessionSettings?.exportToolOutputs,
     ],
   );
-  const hasExportableMessages = useMemo(
-    () =>
+  const promptBeforeExport = sessionSettings?.promptBeforeExport ?? true;
+  const hasExportableContent = useCallback(
+    (options: SessionExportOptions) =>
       exportGroups.some((group) => {
         const role = group.role.toLowerCase();
         if (role === "tool") {
           return Boolean(
-            (exportOptions.includeToolInputs && group.toolInput?.trim()) ||
-              (exportOptions.includeToolOutputs && group.toolOutput?.trim()),
+            (options.includeToolInputs && group.toolInput?.trim()) ||
+              (options.includeToolOutputs && group.toolOutput?.trim()),
           );
         }
         if (role !== "user" && role !== "assistant") return false;
         return Boolean(
           group.content.trim() ||
-            (exportOptions.includeThinking && group.reasoning.trim()),
+            (options.includeThinking && group.reasoning.trim()),
         );
       }),
-    [exportGroups, exportOptions],
+    [exportGroups],
+  );
+  const hasExportableMessages = useMemo(
+    () => hasExportableContent(exportOptions),
+    [exportOptions, hasExportableContent],
+  );
+  const hasAnyExportableMessages = useMemo(
+    () =>
+      hasExportableContent({
+        includeThinking: true,
+        includeToolInputs: true,
+        includeToolOutputs: true,
+      }),
+    [hasExportableContent],
   );
   const tocItems = useMemo(
     () =>
@@ -772,17 +792,13 @@ export function SessionManagerPage() {
     }
   };
 
-  const handleExportMarkdown = async () => {
+  const handleExportMarkdown = async (options: SessionExportOptions) => {
     if (!selectedSession || isExporting) return;
-    if (!hasExportableMessages) {
-      toast.error(t("sessionManager.exportEmpty"));
-      return;
-    }
 
     setIsExporting(true);
     try {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-      const markdown = formatSessionGroupsMarkdown(exportGroups, exportOptions);
+      const markdown = formatSessionGroupsMarkdown(exportGroups, options);
       if (!markdown) {
         toast.error(t("sessionManager.exportEmpty"));
         return;
@@ -804,6 +820,19 @@ export function SessionManagerPage() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleExportRequest = () => {
+    if (!selectedSession || isExporting) return;
+    if (!promptBeforeExport) {
+      void handleExportMarkdown(exportOptions);
+      return;
+    }
+    if (!hasAnyExportableMessages) {
+      toast.error(t("sessionManager.exportEmpty"));
+      return;
+    }
+    setExportDialogOpen(true);
   };
 
   const scrollToMessage = (index: number) => {
@@ -1333,8 +1362,13 @@ export function SessionManagerPage() {
                         <Button
                           size="icon"
                           aria-label={t("sessionManager.export")}
-                          onClick={() => void handleExportMarkdown()}
-                          disabled={!hasExportableMessages || isExporting}
+                          onClick={handleExportRequest}
+                          disabled={
+                            isExporting ||
+                            (promptBeforeExport
+                              ? !hasAnyExportableMessages
+                              : !hasExportableMessages)
+                          }
                         >
                           <Download
                             className={
@@ -1477,6 +1511,15 @@ export function SessionManagerPage() {
         onConfirm={() => void handleDeleteConfirm()}
         onCancel={() => {
           if (!isDeleting) setDeleteTargets(null);
+        }}
+      />
+      <SessionExportDialog
+        open={exportDialogOpen}
+        options={exportOptions}
+        onOpenChange={setExportDialogOpen}
+        onConfirm={(options) => {
+          setExportDialogOpen(false);
+          void handleExportMarkdown(options);
         }}
       />
     </TooltipProvider>

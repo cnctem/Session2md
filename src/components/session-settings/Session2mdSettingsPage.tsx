@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Brain,
   FileCode2,
+  FileQuestion,
   FileText,
   FolderSearch,
   Loader2,
@@ -31,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import {
   session2mdSettingsApi,
   type Session2mdSettings,
+  type Session2mdSettingsSnapshot,
 } from "@/lib/api/session2mdSettings";
 import {
   SESSION_DIRECTORY_IDS,
@@ -55,6 +57,23 @@ const asLanguageOption = (value: string): LanguageOption => {
   }
   return "zh";
 };
+
+const buildSettingsPayload = (
+  settings: Session2mdSettingsSnapshot,
+  overrides: Partial<Session2mdSettings> = {},
+): Session2mdSettings => ({
+  directoryOverrides: settings.directoryOverrides,
+  hiddenProviders: settings.hiddenProviders,
+  promptBeforeExport: settings.promptBeforeExport,
+  exportThinking: settings.exportThinking,
+  exportToolInputs: settings.exportToolInputs,
+  exportToolOutputs: settings.exportToolOutputs,
+  defaultExpandThinking: settings.defaultExpandThinking,
+  defaultExpandTools: settings.defaultExpandTools,
+  defaultExpandSystem: settings.defaultExpandSystem,
+  renderMarkdown: settings.renderMarkdown,
+  ...overrides,
+});
 
 export function Session2mdSettingsPage() {
   const { t } = useTranslation();
@@ -120,17 +139,11 @@ export function Session2mdSettingsPage() {
     }
 
     try {
-      await saveMutation.mutateAsync({
-        directoryOverrides: nextOverrides,
-        hiddenProviders: settings.hiddenProviders,
-        exportThinking: settings.exportThinking,
-        exportToolInputs: settings.exportToolInputs,
-        exportToolOutputs: settings.exportToolOutputs,
-        defaultExpandThinking: settings.defaultExpandThinking,
-        defaultExpandTools: settings.defaultExpandTools,
-        defaultExpandSystem: settings.defaultExpandSystem,
-        renderMarkdown: settings.renderMarkdown,
-      });
+      await saveMutation.mutateAsync(
+        buildSettingsPayload(settings, {
+          directoryOverrides: nextOverrides,
+        }),
+      );
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setDrafts((current) => {
         const next = { ...current };
@@ -161,17 +174,11 @@ export function Session2mdSettingsPage() {
     });
 
     try {
-      await saveMutation.mutateAsync({
-        directoryOverrides: settings.directoryOverrides,
-        hiddenProviders: hiddenProviderList,
-        exportThinking: settings.exportThinking,
-        exportToolInputs: settings.exportToolInputs,
-        exportToolOutputs: settings.exportToolOutputs,
-        defaultExpandThinking: settings.defaultExpandThinking,
-        defaultExpandTools: settings.defaultExpandTools,
-        defaultExpandSystem: settings.defaultExpandSystem,
-        renderMarkdown: settings.renderMarkdown,
-      });
+      await saveMutation.mutateAsync(
+        buildSettingsPayload(settings, {
+          hiddenProviders: hiddenProviderList,
+        }),
+      );
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
@@ -198,7 +205,11 @@ export function Session2mdSettingsPage() {
   };
 
   const saveExportOption = async (
-    key: "exportThinking" | "exportToolInputs" | "exportToolOutputs",
+    key:
+      | "promptBeforeExport"
+      | "exportThinking"
+      | "exportToolInputs"
+      | "exportToolOutputs",
     value: boolean,
   ) => {
     if (!settings) return;
@@ -208,17 +219,7 @@ export function Session2mdSettingsPage() {
     queryClient.setQueryData(session2mdSettingsKey, nextSettings);
 
     try {
-      await saveMutation.mutateAsync({
-        directoryOverrides: nextSettings.directoryOverrides,
-        hiddenProviders: nextSettings.hiddenProviders,
-        exportThinking: nextSettings.exportThinking,
-        exportToolInputs: nextSettings.exportToolInputs,
-        exportToolOutputs: nextSettings.exportToolOutputs,
-        defaultExpandThinking: nextSettings.defaultExpandThinking,
-        defaultExpandTools: nextSettings.defaultExpandTools,
-        defaultExpandSystem: nextSettings.defaultExpandSystem,
-        renderMarkdown: nextSettings.renderMarkdown,
-      });
+      await saveMutation.mutateAsync(buildSettingsPayload(nextSettings));
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
@@ -240,17 +241,7 @@ export function Session2mdSettingsPage() {
     queryClient.setQueryData(session2mdSettingsKey, nextSettings);
 
     try {
-      await saveMutation.mutateAsync({
-        directoryOverrides: nextSettings.directoryOverrides,
-        hiddenProviders: nextSettings.hiddenProviders,
-        exportThinking: nextSettings.exportThinking,
-        exportToolInputs: nextSettings.exportToolInputs,
-        exportToolOutputs: nextSettings.exportToolOutputs,
-        defaultExpandThinking: nextSettings.defaultExpandThinking,
-        defaultExpandTools: nextSettings.defaultExpandTools,
-        defaultExpandSystem: nextSettings.defaultExpandSystem,
-        renderMarkdown: nextSettings.renderMarkdown,
-      });
+      await saveMutation.mutateAsync(buildSettingsPayload(nextSettings));
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
@@ -269,17 +260,7 @@ export function Session2mdSettingsPage() {
     queryClient.setQueryData(session2mdSettingsKey, nextSettings);
 
     try {
-      await saveMutation.mutateAsync({
-        directoryOverrides: nextSettings.directoryOverrides,
-        hiddenProviders: nextSettings.hiddenProviders,
-        exportThinking: nextSettings.exportThinking,
-        exportToolInputs: nextSettings.exportToolInputs,
-        exportToolOutputs: nextSettings.exportToolOutputs,
-        defaultExpandThinking: nextSettings.defaultExpandThinking,
-        defaultExpandTools: nextSettings.defaultExpandTools,
-        defaultExpandSystem: nextSettings.defaultExpandSystem,
-        renderMarkdown: nextSettings.renderMarkdown,
-      });
+      await saveMutation.mutateAsync(buildSettingsPayload(nextSettings));
     } catch (error) {
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
@@ -372,6 +353,20 @@ export function Session2mdSettingsPage() {
                 </header>
 
                 <div className="space-y-3">
+                  <ToggleRow
+                    icon={<FileQuestion className="size-4 text-amber-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.promptBeforeExport.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.promptBeforeExport.description",
+                    )}
+                    checked={settings.promptBeforeExport}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("promptBeforeExport", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
                   <ToggleRow
                     icon={<Brain className="size-4 text-blue-500" />}
                     title={t(

@@ -994,6 +994,11 @@
     "export": "匯出工作階段",
     "exporting": "匯出中...",
     "exportTooltip": "將對話紀錄匯出為 Markdown 檔案",
+    "exportOptions": {
+      "title": "匯出選項",
+      "description": "選擇本次 Markdown 匯出要包含的內容；修改僅對本次匯出生效。",
+      "confirm": "匯出"
+    },
     "exportSuccess": "工作階段已匯出",
     "exportEmpty": "此工作階段沒有可匯出的對話內容",
     "exportFailed": "匯出工作階段失敗: {{error}}",
@@ -1060,6 +1065,10 @@
       "title": "Markdown 匯出內容",
       "description": "預設只匯出使用者訊息與 AI 正文，可依需求附加更多執行紀錄。",
       "saveFailed": "儲存匯出設定失敗：{{error}}",
+      "promptBeforeExport": {
+        "label": "每次匯出前詢問",
+        "description": "點擊匯出時先選擇本次要包含的內容，選項預設使用下方設定。"
+      },
       "includeThinking": {
         "label": "匯出含思考",
         "description": "在 AI 氣泡中保留 Thinking 內容。"

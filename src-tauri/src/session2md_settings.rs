@@ -40,6 +40,8 @@ pub struct Session2mdSettings {
     pub directory_overrides: BTreeMap<String, String>,
     #[serde(default)]
     pub hidden_providers: BTreeSet<String>,
+    #[serde(default = "default_prompt_before_export")]
+    pub prompt_before_export: bool,
     #[serde(default)]
     pub export_thinking: bool,
     #[serde(default)]
@@ -61,6 +63,7 @@ impl Default for Session2mdSettings {
         Self {
             directory_overrides: BTreeMap::new(),
             hidden_providers: BTreeSet::new(),
+            prompt_before_export: true,
             export_thinking: false,
             export_tool_inputs: false,
             export_tool_outputs: false,
@@ -72,6 +75,10 @@ impl Default for Session2mdSettings {
     }
 }
 
+fn default_prompt_before_export() -> bool {
+    true
+}
+
 fn default_render_markdown() -> bool {
     true
 }
@@ -81,6 +88,7 @@ fn default_render_markdown() -> bool {
 pub struct Session2mdSettingsSnapshot {
     pub directory_overrides: BTreeMap<String, String>,
     pub hidden_providers: BTreeSet<String>,
+    pub prompt_before_export: bool,
     pub export_thinking: bool,
     pub export_tool_inputs: bool,
     pub export_tool_outputs: bool,
@@ -144,6 +152,7 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
     Session2mdSettingsSnapshot {
         directory_overrides: settings.directory_overrides,
         hidden_providers: settings.hidden_providers,
+        prompt_before_export: settings.prompt_before_export,
         export_thinking: settings.export_thinking,
         export_tool_inputs: settings.export_tool_inputs,
         export_tool_outputs: settings.export_tool_outputs,
@@ -249,6 +258,7 @@ mod tests {
             serde_json::from_str(r#"{"directoryOverrides":{}}"#).expect("settings");
 
         assert!(settings.hidden_providers.is_empty());
+        assert!(settings.prompt_before_export);
         assert!(!settings.export_thinking);
         assert!(!settings.export_tool_inputs);
         assert!(!settings.export_tool_outputs);
@@ -264,5 +274,13 @@ mod tests {
             serde_json::from_str(r#"{"renderMarkdown":false}"#).expect("settings");
 
         assert!(!settings.render_markdown);
+    }
+
+    #[test]
+    fn explicit_prompt_before_export_setting_is_preserved() {
+        let settings: Session2mdSettings =
+            serde_json::from_str(r#"{"promptBeforeExport":false}"#).expect("settings");
+
+        assert!(!settings.prompt_before_export);
     }
 }

@@ -160,6 +160,7 @@ let sessionMessagesState = createDefaultSessionMessages();
 let session2mdSettingsState = {
   directoryOverrides: {} as Record<string, string>,
   hiddenProviders: [] as SessionProviderId[],
+  promptBeforeExport: true,
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
@@ -232,6 +233,7 @@ export const resetProviderState = () => {
   session2mdSettingsState = {
     directoryOverrides: {},
     hiddenProviders: [],
+    promptBeforeExport: true,
     exportThinking: false,
     exportToolInputs: false,
     exportToolOutputs: false,
@@ -459,6 +461,7 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
     session2mdSettingsState.directoryOverrides,
   ) as Session2mdSettingsSnapshot["directoryOverrides"],
   hiddenProviders: [...session2mdSettingsState.hiddenProviders],
+  promptBeforeExport: session2mdSettingsState.promptBeforeExport,
   exportThinking: session2mdSettingsState.exportThinking,
   exportToolInputs: session2mdSettingsState.exportToolInputs,
   exportToolOutputs: session2mdSettingsState.exportToolOutputs,
@@ -477,6 +480,7 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
 export const saveSession2mdSettings = (settings: {
   directoryOverrides: Record<string, string>;
   hiddenProviders: SessionProviderId[];
+  promptBeforeExport: boolean;
   exportThinking: boolean;
   exportToolInputs: boolean;
   exportToolOutputs: boolean;
@@ -491,6 +495,7 @@ export const saveSession2mdSettings = (settings: {
       string
     >,
     hiddenProviders: [...settings.hiddenProviders],
+    promptBeforeExport: settings.promptBeforeExport,
     exportThinking: settings.exportThinking,
     exportToolInputs: settings.exportToolInputs,
     exportToolOutputs: settings.exportToolOutputs,
@@ -510,6 +515,26 @@ export const setSession2mdRenderMarkdown = (renderMarkdown: boolean) => {
   session2mdSettingsState = {
     ...session2mdSettingsState,
     renderMarkdown,
+  };
+};
+
+export const setSession2mdPromptBeforeExport = (
+  promptBeforeExport: boolean,
+) => {
+  session2mdSettingsState = {
+    ...session2mdSettingsState,
+    promptBeforeExport,
+  };
+};
+
+export const setSession2mdExportOptions = (options: {
+  exportThinking?: boolean;
+  exportToolInputs?: boolean;
+  exportToolOutputs?: boolean;
+}) => {
+  session2mdSettingsState = {
+    ...session2mdSettingsState,
+    ...options,
   };
 };
 

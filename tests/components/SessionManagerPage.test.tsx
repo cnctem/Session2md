@@ -7,6 +7,8 @@ import { sessionsApi } from "@/lib/api/sessions";
 import type { SessionMessage, SessionMeta } from "@/types";
 import {
   setHiddenSessionProviders,
+  setSession2mdExportOptions,
+  setSession2mdPromptBeforeExport,
   setSession2mdDefaultExpansion,
   setSession2mdRenderMarkdown,
   setSessionFixtures,
@@ -138,6 +140,11 @@ describe("SessionManagerPage", () => {
     });
     await waitFor(() => expect(exportButton).not.toBeDisabled());
     fireEvent.click(exportButton);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
 
     await waitFor(() =>
       expect(exportSpy).toHaveBeenCalledWith(
@@ -146,6 +153,87 @@ describe("SessionManagerPage", () => {
       ),
     );
     expect(toastSuccessMock).toHaveBeenCalled();
+  });
+
+  it("exports directly when prompt before export is disabled", async () => {
+    setSession2mdPromptBeforeExport(false);
+    const exportSpy = vi
+      .spyOn(sessionsApi, "exportMarkdown")
+      .mockResolvedValueOnce("/tmp/Alpha Session.md");
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Alpha Session/i }),
+    );
+    const exportButton = await screen.findByRole("button", {
+      name: "sessionManager.export",
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    fireEvent.click(exportButton);
+
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith(
+        "Alpha Session.md",
+        "## User\n\nalpha\n",
+      ),
+    );
+    expect(
+      screen.queryByText("sessionManager.exportOptions.title"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses one-off choices from the export prompt", async () => {
+    setSession2mdExportOptions({ exportThinking: true });
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "thinking-session",
+          title: "Thinking Session",
+          sourcePath: "/mock/codex/thinking-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/thinking-session.jsonl": [
+          { role: "user", content: "question" },
+          {
+            role: "assistant",
+            content: "private reasoning",
+            kind: "reasoning",
+          },
+          { role: "assistant", content: "answer", kind: "text" },
+        ],
+      },
+    );
+    const exportSpy = vi
+      .spyOn(sessionsApi, "exportMarkdown")
+      .mockResolvedValueOnce("/tmp/Thinking Session.md");
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Thinking Session/i }),
+    );
+    const exportButton = await screen.findByRole("button", {
+      name: "sessionManager.export",
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    fireEvent.click(exportButton);
+
+    const checkboxes = await screen.findAllByRole("checkbox");
+    expect(checkboxes[0]).toBeChecked();
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith(
+        "Thinking Session.md",
+        "## User\n\nquestion\n\n## Assistant\n\nanswer\n",
+      ),
+    );
   });
 
   it("shows the CC Switch-aligned source and resume command rows", async () => {
@@ -230,6 +318,11 @@ describe("SessionManagerPage", () => {
     });
     await waitFor(() => expect(exportButton).not.toBeDisabled());
     fireEvent.click(exportButton);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
 
     await waitFor(() =>
       expect(exportSpy).toHaveBeenCalledWith(
@@ -702,6 +795,11 @@ describe("SessionManagerPage", () => {
     });
     await waitFor(() => expect(exportButton).not.toBeDisabled());
     await user.click(exportButton);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
 
     await waitFor(() =>
       expect(exportSpy).toHaveBeenCalledWith(

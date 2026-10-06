@@ -993,6 +993,11 @@
     "export": "セッションをエクスポート",
     "exporting": "エクスポート中...",
     "exportTooltip": "会話履歴を Markdown ファイルとしてエクスポート",
+    "exportOptions": {
+      "title": "エクスポートオプション",
+      "description": "今回の Markdown エクスポートに含める内容を選択します。変更は今回のみ適用されます。",
+      "confirm": "エクスポート"
+    },
     "exportSuccess": "セッションをエクスポートしました",
     "exportEmpty": "エクスポートできる会話内容がありません",
     "exportFailed": "セッションのエクスポートに失敗しました: {{error}}",
@@ -1059,6 +1064,10 @@
       "title": "Markdown エクスポート内容",
       "description": "既定ではユーザーメッセージと AI の本文だけを出力します。必要に応じて実行記録を追加できます。",
       "saveFailed": "エクスポート設定を保存できませんでした: {{error}}",
+      "promptBeforeExport": {
+        "label": "毎回エクスポート前に確認",
+        "description": "エクスポート時に含める内容を毎回選択します。初期値は以下の設定を使用します。"
+      },
       "includeThinking": {
         "label": "思考を含める",
         "description": "AI メッセージ内の思考内容を保持します。"
