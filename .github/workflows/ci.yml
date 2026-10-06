@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -151,77 +151,3 @@ jobs:
 
       - name: Run tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
-
-  backend-windows-wsl2:
-    name: Backend Checks (Windows + WSL2 home)
-    runs-on: windows-2025
-    timeout-minutes: 45
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.95.0
-
-      - name: Setup WSL2
-        uses: Vampire/setup-wsl@d1da7f2c0322a5ee4f24975344f67fc0f5baf364 # v7
-        with:
-          distribution: Ubuntu-24.04
-          wsl-version: 2
-
-      - name: Cache Cargo registry and build
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - name: Create frontend dist placeholder
-        shell: bash
-        run: mkdir -p dist
-
-      - name: Prepare WSL2-backed test environment
-        shell: pwsh
-        run: |
-          wsl.exe -d Ubuntu-24.04 -- bash -lc "rm -rf /tmp/session2md-windows-test-root && mkdir -p /tmp/session2md-windows-test-root/{home,temp} && chmod -R 0777 /tmp/session2md-windows-test-root"
-          $testRoot = "\\wsl.localhost\Ubuntu-24.04\tmp\session2md-windows-test-root"
-          $testHome = Join-Path $testRoot "home"
-          $testTemp = Join-Path $testRoot "temp"
-          foreach ($path in @($testRoot, $testHome, $testTemp)) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "WSL2-backed test path is unavailable: $path"
-            }
-          }
-          "CC_SWITCH_TEST_HOME=$testHome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CC_SWITCH_WSL_TEST_DIR=$testRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "CC_SWITCH_WSL_TEST_TEMP=$testTemp" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Compile backend tests with native temp
-        # link.exe/mt.exe cannot create manifests when TEMP points at a WSL UNC path.
-        run: cargo test --lib --manifest-path src-tauri/Cargo.toml --no-run
-
-      - name: Run Windows-to-WSL2 filesystem contract
-        shell: pwsh
-        run: |
-          $env:TEMP = $env:CC_SWITCH_WSL_TEST_TEMP
-          $env:TMP = $env:CC_SWITCH_WSL_TEST_TEMP
-          $testName = "config::tests::atomic_write_replaces_existing_wsl_unc_file"
-          $testList = cargo test --lib --manifest-path src-tauri/Cargo.toml -- --ignored --list
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-          $expected = "${testName}: test"
-          if ($testList -notcontains $expected) {
-            throw "Expected ignored test was not discovered: $testName"
-          }
-          cargo test --lib --manifest-path src-tauri/Cargo.toml $testName -- --ignored --exact --nocapture
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }

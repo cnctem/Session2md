@@ -1,38 +1,18 @@
 import { Code2, Grid2X2 } from "lucide-react";
-import { ProviderIcon } from "@/components/ProviderIcon";
+import {
+  SESSION_PROVIDER_ICON_ASSETS,
+  type SessionProviderIconAsset,
+} from "./sessionProviderIcons";
 import { cn } from "@/lib/utils";
 
-// 与主界面 AppSwitcher / APP_ICON_MAP 相同的品牌图标方案，
-// 图标名对应 src/icons/extracted/index.ts 中的注册键。
-const PROVIDER_BRAND_ICONS: Record<string, { icon: string; name: string }> = {
-  claude: { icon: "claude", name: "Claude Code" },
-  codex: { icon: "openai", name: "Codex" },
-  gemini: { icon: "gemini", name: "Gemini CLI" },
-  grokbuild: { icon: "grok", name: "Grok Build" },
-  hermes: { icon: "hermes", name: "Hermes" },
-  mcode: { icon: "minimax", name: "MiniMax Code" },
-  openclaw: { icon: "openclaw", name: "OpenClaw" },
-  opencode: { icon: "opencode", name: "OpenCode" },
-  pi: { icon: "pi", name: "Pi" },
-  cursor: { icon: "cursor", name: "Cursor" },
-  antigravity: { icon: "antigravity", name: "Antigravity" },
-  reasonix: { icon: "reasonix", name: "Reasonix" },
-  mimocode: { icon: "mimocode", name: "MiMo Code" },
-  deveco: { icon: "deveco", name: "DevEco Code" },
-  zcode: { icon: "zcode", name: "ZCode" },
-  kimi: { icon: "kimi", name: "Kimi" },
-  kilocode: { icon: "kilocode", name: "Kilo Code" },
-  qoder: { icon: "qoder", name: "Qoder CLI" },
-  workbuddy: { icon: "workbuddy", name: "WorkBuddy" },
-  qwen: { icon: "qwen", name: "Qwen Work" },
-  continue: { icon: "continue", name: "Continue" },
-  cline: { icon: "cline", name: "Cline" },
-  goose: { icon: "goose", name: "Goose" },
-  zed: { icon: "zed", name: "Zed" },
-  crush: { icon: "crush", name: "Crush" },
-  teleagent: { icon: "teleagent", name: "TeleAgent" },
-  dsh: { icon: "deepseek", name: "DeepSeek" },
-};
+const getProviderAsset = (
+  providerId: string,
+): SessionProviderIconAsset | undefined =>
+  Object.prototype.hasOwnProperty.call(SESSION_PROVIDER_ICON_ASSETS, providerId)
+    ? SESSION_PROVIDER_ICON_ASSETS[
+        providerId as keyof typeof SESSION_PROVIDER_ICON_ASSETS
+      ]
+    : undefined;
 
 interface SessionProviderIconProps {
   providerId: string;
@@ -45,9 +25,9 @@ export function SessionProviderIcon({
   size = 16,
   className,
 }: SessionProviderIconProps) {
-  const brand = PROVIDER_BRAND_ICONS[providerId];
+  const asset = getProviderAsset(providerId);
 
-  if (!brand) {
+  if (!asset) {
     // “全部”与未知提供方沿用中性线性图标
     const Icon = providerId === "all" ? Grid2X2 : Code2;
     return (
@@ -59,13 +39,38 @@ export function SessionProviderIcon({
     );
   }
 
+  const sizeValue = typeof size === "number" ? `${size}px` : size;
+
+  if (asset.kind === "image") {
+    return (
+      <img
+        src={asset.url}
+        alt={asset.name}
+        title={asset.name}
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center object-contain",
+          className,
+        )}
+        style={{ width: sizeValue, height: sizeValue }}
+        loading="lazy"
+      />
+    );
+  }
+
   return (
-    <ProviderIcon
-      icon={brand.icon}
-      name={brand.name}
-      size={size}
-      showFallback={false}
-      className={className}
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center",
+        className,
+      )}
+      title={asset.name}
+      style={{
+        width: sizeValue,
+        height: sizeValue,
+        fontSize: sizeValue,
+        lineHeight: 1,
+      }}
+      dangerouslySetInnerHTML={{ __html: asset.content }}
     />
   );
 }
