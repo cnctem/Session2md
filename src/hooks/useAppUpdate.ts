@@ -12,13 +12,16 @@ export interface AppUpdateController {
   check: () => Promise<AppUpdateInfo | null>;
 }
 
-export function useAppUpdate(): AppUpdateController {
+export function useAppUpdate(
+  autoCheckUpdates: boolean | null | undefined,
+): AppUpdateController {
   const [currentVersion, setCurrentVersion] = useState("");
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const checkingRef = useRef(false);
+  const previousAutoCheckRef = useRef<boolean | null | undefined>(undefined);
 
   useEffect(() => {
     // Renderer-only tests and browser previews do not expose the Tauri bridge.
@@ -67,18 +70,27 @@ export function useAppUpdate(): AppUpdateController {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+    const previousAutoCheck = previousAutoCheckRef.current;
+    previousAutoCheckRef.current = autoCheckUpdates;
+
+    if (
+      autoCheckUpdates !== true ||
+      typeof window === "undefined" ||
+      !("__TAURI_INTERNALS__" in window)
+    ) {
       return;
     }
 
+    const delay =
+      previousAutoCheck === null || previousAutoCheck === false ? 0 : 1000;
     const timer = window.setTimeout(() => {
       void check().catch((checkError) => {
         console.warn("[Session2md] Automatic update check failed", checkError);
       });
-    }, 1000);
+    }, delay);
 
     return () => window.clearTimeout(timer);
-  }, [check]);
+  }, [autoCheckUpdates, check]);
 
   return {
     currentVersion,

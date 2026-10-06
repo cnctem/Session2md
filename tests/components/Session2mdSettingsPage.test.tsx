@@ -47,6 +47,14 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Configuration Directory Overrides",
             "sessionSettings.directoryOverrides.description":
               "Session-only paths",
+            "sessionSettings.autoUpdatePrompt.title": "Automatic Update Checks",
+            "sessionSettings.autoUpdatePrompt.description":
+              "Allow automatic update checks",
+            "sessionSettings.autoUpdatePrompt.yes": "Yes, check automatically",
+            "sessionSettings.autoUpdatePrompt.no":
+              "No, don't check automatically",
+            "sessionSettings.autoUpdatePrompt.saveFailed":
+              "Save auto update preference failed",
             "sessionSettings.providerVisibility.title": "Agent Visibility",
             "sessionSettings.providerVisibility.description":
               "Choose visible agents",
@@ -107,6 +115,12 @@ vi.mock("react-i18next", async (importOriginal) => {
             "sessionSettings.about.updates.title": "Software Updates",
             "sessionSettings.about.updates.description": "Update description",
             "sessionSettings.about.updates.checkNow": "Check for updates",
+            "sessionSettings.about.updates.autoCheck.label":
+              "Automatically check for updates",
+            "sessionSettings.about.updates.autoCheck.description":
+              "Check GitHub Releases when the app starts",
+            "sessionSettings.about.updates.autoCheck.saveFailed":
+              "Save auto update preference failed",
             "sessionSettings.directories.claude": "Claude",
             "sessionSettings.directories.codex": "Codex",
             "sessionSettings.directories.gemini": "Gemini",
@@ -155,6 +169,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 const snapshot = {
   directoryOverrides: {},
   hiddenProviders: [],
+  autoCheckUpdates: true,
   promptBeforeExport: true,
   exportThinking: false,
   exportToolInputs: false,
@@ -187,6 +202,7 @@ describe("Session2mdSettingsPage", () => {
       ...snapshot,
       directoryOverrides: next.directoryOverrides,
       hiddenProviders: next.hiddenProviders,
+      autoCheckUpdates: next.autoCheckUpdates,
       promptBeforeExport: next.promptBeforeExport,
       exportThinking: next.exportThinking,
       exportToolInputs: next.exportToolInputs,
@@ -215,6 +231,85 @@ describe("Session2mdSettingsPage", () => {
     expect(screen.getByText("session-manager")).toBeInTheDocument();
   });
 
+  it("asks for the automatic update preference only when it is unset", async () => {
+    settingsApiMock.get.mockResolvedValue({
+      ...snapshot,
+      autoCheckUpdates: null,
+    });
+    renderWithProviders(<App />);
+
+    expect(
+      await screen.findByText("Automatic Update Checks"),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Yes, check automatically" }),
+    );
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenCalledWith({
+        directoryOverrides: {},
+        hiddenProviders: [],
+        autoCheckUpdates: true,
+        promptBeforeExport: true,
+        exportThinking: false,
+        exportToolInputs: false,
+        exportToolOutputs: false,
+        defaultExpandThinking: false,
+        defaultExpandTools: false,
+        defaultExpandSystem: false,
+        renderMarkdown: true,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("stores an explicit no for automatic update checks", async () => {
+    settingsApiMock.get.mockResolvedValue({
+      ...snapshot,
+      autoCheckUpdates: null,
+    });
+    renderWithProviders(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "No, don't check automatically",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({ autoCheckUpdates: false }),
+      ),
+    );
+  });
+
+  it("keeps the automatic update prompt open when saving fails", async () => {
+    settingsApiMock.get.mockResolvedValue({
+      ...snapshot,
+      autoCheckUpdates: null,
+    });
+    settingsApiMock.save.mockRejectedValueOnce(new Error("save failed"));
+    renderWithProviders(<App />);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Yes, check automatically",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({ autoCheckUpdates: true }),
+      ),
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("stores the selected language under the Session2md key", async () => {
     renderWithProviders(<Session2mdSettingsPage />);
 
@@ -240,6 +335,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -269,6 +365,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenCalledWith({
         directoryOverrides: { codex: "/Volumes/work/codex" },
         hiddenProviders: ["codex"],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -289,6 +386,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [...SESSION_PROVIDER_IDS],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -305,6 +403,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -327,6 +426,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: true,
         exportToolInputs: false,
@@ -352,6 +452,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: false,
         exportThinking: false,
         exportToolInputs: false,
@@ -376,6 +477,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -401,6 +503,7 @@ describe("Session2mdSettingsPage", () => {
       expect(settingsApiMock.save).toHaveBeenLastCalledWith({
         directoryOverrides: {},
         hiddenProviders: [],
+        autoCheckUpdates: true,
         promptBeforeExport: true,
         exportThinking: false,
         exportToolInputs: false,
@@ -477,5 +580,40 @@ describe("Session2mdSettingsPage", () => {
 
     expect(await screen.findByText("About Session2md")).toBeInTheDocument();
     expect(screen.getByText("Software Updates")).toBeInTheDocument();
+  });
+
+  it("changes automatic update checks from the About section", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "About" }), {
+      button: 0,
+    });
+    const autoCheckSwitch = await screen.findByRole("switch", {
+      name: "Automatically check for updates",
+    });
+    expect(autoCheckSwitch).toBeChecked();
+
+    fireEvent.click(autoCheckSwitch);
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({ autoCheckUpdates: false }),
+      ),
+    );
+  });
+
+  it("rolls back the About switch when saving fails", async () => {
+    settingsApiMock.save.mockRejectedValueOnce(new Error("save failed"));
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "About" }), {
+      button: 0,
+    });
+    const autoCheckSwitch = await screen.findByRole("switch", {
+      name: "Automatically check for updates",
+    });
+    fireEvent.click(autoCheckSwitch);
+
+    await waitFor(() => expect(autoCheckSwitch).toBeChecked());
   });
 });

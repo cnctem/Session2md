@@ -2,9 +2,11 @@ import { ArrowLeft, FileDown, Settings } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
+import { AutoUpdatePreferenceDialog } from "@/components/session-settings/AutoUpdatePreferenceDialog";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
 import { Button } from "@/components/ui/button";
 import { useAppUpdate } from "@/hooks/useAppUpdate";
+import { useSession2mdSettingsQuery } from "@/lib/query/session2mdSettings";
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +18,10 @@ function App() {
   const { t } = useTranslation();
   const [page, setPage] = useState<"sessions" | "settings">("sessions");
   const isSettingsPage = page === "settings";
-  const appUpdate = useAppUpdate();
+  const { data: settings } = useSession2mdSettingsQuery();
+  const appUpdate = useAppUpdate(settings?.autoCheckUpdates);
+  const pendingAutoUpdatePreference =
+    settings?.autoCheckUpdates === null ? settings : null;
 
   return (
     <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground">
@@ -71,6 +76,7 @@ function App() {
           <SessionManagerPage />
         )}
       </main>
+      <AutoUpdatePreferenceDialog settings={pendingAutoUpdatePreference} />
     </div>
   );
 }

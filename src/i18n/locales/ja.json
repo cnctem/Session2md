@@ -1110,6 +1110,13 @@
       "teleagent": "TeleAgent データディレクトリ",
       "dsh": "DeepSeek Harness データディレクトリ"
     },
+    "autoUpdatePrompt": {
+      "title": "更新の自動確認",
+      "description": "Session2md の起動時に GitHub Releases を自動確認してもよいですか？\n\n選択後は「設定 → バージョン情報」で変更できます。",
+      "yes": "はい、自動確認する",
+      "no": "いいえ、自動確認しない",
+      "saveFailed": "更新の自動確認設定を保存できませんでした。もう一度お試しください。"
+    },
     "about": {
       "title": "Session2md について",
       "description": "アプリの概要、現在のバージョン、更新状態を確認できます。",
@@ -1125,7 +1132,12 @@
       "updateAvailable": "新しいバージョン {{version}} があります",
       "updates": {
         "title": "ソフトウェア更新",
-        "description": "起動時に GitHub Releases を自動確認します。ダウンロードボタンは、このバージョンと現在のプラットフォームに対応する GitHub アセットを開きます。",
+        "description": "有効にすると、起動時に GitHub Releases を自動確認します。ダウンロードボタンは、このバージョンと現在のプラットフォームに対応する GitHub アセットを開きます。",
+        "autoCheck": {
+          "label": "更新を自動確認",
+          "description": "アプリ起動時に GitHub Releases を確認します。オフでも手動確認は利用できます。",
+          "saveFailed": "更新の自動確認設定を保存できませんでした: {{error}}"
+        },
         "publishedAt": "公開日 {{date}}",
         "checkNow": "更新を確認",
         "recheck": "再確認",

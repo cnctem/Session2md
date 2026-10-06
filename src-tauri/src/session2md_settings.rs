@@ -40,6 +40,8 @@ pub struct Session2mdSettings {
     pub directory_overrides: BTreeMap<String, String>,
     #[serde(default)]
     pub hidden_providers: BTreeSet<String>,
+    #[serde(default)]
+    pub auto_check_updates: Option<bool>,
     #[serde(default = "default_prompt_before_export")]
     pub prompt_before_export: bool,
     #[serde(default)]
@@ -63,6 +65,7 @@ impl Default for Session2mdSettings {
         Self {
             directory_overrides: BTreeMap::new(),
             hidden_providers: BTreeSet::new(),
+            auto_check_updates: None,
             prompt_before_export: true,
             export_thinking: false,
             export_tool_inputs: false,
@@ -88,6 +91,7 @@ fn default_render_markdown() -> bool {
 pub struct Session2mdSettingsSnapshot {
     pub directory_overrides: BTreeMap<String, String>,
     pub hidden_providers: BTreeSet<String>,
+    pub auto_check_updates: Option<bool>,
     pub prompt_before_export: bool,
     pub export_thinking: bool,
     pub export_tool_inputs: bool,
@@ -152,6 +156,7 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
     Session2mdSettingsSnapshot {
         directory_overrides: settings.directory_overrides,
         hidden_providers: settings.hidden_providers,
+        auto_check_updates: settings.auto_check_updates,
         prompt_before_export: settings.prompt_before_export,
         export_thinking: settings.export_thinking,
         export_tool_inputs: settings.export_tool_inputs,
@@ -258,6 +263,7 @@ mod tests {
             serde_json::from_str(r#"{"directoryOverrides":{}}"#).expect("settings");
 
         assert!(settings.hidden_providers.is_empty());
+        assert_eq!(settings.auto_check_updates, None);
         assert!(settings.prompt_before_export);
         assert!(!settings.export_thinking);
         assert!(!settings.export_tool_inputs);
@@ -282,5 +288,19 @@ mod tests {
             serde_json::from_str(r#"{"promptBeforeExport":false}"#).expect("settings");
 
         assert!(!settings.prompt_before_export);
+    }
+
+    #[test]
+    fn auto_check_updates_tristate_is_preserved() {
+        let unset: Session2mdSettings =
+            serde_json::from_str(r#"{"autoCheckUpdates":null}"#).expect("settings");
+        let enabled: Session2mdSettings =
+            serde_json::from_str(r#"{"autoCheckUpdates":true}"#).expect("settings");
+        let disabled: Session2mdSettings =
+            serde_json::from_str(r#"{"autoCheckUpdates":false}"#).expect("settings");
+
+        assert_eq!(unset.auto_check_updates, None);
+        assert_eq!(enabled.auto_check_updates, Some(true));
+        assert_eq!(disabled.auto_check_updates, Some(false));
     }
 }

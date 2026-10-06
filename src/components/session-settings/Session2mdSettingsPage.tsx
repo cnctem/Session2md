@@ -66,6 +66,7 @@ const buildSettingsPayload = (
 ): Session2mdSettings => ({
   directoryOverrides: settings.directoryOverrides,
   hiddenProviders: settings.hiddenProviders,
+  autoCheckUpdates: settings.autoCheckUpdates,
   promptBeforeExport: settings.promptBeforeExport,
   exportThinking: settings.exportThinking,
   exportToolInputs: settings.exportToolInputs,
@@ -282,6 +283,25 @@ export function Session2mdSettingsPage({
       queryClient.setQueryData(session2mdSettingsKey, previousSettings);
       toast.error(
         t("sessionSettings.messagePreview.saveFailed", {
+          error: String(error),
+        }),
+      );
+    }
+  };
+
+  const saveAutoCheckUpdates = async (value: boolean) => {
+    if (!settings) return;
+
+    const previousSettings = settings;
+    const nextSettings = { ...settings, autoCheckUpdates: value };
+    queryClient.setQueryData(session2mdSettingsKey, nextSettings);
+
+    try {
+      await saveMutation.mutateAsync(buildSettingsPayload(nextSettings));
+    } catch (error) {
+      queryClient.setQueryData(session2mdSettingsKey, previousSettings);
+      toast.error(
+        t("sessionSettings.about.updates.autoCheck.saveFailed", {
           error: String(error),
         }),
       );
@@ -644,7 +664,14 @@ export function Session2mdSettingsPage({
             </TabsContent>
 
             <TabsContent value="about" className="mt-0">
-              <Session2mdAboutSection update={update} />
+              <Session2mdAboutSection
+                update={update}
+                autoCheckUpdates={settings.autoCheckUpdates === true}
+                isSavingAutoCheckUpdates={saveMutation.isPending}
+                onAutoCheckUpdatesChange={(value) =>
+                  void saveAutoCheckUpdates(value)
+                }
+              />
             </TabsContent>
           </Tabs>
         </div>

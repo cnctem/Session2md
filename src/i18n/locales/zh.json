@@ -1110,6 +1110,13 @@
       "teleagent": "TeleAgent 数据目录",
       "dsh": "DeepSeek Harness 数据目录"
     },
+    "autoUpdatePrompt": {
+      "title": "自动检查更新",
+      "description": "是否允许 Session2md 在每次启动时自动检查 GitHub Releases？\n\n选择后仍可在“设置 → 关于”中修改。",
+      "yes": "是，自动检查",
+      "no": "否，暂不检查",
+      "saveFailed": "保存自动检查更新设置失败，请重试。"
+    },
     "about": {
       "title": "关于 Session2md",
       "description": "查看应用概览、当前版本和更新状态。",
@@ -1125,7 +1132,12 @@
       "updateAvailable": "发现新版本 {{version}}",
       "updates": {
         "title": "软件更新",
-        "description": "应用启动后会自动检查 GitHub Releases。下载按钮会打开当前平台对应版本的 GitHub 资源链接。",
+        "description": "开启后，应用启动时会自动检查 GitHub Releases。下载按钮会打开当前平台对应版本的 GitHub 资源链接。",
+        "autoCheck": {
+          "label": "自动检查更新",
+          "description": "应用启动时自动检查 GitHub Releases；关闭后仍可手动检查。",
+          "saveFailed": "保存自动检查更新设置失败：{{error}}"
+        },
         "publishedAt": "发布于 {{date}}",
         "checkNow": "检查更新",
         "recheck": "重新检查",

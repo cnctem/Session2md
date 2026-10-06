@@ -1110,6 +1110,13 @@
       "teleagent": "TeleAgent directory",
       "dsh": "DeepSeek Harness directory"
     },
+    "autoUpdatePrompt": {
+      "title": "Automatic Update Checks",
+      "description": "Allow Session2md to check GitHub Releases automatically each time the app starts?\n\nYou can change this later in Settings → About.",
+      "yes": "Yes, check automatically",
+      "no": "No, don't check automatically",
+      "saveFailed": "Unable to save the automatic update preference. Please try again."
+    },
     "about": {
       "title": "About Session2md",
       "description": "View an overview of the app, the current version, and update status.",
@@ -1125,7 +1132,12 @@
       "updateAvailable": "Version {{version}} is available",
       "updates": {
         "title": "Software Updates",
-        "description": "Session2md checks GitHub Releases automatically at startup. The download button opens the GitHub asset for this version and platform.",
+        "description": "When enabled, Session2md checks GitHub Releases at startup. The download button opens the GitHub asset for this version and platform.",
+        "autoCheck": {
+          "label": "Automatically check for updates",
+          "description": "Check GitHub Releases when the app starts. Manual checks remain available when this is off.",
+          "saveFailed": "Unable to save the automatic update preference: {{error}}"
+        },
         "publishedAt": "Published {{date}}",
         "checkNow": "Check for updates",
         "recheck": "Check again",

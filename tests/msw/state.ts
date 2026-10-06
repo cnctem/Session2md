@@ -160,6 +160,7 @@ let sessionMessagesState = createDefaultSessionMessages();
 let session2mdSettingsState = {
   directoryOverrides: {} as Record<string, string>,
   hiddenProviders: [] as SessionProviderId[],
+  autoCheckUpdates: null as boolean | null,
   promptBeforeExport: true,
   exportThinking: false,
   exportToolInputs: false,
@@ -233,6 +234,7 @@ export const resetProviderState = () => {
   session2mdSettingsState = {
     directoryOverrides: {},
     hiddenProviders: [],
+    autoCheckUpdates: null,
     promptBeforeExport: true,
     exportThinking: false,
     exportToolInputs: false,
@@ -461,6 +463,7 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
     session2mdSettingsState.directoryOverrides,
   ) as Session2mdSettingsSnapshot["directoryOverrides"],
   hiddenProviders: [...session2mdSettingsState.hiddenProviders],
+  autoCheckUpdates: session2mdSettingsState.autoCheckUpdates,
   promptBeforeExport: session2mdSettingsState.promptBeforeExport,
   exportThinking: session2mdSettingsState.exportThinking,
   exportToolInputs: session2mdSettingsState.exportToolInputs,
@@ -480,6 +483,7 @@ export const getSession2mdSettings = (): Session2mdSettingsSnapshot => ({
 export const saveSession2mdSettings = (settings: {
   directoryOverrides: Record<string, string>;
   hiddenProviders: SessionProviderId[];
+  autoCheckUpdates: boolean | null;
   promptBeforeExport: boolean;
   exportThinking: boolean;
   exportToolInputs: boolean;
@@ -495,6 +499,7 @@ export const saveSession2mdSettings = (settings: {
       string
     >,
     hiddenProviders: [...settings.hiddenProviders],
+    autoCheckUpdates: settings.autoCheckUpdates,
     promptBeforeExport: settings.promptBeforeExport,
     exportThinking: settings.exportThinking,
     exportToolInputs: settings.exportToolInputs,

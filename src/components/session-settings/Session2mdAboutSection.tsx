@@ -13,17 +13,24 @@ import { toast } from "sonner";
 import appIcon from "@/assets/icons/app-icon.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ToggleRow } from "@/components/ui/toggle-row";
 import type { AppUpdateController } from "@/hooks/useAppUpdate";
 import { sessionsApi } from "@/lib/api/sessions";
 
 interface Session2mdAboutSectionProps {
   update: AppUpdateController;
+  autoCheckUpdates: boolean;
+  isSavingAutoCheckUpdates: boolean;
+  onAutoCheckUpdatesChange: (value: boolean) => void;
 }
 
 const REPOSITORY_URL = "https://github.com/cnctem/Session2md";
 
 export function Session2mdAboutSection({
   update,
+  autoCheckUpdates,
+  isSavingAutoCheckUpdates,
+  onAutoCheckUpdatesChange,
 }: Session2mdAboutSectionProps) {
   const { t, i18n } = useTranslation();
   const [isOpeningLink, setIsOpeningLink] = useState(false);
@@ -171,6 +178,15 @@ export function Session2mdAboutSection({
             {t("sessionSettings.about.updates.description")}
           </p>
         </header>
+
+        <ToggleRow
+          icon={<RefreshCw className="size-4 text-blue-500" />}
+          title={t("sessionSettings.about.updates.autoCheck.label")}
+          description={t("sessionSettings.about.updates.autoCheck.description")}
+          checked={autoCheckUpdates}
+          onCheckedChange={onAutoCheckUpdatesChange}
+          disabled={isSavingAutoCheckUpdates}
+        />
 
         <div
           aria-live="polite"

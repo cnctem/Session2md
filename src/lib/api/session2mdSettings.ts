@@ -11,6 +11,7 @@ export type { SessionDirectoryId };
 export interface Session2mdSettings {
   directoryOverrides: Partial<Record<SessionDirectoryId, string>>;
   hiddenProviders: SessionProviderId[];
+  autoCheckUpdates: boolean | null;
   promptBeforeExport: boolean;
   exportThinking: boolean;
   exportToolInputs: boolean;
