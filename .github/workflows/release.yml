@@ -91,6 +91,9 @@ jobs:
           node --version
           pnpm --version
 
+      - name: Set version from release tag
+        run: node scripts/apply-release-version.mjs
+
       - name: Get pnpm store directory
         if: runner.os != 'Windows' || matrix.arch != 'arm64'
         id: pnpm-store

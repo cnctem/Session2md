@@ -65,6 +65,8 @@ fn build_update_info(
     app: &AppHandle,
     release: GitHubRelease,
 ) -> Result<Option<AppUpdateInfo>, String> {
+    // Release builds stamp tauri.conf.json from the Git tag before compiling,
+    // so package_info is the tag-derived current version in shipped binaries.
     let current_version = app.package_info().version.to_string();
     let latest = parse_version(&release.tag_name)?;
 
