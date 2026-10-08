@@ -128,9 +128,11 @@ jobs:
       - name: Build Tauri App (macOS)
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: |
           set -euo pipefail
-          pnpm tauri build --target universal-apple-darwin
+          pnpm tauri build --target universal-apple-darwin --bundles app,dmg
 
       - name: Build Tauri App (Windows)
         if: runner.os == 'Windows'
@@ -157,7 +159,7 @@ jobs:
           mkdir -p release-assets
           VERSION="${GITHUB_REF_NAME}"  # e.g., v3.5.0
 
-          # Locate and AdHoc-sign the application bundle.
+          # Locate the Tauri-signed application bundle.
           APP_PATH=""
           for path in \
             "src-tauri/target/universal-apple-darwin/release/bundle/macos" \
@@ -174,39 +176,32 @@ jobs:
             exit 1
           fi
 
-          codesign --force --deep --sign - "$APP_PATH"
-          echo "✅ .app AdHoc-signed"
-
           # 1) Collect .app as zip for manual installation.
           NEW_ZIP="Session2md-${VERSION}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release-assets/$NEW_ZIP"
           echo "macOS zip ready: $NEW_ZIP"
 
-          # 2) Create a styled DMG for manual installation.
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
+          # 2) Collect Tauri's native DMG for manual installation.
+          DMG_PATH=""
+          for path in \
+            "src-tauri/target/universal-apple-darwin/release/bundle/dmg" \
+            "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg" \
+            "src-tauri/target/x86_64-apple-darwin/release/bundle/dmg" \
+            "src-tauri/target/release/bundle/dmg"; do
+            if [ -d "$path" ]; then
+              [ -z "$DMG_PATH" ] && DMG_PATH=$(find "$path" -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
+            fi
+          done
+
+          if [ -z "$DMG_PATH" ]; then
+            echo "❌ No .dmg found" >&2
+            exit 1
+          fi
+
           NEW_DMG="Session2md-${VERSION}-macOS.dmg"
-          DMG_STAGE_DIR="$RUNNER_TEMP/dmg-stage"
-          APP_NAME=$(basename "$APP_PATH")
-          rm -rf "$DMG_STAGE_DIR"
-          mkdir -p "$DMG_STAGE_DIR"
-          ditto "$APP_PATH" "$DMG_STAGE_DIR/$APP_NAME"
-
-          create-dmg \
-            --volname "Session2md" \
-            --background "src-tauri/icons/dmg-background.png" \
-            --window-size 660 400 \
-            --window-pos 200 120 \
-            --icon-size 80 \
-            --icon "$APP_NAME" 180 220 \
-            --hide-extension "$APP_NAME" \
-            --app-drop-link 480 220 \
-            --no-internet-enable \
-            "release-assets/$NEW_DMG" \
-            "$DMG_STAGE_DIR"
-
+          cp "$DMG_PATH" "release-assets/$NEW_DMG"
           codesign --force --sign - "release-assets/$NEW_DMG"
-          rm -rf "$DMG_STAGE_DIR"
-          echo "✅ Styled AdHoc-signed DMG created: $NEW_DMG"
+          echo "✅ Native AdHoc-signed DMG ready: $NEW_DMG"
 
       - name: Verify macOS AdHoc signatures
         if: runner.os == 'macOS'
