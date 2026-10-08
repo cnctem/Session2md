@@ -785,7 +785,8 @@ describe("SessionManagerPage", () => {
         "codex:/mock/codex/uncollapsed-context-session.jsonl": [
           {
             role: "user",
-            content: "# AGENTS.md instructions for /mock/codex",
+            content:
+              "# AGENTS.md instructions for /mock/codex\n<INSTRUCTIONS>agents body</INSTRUCTIONS>",
           },
           {
             role: "user",
@@ -814,7 +815,8 @@ describe("SessionManagerPage", () => {
         name: "sessionManager.roleSystem · <environment_context>",
       }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/agents body/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/agents body/)).toBeInTheDocument();
+    expect(screen.getByText(/<cwd>\/mock\/codex<\/cwd>/)).toBeInTheDocument();
   });
 
   it("renders user and assistant message bodies as Markdown by default", async () => {
