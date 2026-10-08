@@ -58,7 +58,7 @@ function MultiSelect({
         <Button
           type="button"
           variant="outline"
-          className="h-8 w-full justify-between gap-2 px-2 text-xs font-normal"
+          className="h-8 w-full justify-between gap-2 px-2 text-xs font-normal text-foreground hover:text-foreground"
         >
           <span className="min-w-0 truncate text-left">{summary}</span>
           <ChevronDown className="size-3.5 shrink-0 opacity-60" />
