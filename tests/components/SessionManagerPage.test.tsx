@@ -31,13 +31,13 @@ vi.mock("@/components/sessions/SessionToc", () => ({
   SessionTocDialog: () => null,
 }));
 
-const renderPage = () => {
+const renderPage = (props: { minimalMode?: boolean } = {}) => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <SessionManagerPage />
+      <SessionManagerPage {...props} />
     </QueryClientProvider>,
   );
 };
@@ -523,6 +523,56 @@ describe("SessionManagerPage", () => {
     expect(
       await screen.findByText("hidden system instructions"),
     ).toBeInTheDocument();
+  });
+
+  it("shows only user and assistant text in minimal mode", async () => {
+    setSessionFixtures(
+      [
+        {
+          providerId: "dsh",
+          sessionId: "minimal-session",
+          title: "Minimal Session",
+          sourcePath: "/mock/dsh/minimal-session.jsonl",
+        },
+      ],
+      {
+        "dsh:/mock/dsh/minimal-session.jsonl": [
+          {
+            role: "system",
+            content: "hidden system instructions",
+            kind: "text",
+          },
+          { role: "user", content: "visible question", kind: "text" },
+          { role: "assistant", content: "hidden thinking", kind: "reasoning" },
+          { role: "assistant", content: "visible answer", kind: "text" },
+          {
+            role: "tool",
+            content: '{"command":"ls -la"}',
+            kind: "toolCall",
+            toolCallId: "minimal-call-1",
+            toolName: "bash",
+          },
+          {
+            role: "tool",
+            content: "file-a\nfile-b",
+            kind: "toolResult",
+            toolCallId: "minimal-call-1",
+            toolName: "bash",
+          },
+        ],
+      },
+    );
+
+    renderPage({ minimalMode: true });
+
+    expect(await screen.findByText("visible question")).toBeInTheDocument();
+    expect(await screen.findByText("visible answer")).toBeInTheDocument();
+    expect(
+      screen.queryByText("hidden system instructions"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("hidden thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("$ ls -la")).not.toBeInTheDocument();
+    expect(screen.queryByText(/file-a\s+file-b/)).not.toBeInTheDocument();
   });
 
   it("renders user and assistant message bodies as Markdown by default", async () => {

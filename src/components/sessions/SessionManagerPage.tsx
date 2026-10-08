@@ -215,7 +215,13 @@ const filterSetToAllowedValues = (
   return next.size === current.size ? current : next;
 };
 
-export function SessionManagerPage() {
+interface SessionManagerPageProps {
+  minimalMode?: boolean;
+}
+
+export function SessionManagerPage({
+  minimalMode = false,
+}: SessionManagerPageProps = {}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch } = useSessionsQuery();
@@ -521,6 +527,19 @@ export function SessionManagerPage() {
     () => groupSessionMessages(messages),
     [messages],
   );
+  const displayMessageGroups = useMemo(() => {
+    if (!minimalMode) return messageGroups;
+
+    return messageGroups.flatMap((group) => {
+      const role = group.role.toLowerCase();
+      const isConversationText =
+        group.kind === "message" &&
+        (role === "user" || role === "assistant") &&
+        group.content.trim().length > 0;
+      if (!isConversationText) return [];
+      return group.reasoning ? [{ ...group, reasoning: "" }] : [group];
+    });
+  }, [messageGroups, minimalMode]);
   const getMessageListScrollElement = useCallback(
     () =>
       messageListScrollRef.current?.closest<HTMLElement>(
@@ -529,12 +548,12 @@ export function SessionManagerPage() {
     [],
   );
   const messageVirtualizer = useVirtualizer({
-    count: messageGroups.length,
+    count: displayMessageGroups.length,
     getScrollElement: getMessageListScrollElement,
     observeElementRect: observeElementRectWithFallback,
     initialRect: { width: 1024, height: 768 },
     estimateSize: () => 140,
-    getItemKey: (index) => messageGroups[index]?.id ?? index,
+    getItemKey: (index) => displayMessageGroups[index]?.id ?? index,
     overscan: 8,
     gap: 12,
     paddingStart: 16,
@@ -608,7 +627,7 @@ export function SessionManagerPage() {
   );
   const tocItems = useMemo(
     () =>
-      messageGroups
+      displayMessageGroups
         .map((group, index) => ({ group, index }))
         .filter(({ group }) => {
           return (
@@ -625,7 +644,7 @@ export function SessionManagerPage() {
           ),
           ts: group.ts,
         })),
-    [isCodexSession, messageGroups],
+    [displayMessageGroups, isCodexSession],
   );
 
   const copyText = useCallback(
@@ -998,7 +1017,7 @@ export function SessionManagerPage() {
     if (!pending || !selectedSession || isLoadingMessages) return;
     if (getSessionKey(selectedSession) !== pending.sessionKey) return;
 
-    const groupIndex = messageGroups.findIndex((group) =>
+    const groupIndex = displayMessageGroups.findIndex((group) =>
       group.sourceMessageIndexes.includes(pending.messageIndex),
     );
     if (groupIndex < 0) {
@@ -1006,7 +1025,7 @@ export function SessionManagerPage() {
       return;
     }
 
-    const group = messageGroups[groupIndex];
+    const group = displayMessageGroups[groupIndex];
     setExpandedBlockOverrides((current) => {
       const next = new Map(current);
       if (pending.kind === "reasoning") {
@@ -1021,8 +1040,8 @@ export function SessionManagerPage() {
     scrollToMessage(groupIndex);
     setPendingMessageJump(null);
   }, [
+    displayMessageGroups,
     isLoadingMessages,
-    messageGroups,
     pendingMessageJump,
     selectedSession,
     scrollToMessage,
@@ -1665,7 +1684,7 @@ export function SessionManagerPage() {
                       <p className="p-4 text-center text-sm text-muted-foreground">
                         {t("sessionManager.loadingMessages")}
                       </p>
-                    ) : messageGroups.length === 0 ? (
+                    ) : displayMessageGroups.length === 0 ? (
                       <p className="p-4 text-center text-sm text-muted-foreground">
                         {t("sessionManager.emptySession")}
                       </p>
@@ -1678,7 +1697,8 @@ export function SessionManagerPage() {
                         {messageVirtualizer
                           .getVirtualItems()
                           .map((virtualMessage) => {
-                            const group = messageGroups[virtualMessage.index];
+                            const group =
+                              displayMessageGroups[virtualMessage.index];
                             if (!group) return null;
                             return (
                               <div

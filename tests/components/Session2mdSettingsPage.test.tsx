@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
@@ -24,6 +25,10 @@ vi.mock("react-i18next", async (importOriginal) => {
         (
           ({
             "common.settings": "Settings",
+            "common.minimalMode": "Minimal mode",
+            "common.minimalModeDescription": "Show only user and AI text",
+            "common.minimalModeEnabled": "Minimal mode enabled",
+            "common.minimalModeDisabled": "Minimal mode disabled",
             "common.about": "About",
             "common.version": "Version",
             "common.loading": "Loading",
@@ -140,7 +145,14 @@ vi.mock("react-i18next", async (importOriginal) => {
 });
 
 vi.mock("@/components/sessions/SessionManagerPage", () => ({
-  SessionManagerPage: () => <div>session-manager</div>,
+  SessionManagerPage: ({ minimalMode }: { minimalMode?: boolean }) => (
+    <div>
+      <span>session-manager</span>
+      <span data-testid="minimal-mode-prop">
+        {String(Boolean(minimalMode))}
+      </span>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/theme-provider", () => ({
@@ -229,6 +241,41 @@ describe("Session2mdSettingsPage", () => {
       }),
     );
     expect(screen.getByText("session-manager")).toBeInTheDocument();
+  });
+
+  it("toggles minimal mode from the header and persists it", async () => {
+    const successToastSpy = vi.spyOn(toast, "success");
+    const infoToastSpy = vi.spyOn(toast, "info");
+    const view = renderWithProviders(<App />);
+    const minimalModeSwitch = screen.getByRole("switch", {
+      name: "Minimal mode",
+    });
+
+    expect(minimalModeSwitch).not.toBeChecked();
+    expect(screen.getByTestId("minimal-mode-prop")).toHaveTextContent("false");
+
+    fireEvent.click(minimalModeSwitch);
+
+    expect(minimalModeSwitch).toBeChecked();
+    expect(screen.getByTestId("minimal-mode-prop")).toHaveTextContent("true");
+    expect(window.localStorage.getItem("session2md.minimalMode")).toBe("true");
+    expect(successToastSpy).toHaveBeenCalledWith("Minimal mode enabled", {
+      description: "Show only user and AI text",
+    });
+
+    fireEvent.click(minimalModeSwitch);
+
+    expect(minimalModeSwitch).not.toBeChecked();
+    expect(infoToastSpy).toHaveBeenCalledWith("Minimal mode disabled");
+
+    fireEvent.click(minimalModeSwitch);
+
+    view.unmount();
+    renderWithProviders(<App />);
+
+    expect(screen.getByRole("switch", { name: "Minimal mode" })).toBeChecked();
+    successToastSpy.mockRestore();
+    infoToastSpy.mockRestore();
   });
 
   it("asks for the automatic update preference only when it is unset", async () => {
