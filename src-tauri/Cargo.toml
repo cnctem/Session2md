@@ -1,6 +1,6 @@
 [package]
 name = "session2md"
-version = "3.1.0"
+version = "3.2.0"
 description = "Read local AI sessions and export conversations as Markdown"
 authors = ["Jason Young"]
 license = "MIT"
