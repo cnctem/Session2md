@@ -15,6 +15,7 @@ export interface SessionExportOptions {
   includeThinking: boolean;
   includeToolInputs: boolean;
   includeToolOutputs: boolean;
+  includeSystem: boolean;
 }
 
 interface SessionExportDialogProps {
@@ -58,6 +59,11 @@ export function SessionExportDialog({
       description: t(
         "sessionSettings.exportContent.includeToolOutputs.description",
       ),
+    },
+    {
+      key: "includeSystem" as const,
+      label: t("sessionSettings.exportContent.includeSystem.label"),
+      description: t("sessionSettings.exportContent.includeSystem.description"),
     },
   ];
 

@@ -51,6 +51,8 @@ pub struct Session2mdSettings {
     #[serde(default)]
     pub export_tool_outputs: bool,
     #[serde(default)]
+    pub export_system: bool,
+    #[serde(default)]
     pub default_expand_thinking: bool,
     #[serde(default)]
     pub default_expand_tools: bool,
@@ -70,6 +72,7 @@ impl Default for Session2mdSettings {
             export_thinking: false,
             export_tool_inputs: false,
             export_tool_outputs: false,
+            export_system: false,
             default_expand_thinking: false,
             default_expand_tools: false,
             default_expand_system: false,
@@ -96,6 +99,7 @@ pub struct Session2mdSettingsSnapshot {
     pub export_thinking: bool,
     pub export_tool_inputs: bool,
     pub export_tool_outputs: bool,
+    pub export_system: bool,
     pub default_expand_thinking: bool,
     pub default_expand_tools: bool,
     pub default_expand_system: bool,
@@ -161,6 +165,7 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
         export_thinking: settings.export_thinking,
         export_tool_inputs: settings.export_tool_inputs,
         export_tool_outputs: settings.export_tool_outputs,
+        export_system: settings.export_system,
         default_expand_thinking: settings.default_expand_thinking,
         default_expand_tools: settings.default_expand_tools,
         default_expand_system: settings.default_expand_system,
@@ -268,6 +273,7 @@ mod tests {
         assert!(!settings.export_thinking);
         assert!(!settings.export_tool_inputs);
         assert!(!settings.export_tool_outputs);
+        assert!(!settings.export_system);
         assert!(!settings.default_expand_thinking);
         assert!(!settings.default_expand_tools);
         assert!(!settings.default_expand_system);
@@ -288,6 +294,14 @@ mod tests {
             serde_json::from_str(r#"{"promptBeforeExport":false}"#).expect("settings");
 
         assert!(!settings.prompt_before_export);
+    }
+
+    #[test]
+    fn explicit_system_export_setting_is_preserved() {
+        let settings: Session2mdSettings =
+            serde_json::from_str(r#"{"exportSystem":true}"#).expect("settings");
+
+        assert!(settings.export_system);
     }
 
     #[test]

@@ -1113,6 +1113,10 @@
         "label": "Ask before every export",
         "description": "Choose what to include each time you export. Initial selections use the settings below."
       },
+      "includeSystem": {
+        "label": "Include system messages",
+        "description": "Export system messages as separate System sections."
+      },
       "includeThinking": {
         "label": "Include thinking",
         "description": "Keep thinking content inside assistant messages."

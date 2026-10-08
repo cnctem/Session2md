@@ -1114,6 +1114,10 @@
         "label": "每次匯出前詢問",
         "description": "點擊匯出時先選擇本次要包含的內容，選項預設使用下方設定。"
       },
+      "includeSystem": {
+        "label": "匯出含系統",
+        "description": "將系統訊息作為獨立的 System 章節寫入 Markdown。"
+      },
       "includeThinking": {
         "label": "匯出含思考",
         "description": "在 AI 氣泡中保留 Thinking 內容。"

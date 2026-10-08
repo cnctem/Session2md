@@ -465,6 +465,81 @@ describe("SessionManagerPage", () => {
     exportSpy.mockRestore();
   });
 
+  it("includes system messages when system export is enabled", async () => {
+    setSession2mdExportOptions({ exportSystem: true });
+    const exportSpy = vi
+      .spyOn(sessionsApi, "exportMarkdown")
+      .mockResolvedValueOnce("/tmp/System Session.md");
+
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "system-export-session",
+          title: "System Export Session",
+          sourcePath: "/mock/codex/system-export-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/system-export-session.jsonl": [
+          { role: "system", content: "system context" },
+          { role: "user", content: "Keep this request" },
+          { role: "assistant", content: "Here is the answer." },
+        ],
+      },
+    );
+
+    renderPage();
+
+    const exportButton = await screen.findByRole("button", {
+      name: "sessionManager.export",
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    fireEvent.click(exportButton);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith(
+        "System Export Session.md",
+        "## System\n\nsystem context\n\n" +
+          "## User\n\nKeep this request\n\n" +
+          "## Assistant\n\nHere is the answer.\n",
+      ),
+    );
+
+    exportSpy.mockRestore();
+  });
+
+  it("enables export for system-only sessions when system export is enabled", async () => {
+    setSession2mdExportOptions({ exportSystem: true });
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "system-only-export-session",
+          title: "System Only Export Session",
+          sourcePath: "/mock/codex/system-only-export-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/system-only-export-session.jsonl": [
+          { role: "system", content: "system context" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    const exportButton = await screen.findByRole("button", {
+      name: "sessionManager.export",
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+  });
+
   it("disables export when only assistant tool messages remain", async () => {
     setSessionFixtures(
       [

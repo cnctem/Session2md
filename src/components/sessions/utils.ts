@@ -195,6 +195,7 @@ export interface SessionMarkdownOptions {
   includeThinking?: boolean;
   includeToolInputs?: boolean;
   includeToolOutputs?: boolean;
+  includeSystem?: boolean;
 }
 
 const fencedCodeBlock = (content: string, language: string) => {
@@ -238,6 +239,12 @@ export const formatSessionGroupsMarkdown = (
     if (role === "tool") {
       const markdown = formatToolGroupMarkdown(group, options);
       return markdown ? [markdown] : [];
+    }
+    if (role === "system") {
+      const content = group.content.trim();
+      return options.includeSystem && content
+        ? [`## System\n\n${content}`]
+        : [];
     }
     if (role !== "user" && role !== "assistant") return [];
 

@@ -158,6 +158,7 @@ describe("session utils", () => {
 
   it("exports thinking and tool records only when enabled", () => {
     const messages: SessionMessage[] = [
+      { role: "system", content: "system context" },
       { role: "user", content: "hello", kind: "text" },
       { role: "assistant", content: "hidden", kind: "reasoning" },
       { role: "assistant", content: "answer", kind: "text" },
@@ -189,6 +190,9 @@ describe("session utils", () => {
     expect(
       formatSessionMarkdown(messages, { includeToolOutputs: true }),
     ).toContain("```text\nfile.txt\n```");
+    expect(formatSessionMarkdown(messages, { includeSystem: true })).toContain(
+      "## System\n\nsystem context",
+    );
     expect(
       formatSessionMarkdown(messages, {
         includeThinking: true,

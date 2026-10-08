@@ -6,6 +6,7 @@ import {
 } from "./SessionExportDialog";
 
 const initialOptions: SessionExportOptions = {
+  includeSystem: false,
   includeThinking: false,
   includeToolInputs: true,
   includeToolOutputs: false,
@@ -24,7 +25,7 @@ describe("SessionExportDialog", () => {
     );
 
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[3]);
     fireEvent.click(
       screen.getByRole("button", {
         name: "sessionManager.exportOptions.confirm",
@@ -32,7 +33,8 @@ describe("SessionExportDialog", () => {
     );
 
     expect(onConfirm).toHaveBeenCalledWith({
-      includeThinking: true,
+      includeSystem: true,
+      includeThinking: false,
       includeToolInputs: true,
       includeToolOutputs: false,
     });
@@ -67,8 +69,8 @@ describe("SessionExportDialog", () => {
     );
 
     const initialCheckboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(initialCheckboxes[0]);
-    expect(initialCheckboxes[0]).toBeChecked();
+    fireEvent.click(initialCheckboxes[3]);
+    expect(initialCheckboxes[3]).toBeChecked();
 
     rerender(
       <SessionExportDialog
@@ -91,5 +93,6 @@ describe("SessionExportDialog", () => {
     expect(reopenedCheckboxes[0]).not.toBeChecked();
     expect(reopenedCheckboxes[1]).toBeChecked();
     expect(reopenedCheckboxes[2]).not.toBeChecked();
+    expect(reopenedCheckboxes[3]).not.toBeChecked();
   });
 });

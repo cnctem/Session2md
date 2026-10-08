@@ -1113,6 +1113,10 @@
         "label": "毎回エクスポート前に確認",
         "description": "エクスポート時に含める内容を毎回選択します。初期値は以下の設定を使用します。"
       },
+      "includeSystem": {
+        "label": "システムメッセージを含める",
+        "description": "システムメッセージを独立した System セクションとして出力します。"
+      },
       "includeThinking": {
         "label": "思考を含める",
         "description": "AI メッセージ内の思考内容を保持します。"

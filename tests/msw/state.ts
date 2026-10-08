@@ -27,6 +27,7 @@ const createDefaultSettings = (): Session2mdSettings => ({
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
+  exportSystem: false,
   defaultExpandThinking: false,
   defaultExpandTools: false,
   defaultExpandSystem: false,
@@ -246,6 +247,7 @@ export const setSession2mdExportOptions = (options: {
   exportThinking?: boolean;
   exportToolInputs?: boolean;
   exportToolOutputs?: boolean;
+  exportSystem?: boolean;
 }) => {
   session2mdSettingsState = {
     ...session2mdSettingsState,

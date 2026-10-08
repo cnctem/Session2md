@@ -1113,6 +1113,10 @@
         "label": "每次导出前询问",
         "description": "点击导出时先选择本次要包含的内容，选项默认使用下方设置。"
       },
+      "includeSystem": {
+        "label": "导出含系统",
+        "description": "将系统消息作为独立的 System 章节写入 Markdown。"
+      },
       "includeThinking": {
         "label": "导出含思考",
         "description": "在 AI 气泡中保留 Thinking 内容。"

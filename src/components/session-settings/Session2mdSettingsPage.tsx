@@ -71,6 +71,7 @@ const buildSettingsPayload = (
   exportThinking: settings.exportThinking,
   exportToolInputs: settings.exportToolInputs,
   exportToolOutputs: settings.exportToolOutputs,
+  exportSystem: settings.exportSystem,
   defaultExpandThinking: settings.defaultExpandThinking,
   defaultExpandTools: settings.defaultExpandTools,
   defaultExpandSystem: settings.defaultExpandSystem,
@@ -229,7 +230,8 @@ export function Session2mdSettingsPage({
       | "promptBeforeExport"
       | "exportThinking"
       | "exportToolInputs"
-      | "exportToolOutputs",
+      | "exportToolOutputs"
+      | "exportSystem",
     value: boolean,
   ) => {
     if (!settings) return;
@@ -513,6 +515,22 @@ export function Session2mdSettingsPage({
                     checked={settings.exportToolOutputs}
                     onCheckedChange={(value) =>
                       void saveExportOption("exportToolOutputs", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={
+                      <MessageSquareText className="size-4 text-amber-500" />
+                    }
+                    title={t(
+                      "sessionSettings.exportContent.includeSystem.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeSystem.description",
+                    )}
+                    checked={settings.exportSystem}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportSystem", value)
                     }
                     disabled={saveMutation.isPending}
                   />

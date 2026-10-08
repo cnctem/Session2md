@@ -97,6 +97,10 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Ask before every export",
             "sessionSettings.exportContent.promptBeforeExport.description":
               "Ask before export description",
+            "sessionSettings.exportContent.includeSystem.label":
+              "Include system messages",
+            "sessionSettings.exportContent.includeSystem.description":
+              "Include system messages description",
             "sessionSettings.exportContent.includeThinking.label":
               "Include thinking",
             "sessionSettings.exportContent.includeThinking.description":
@@ -186,6 +190,7 @@ const snapshot = {
   exportThinking: false,
   exportToolInputs: false,
   exportToolOutputs: false,
+  exportSystem: false,
   defaultExpandThinking: false,
   defaultExpandTools: false,
   defaultExpandSystem: false,
@@ -219,6 +224,7 @@ describe("Session2mdSettingsPage", () => {
       exportThinking: next.exportThinking,
       exportToolInputs: next.exportToolInputs,
       exportToolOutputs: next.exportToolOutputs,
+      exportSystem: next.exportSystem,
       defaultExpandThinking: next.defaultExpandThinking,
       defaultExpandTools: next.defaultExpandTools,
       defaultExpandSystem: next.defaultExpandSystem,
@@ -304,6 +310,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -387,6 +394,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -417,6 +425,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -438,6 +447,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -455,6 +465,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -478,11 +489,29 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: true,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
         renderMarkdown: true,
       }),
+    );
+  });
+
+  it("defaults system export off and saves it independently", async () => {
+    renderWithProviders(<Session2mdSettingsPage />);
+
+    const includeSystem = await screen.findByRole("switch", {
+      name: "Include system messages",
+    });
+    expect(includeSystem).not.toBeChecked();
+
+    fireEvent.click(includeSystem);
+
+    await waitFor(() =>
+      expect(settingsApiMock.save).toHaveBeenLastCalledWith(
+        expect.objectContaining({ exportSystem: true }),
+      ),
     );
   });
 
@@ -504,6 +533,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -529,6 +559,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: true,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -555,6 +586,7 @@ describe("Session2mdSettingsPage", () => {
         exportThinking: false,
         exportToolInputs: false,
         exportToolOutputs: false,
+        exportSystem: false,
         defaultExpandThinking: false,
         defaultExpandTools: false,
         defaultExpandSystem: false,
@@ -589,6 +621,20 @@ describe("Session2mdSettingsPage", () => {
     const includeThinking = screen.getByRole("switch", {
       name: /Include thinking/,
     });
+    const includeSystem = screen.getByRole("switch", {
+      name: "Include system messages",
+    });
+    const includeToolOutputs = screen.getByRole("switch", {
+      name: /Include tool output/,
+    });
+    expect(
+      exportTitle.compareDocumentPosition(includeThinking) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      includeToolOutputs.compareDocumentPosition(includeSystem) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       promptBeforeExport.compareDocumentPosition(includeThinking) &
         Node.DOCUMENT_POSITION_FOLLOWING,

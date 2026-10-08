@@ -658,11 +658,13 @@ export function SessionManagerPage({
       includeThinking: sessionSettings?.exportThinking ?? false,
       includeToolInputs: sessionSettings?.exportToolInputs ?? false,
       includeToolOutputs: sessionSettings?.exportToolOutputs ?? false,
+      includeSystem: sessionSettings?.exportSystem ?? false,
     }),
     [
       sessionSettings?.exportThinking,
       sessionSettings?.exportToolInputs,
       sessionSettings?.exportToolOutputs,
+      sessionSettings?.exportSystem,
     ],
   );
   const promptBeforeExport = sessionSettings?.promptBeforeExport ?? true;
@@ -674,6 +676,11 @@ export function SessionManagerPage({
           return Boolean(
             (options.includeToolInputs && group.toolInput?.trim()) ||
               (options.includeToolOutputs && group.toolOutput?.trim()),
+          );
+        }
+        if (role === "system") {
+          return Boolean(
+            options.includeSystem && hasExportableMessageText(group.content),
           );
         }
         if (role !== "user" && role !== "assistant") return false;
@@ -694,6 +701,7 @@ export function SessionManagerPage({
         includeThinking: true,
         includeToolInputs: true,
         includeToolOutputs: true,
+        includeSystem: true,
       }),
     [hasExportableContent],
   );

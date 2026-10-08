@@ -16,6 +16,7 @@ export interface Session2mdSettings {
   exportThinking: boolean;
   exportToolInputs: boolean;
   exportToolOutputs: boolean;
+  exportSystem: boolean;
   defaultExpandThinking: boolean;
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
