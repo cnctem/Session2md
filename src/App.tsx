@@ -2,6 +2,7 @@ import { ArrowLeft, FileDown, Settings } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
+import { AppUpdateDialog } from "@/components/session-settings/AppUpdateDialog";
 import { AutoUpdatePreferenceDialog } from "@/components/session-settings/AutoUpdatePreferenceDialog";
 import { Session2mdSettingsPage } from "@/components/session-settings/Session2mdSettingsPage";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,11 @@ function App() {
         )}
       </main>
       <AutoUpdatePreferenceDialog settings={pendingAutoUpdatePreference} />
+      <AppUpdateDialog
+        update={appUpdate.startupUpdateInfo}
+        currentVersion={appUpdate.currentVersion}
+        onDismiss={appUpdate.dismissStartupUpdate}
+      />
     </div>
   );
 }

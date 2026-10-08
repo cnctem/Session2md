@@ -85,10 +85,12 @@ interface Session2mdSettingsPageProps {
 const FALLBACK_APP_UPDATE: AppUpdateController = {
   currentVersion: "",
   updateInfo: null,
+  startupUpdateInfo: null,
   isChecking: false,
   hasChecked: false,
   error: null,
   check: async () => null,
+  dismissStartupUpdate: () => undefined,
 };
 
 export function Session2mdSettingsPage({

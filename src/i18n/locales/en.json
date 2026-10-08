@@ -1185,6 +1185,17 @@
         "download": "Download {{version}}",
         "viewRelease": "View release"
       }
+    },
+    "updateDialog": {
+      "title": "Session2md {{version}} is available",
+      "description": "A new version is ready. Download it from GitHub and install it manually.",
+      "currentVersion": "Current version",
+      "latestVersion": "Latest version",
+      "releaseNotes": "Release notes",
+      "later": "Later",
+      "close": "Close update dialog",
+      "openLinkFailed": "Unable to open the update link. Please try again.",
+      "copyFailed": "Unable to copy the code. Please copy it manually."
     }
   },
   "console": {

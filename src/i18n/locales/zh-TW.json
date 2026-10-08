@@ -1186,6 +1186,17 @@
         "download": "下載 {{version}}",
         "viewRelease": "查看 Release"
       }
+    },
+    "updateDialog": {
+      "title": "Session2md {{version}} 已推出",
+      "description": "新版本已可使用。請從 GitHub 下載並手動安裝更新。",
+      "currentVersion": "目前版本",
+      "latestVersion": "最新版本",
+      "releaseNotes": "更新日誌",
+      "later": "稍後",
+      "close": "關閉更新對話框",
+      "openLinkFailed": "無法開啟更新連結，請重試。",
+      "copyFailed": "複製程式碼失敗，請手動複製。"
     }
   },
   "console": {

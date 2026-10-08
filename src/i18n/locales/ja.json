@@ -1185,6 +1185,17 @@
         "download": "{{version}} をダウンロード",
         "viewRelease": "Release を表示"
       }
+    },
+    "updateDialog": {
+      "title": "Session2md {{version}} が利用可能です",
+      "description": "新しいバージョンがあります。GitHub からダウンロードし、手動でインストールしてください。",
+      "currentVersion": "現在のバージョン",
+      "latestVersion": "最新バージョン",
+      "releaseNotes": "リリースノート",
+      "later": "後で",
+      "close": "更新ダイアログを閉じる",
+      "openLinkFailed": "更新リンクを開けませんでした。もう一度お試しください。",
+      "copyFailed": "コードをコピーできませんでした。手動でコピーしてください。"
     }
   },
   "console": {

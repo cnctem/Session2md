@@ -6,10 +6,12 @@ import { extractErrorMessage } from "@/utils/errorUtils";
 export interface AppUpdateController {
   currentVersion: string;
   updateInfo: AppUpdateInfo | null;
+  startupUpdateInfo: AppUpdateInfo | null;
   isChecking: boolean;
   hasChecked: boolean;
   error: string | null;
   check: () => Promise<AppUpdateInfo | null>;
+  dismissStartupUpdate: () => void;
 }
 
 export function useAppUpdate(
@@ -17,6 +19,8 @@ export function useAppUpdate(
 ): AppUpdateController {
   const [currentVersion, setCurrentVersion] = useState("");
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [startupUpdateInfo, setStartupUpdateInfo] =
+    useState<AppUpdateInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,29 +48,48 @@ export function useAppUpdate(
     };
   }, []);
 
-  const check = useCallback(async (): Promise<AppUpdateInfo | null> => {
-    if (checkingRef.current) return null;
+  const runCheck = useCallback(
+    async (showStartupPrompt: boolean): Promise<AppUpdateInfo | null> => {
+      if (checkingRef.current) return null;
 
-    checkingRef.current = true;
-    setIsChecking(true);
-    setError(null);
+      checkingRef.current = true;
+      setIsChecking(true);
+      setError(null);
 
-    try {
-      const result = await appUpdateApi.check();
-      setUpdateInfo(result);
-      setHasChecked(true);
-      return result;
-    } catch (checkError) {
-      const message =
-        extractErrorMessage(checkError) ||
-        (checkError instanceof Error ? checkError.message : String(checkError));
-      setError(message);
-      setHasChecked(true);
-      throw checkError;
-    } finally {
-      checkingRef.current = false;
-      setIsChecking(false);
-    }
+      try {
+        const result = await appUpdateApi.check();
+        setUpdateInfo(result);
+        setHasChecked(true);
+        if (showStartupPrompt) {
+          setStartupUpdateInfo(result);
+        }
+        return result;
+      } catch (checkError) {
+        const message =
+          extractErrorMessage(checkError) ||
+          (checkError instanceof Error
+            ? checkError.message
+            : String(checkError));
+        setError(message);
+        setHasChecked(true);
+        if (showStartupPrompt) {
+          setStartupUpdateInfo(null);
+        }
+        throw checkError;
+      } finally {
+        checkingRef.current = false;
+        setIsChecking(false);
+      }
+    },
+    [],
+  );
+
+  const check = useCallback(() => runCheck(false), [runCheck]);
+
+  const checkForStartup = useCallback(() => runCheck(true), [runCheck]);
+
+  const dismissStartupUpdate = useCallback(() => {
+    setStartupUpdateInfo(null);
   }, []);
 
   useEffect(() => {
@@ -84,20 +107,22 @@ export function useAppUpdate(
     const delay =
       previousAutoCheck === null || previousAutoCheck === false ? 0 : 1000;
     const timer = window.setTimeout(() => {
-      void check().catch((checkError) => {
+      void checkForStartup().catch((checkError) => {
         console.warn("[Session2md] Automatic update check failed", checkError);
       });
     }, delay);
 
     return () => window.clearTimeout(timer);
-  }, [autoCheckUpdates, check]);
+  }, [autoCheckUpdates, checkForStartup]);
 
   return {
     currentVersion,
     updateInfo,
+    startupUpdateInfo,
     isChecking,
     hasChecked,
     error,
     check,
+    dismissStartupUpdate,
   };
 }

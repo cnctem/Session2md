@@ -10,6 +10,7 @@ struct GitHubRelease {
     tag_name: String,
     html_url: String,
     name: Option<String>,
+    body: Option<String>,
     published_at: Option<String>,
     #[serde(default)]
     assets: Vec<GitHubAsset>,
@@ -26,6 +27,7 @@ struct GitHubAsset {
 pub struct AppUpdateInfo {
     latest_version: String,
     release_name: Option<String>,
+    release_notes: Option<String>,
     release_url: String,
     download_url: String,
     published_at: Option<String>,
@@ -38,6 +40,13 @@ fn normalized_version(value: &str) -> &str {
 fn parse_version(value: &str) -> Result<Version, String> {
     Version::parse(normalized_version(value))
         .map_err(|error| format!("无法解析版本号 {value}: {error}"))
+}
+
+fn normalize_release_notes(notes: Option<String>) -> Option<String> {
+    notes.and_then(|notes| {
+        let trimmed = notes.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    })
 }
 
 fn current_platform_asset_suffix() -> Option<&'static str> {
@@ -81,6 +90,7 @@ fn build_update_info(
     Ok(Some(AppUpdateInfo {
         latest_version,
         release_name: release.name.filter(|name| !name.trim().is_empty()),
+        release_notes: normalize_release_notes(release.body),
         download_url,
         release_url: release.html_url,
         published_at: release.published_at,
@@ -132,6 +142,7 @@ mod tests {
             tag_name: tag.to_string(),
             html_url: format!("https://github.com/cnctem/Session2md/releases/tag/{tag}"),
             name: Some(tag.to_string()),
+            body: None,
             published_at: None,
             assets: names
                 .iter()
@@ -153,6 +164,16 @@ mod tests {
     fn semantic_versions_drive_update_decisions() {
         assert!(parse_version("v2.3.1").unwrap() > parse_version("2.3.0").unwrap());
         assert!(parse_version("2.2.2").unwrap() < parse_version("2.3.0").unwrap());
+    }
+
+    #[test]
+    fn normalizes_release_notes_without_changing_markdown() {
+        assert_eq!(
+            normalize_release_notes(Some("  ## Changes\n\n- Fix updater  ".to_string())),
+            Some("## Changes\n\n- Fix updater".to_string())
+        );
+        assert_eq!(normalize_release_notes(Some(" \n\t ".to_string())), None);
+        assert_eq!(normalize_release_notes(None), None);
     }
 
     #[test]

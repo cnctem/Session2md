@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 export interface AppUpdateInfo {
   latestVersion: string;
   releaseName: string | null;
+  releaseNotes: string | null;
   releaseUrl: string;
   downloadUrl: string;
   publishedAt: string | null;
