@@ -19,6 +19,7 @@ describe("message groups", () => {
       kind: "message",
       reasoning: "thinking",
       content: "answer",
+      sourceMessageIndexes: [0, 1],
     });
     expect(getMessageGroupCopyText(groups[0])).toBe(
       "thinking\n\n---\n\nanswer",
@@ -51,6 +52,7 @@ describe("message groups", () => {
       toolName: "bash",
       toolInput: '{"command":"pwd"}',
       toolOutput: "/tmp/project",
+      sourceMessageIndexes: [0, 1],
     });
   });
 

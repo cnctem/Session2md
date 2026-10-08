@@ -1,6 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { sessionsApi } from "@/lib/api/sessions";
-import type { SessionMessage, SessionMeta } from "@/types";
+import type {
+  SessionMessage,
+  SessionMeta,
+  SessionSearchRequest,
+  SessionSearchResponse,
+} from "@/types";
 
 export const useSessionsQuery = () =>
   useQuery<SessionMeta[]>({
@@ -18,4 +23,9 @@ export const useSessionMessagesQuery = (
     queryFn: () => sessionsApi.getMessages(providerId!, sourcePath!),
     enabled: Boolean(providerId && sourcePath),
     staleTime: 30 * 1000,
+  });
+
+export const useSessionAdvancedSearchMutation = () =>
+  useMutation<SessionSearchResponse, Error, SessionSearchRequest>({
+    mutationFn: (request) => sessionsApi.searchAdvanced(request),
   });

@@ -6,9 +6,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(session_manager::search::SessionSearchState::default())
         .invoke_handler(tauri::generate_handler![
             commands::list_sessions,
             commands::get_session_messages,
+            commands::search_sessions,
             commands::export_session_markdown,
             commands::open_external_url,
             commands::delete_session,

@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { SessionMessage, SessionMeta } from "@/types";
+import type {
+  SessionMessage,
+  SessionMeta,
+  SessionSearchRequest,
+  SessionSearchResponse,
+} from "@/types";
 
 export interface DeleteSessionOptions {
   providerId: string;
@@ -22,6 +27,12 @@ export const sessionsApi = {
     sourcePath: string,
   ): Promise<SessionMessage[]> {
     return await invoke("get_session_messages", { providerId, sourcePath });
+  },
+
+  async searchAdvanced(
+    request: SessionSearchRequest,
+  ): Promise<SessionSearchResponse> {
+    return await invoke("search_sessions", { request });
   },
 
   async exportMarkdown(

@@ -1,5 +1,6 @@
 pub mod paths;
 pub mod providers;
+pub mod search;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -33,7 +34,7 @@ pub struct SessionMeta {
     pub can_delete: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SessionMessageKind {
     Text,

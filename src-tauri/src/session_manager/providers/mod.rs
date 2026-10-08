@@ -2,7 +2,7 @@ pub mod antigravity;
 pub mod claude;
 pub mod cline;
 pub mod codex;
-mod common;
+pub(crate) mod common;
 pub mod continue_session;
 pub mod crush;
 pub mod cursor;

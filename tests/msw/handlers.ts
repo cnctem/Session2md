@@ -5,6 +5,7 @@ import {
   getSessionMessages,
   listSessions,
   saveSession2mdSettings,
+  searchSessions,
 } from "./state";
 
 const TAURI_ENDPOINT = "http://tauri.local";
@@ -44,6 +45,13 @@ export const handlers = [
       sourcePath: string;
     }>(request);
     return success(getSessionMessages(providerId, sourcePath));
+  }),
+
+  http.post(`${TAURI_ENDPOINT}/search_sessions`, async ({ request }) => {
+    const { request: searchRequest } = await withJson<{
+      request: Parameters<typeof searchSessions>[0];
+    }>(request);
+    return success(searchSessions(searchRequest));
   }),
 
   http.post(`${TAURI_ENDPOINT}/open_external_url`, () => success(true)),

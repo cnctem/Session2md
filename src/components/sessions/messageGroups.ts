@@ -2,6 +2,7 @@ import type { SessionMessage } from "@/types";
 
 export interface SessionMessageGroup {
   id: string;
+  sourceMessageIndexes: number[];
   role: string;
   kind: "message" | "tool";
   content: string;
@@ -41,6 +42,7 @@ export const groupSessionMessages = (
   ): SessionMessageGroup => {
     const group: SessionMessageGroup = {
       id: `message-${groups.length}`,
+      sourceMessageIndexes: [],
       role: kind === "tool" ? "tool" : message.role,
       kind,
       content: "",
@@ -66,7 +68,7 @@ export const groupSessionMessages = (
     if (trimmed) groupBuffers.get(group)?.[key].push(trimmed);
   };
 
-  for (const message of messages) {
+  for (const [messageIndex, message] of messages.entries()) {
     const kind = getMessageKind(message);
     const role = message.role.toLowerCase();
 
@@ -81,10 +83,12 @@ export const groupSessionMessages = (
         } else {
           append(currentAssistant, "content", message.content);
         }
+        currentAssistant.sourceMessageIndexes.push(messageIndex);
         currentAssistant.ts ??= message.ts;
       } else {
         flushAssistant();
         const group = createGroup(message, "message");
+        group.sourceMessageIndexes.push(messageIndex);
         append(group, "content", message.content);
       }
       continue;
@@ -99,6 +103,7 @@ export const groupSessionMessages = (
         group.id = id ? `tool-${id}` : group.id;
         if (id) toolGroupsById.set(id, group);
       }
+      group.sourceMessageIndexes.push(messageIndex);
       group.toolName = message.toolName || group.toolName;
       group.toolCallId ||= id;
       append(group, "toolInput", message.content);
@@ -119,6 +124,7 @@ export const groupSessionMessages = (
     if (id) {
       toolGroupsById.set(id, group);
     }
+    group.sourceMessageIndexes.push(messageIndex);
     group.toolName = message.toolName || group.toolName;
     group.toolCallId ||= id;
     append(group, "toolOutput", message.content);

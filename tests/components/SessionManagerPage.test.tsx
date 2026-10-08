@@ -124,6 +124,99 @@ describe("SessionManagerPage", () => {
     ).toHaveTextContent("sessionManager.providerFilterAll");
     expect(await screen.findByText("Alpha Session")).toBeInTheDocument();
     expect(screen.getAllByText("Claude Session")).not.toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: "sessionManager.advanced.search" }),
+    ).toBeVisible();
+  });
+
+  it("submits advanced search with Enter while options are closed", async () => {
+    const user = userEvent.setup();
+    const searchSpy = vi.spyOn(sessionsApi, "searchAdvanced");
+    renderPage();
+
+    await user.type(
+      await screen.findByPlaceholderText("sessionManager.searchPlaceholder"),
+      "alpha",
+    );
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(searchSpy).toHaveBeenCalledTimes(1));
+    searchSpy.mockRestore();
+  });
+
+  it("opens advanced options when a hidden validation error is submitted", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.advanced.open",
+      }),
+    );
+    await user.clear(
+      screen.getByLabelText("sessionManager.advanced.activeFrom"),
+    );
+    await user.clear(screen.getByLabelText("sessionManager.advanced.activeTo"));
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.advanced.open" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "sessionManager.advanced.search" }),
+    );
+
+    expect(
+      screen.getByText("sessionManager.advanced.noConditions"),
+    ).toBeVisible();
+  });
+
+  it("validates and runs an advanced full-text search", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.advanced.open",
+      }),
+    );
+
+    const formatDate = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    const activeFrom = screen.getByLabelText(
+      "sessionManager.advanced.activeFrom",
+    );
+    const activeTo = screen.getByLabelText("sessionManager.advanced.activeTo");
+    expect(activeFrom).toHaveValue(formatDate(sevenDaysAgo));
+    expect(activeTo).toHaveValue(formatDate(today));
+
+    await user.clear(activeFrom);
+    await user.clear(activeTo);
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.advanced.search",
+      }),
+    );
+    expect(
+      screen.getByText("sessionManager.advanced.noConditions"),
+    ).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText("sessionManager.searchPlaceholder"),
+      "claude",
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.advanced.search",
+      }),
+    );
+
+    expect(
+      await screen.findByText("sessionManager.advanced.resultCount"),
+    ).toBeInTheDocument();
+    expect(await screen.findAllByText("Claude Session")).not.toHaveLength(0);
+    expect(await screen.findAllByText("claude")).not.toHaveLength(0);
   });
 
   it("exports the selected session as Markdown", async () => {

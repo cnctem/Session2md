@@ -26,7 +26,7 @@ import {
   formatTimestamp,
   getRoleLabel,
   getRoleTone,
-  highlightText,
+  highlightTerms,
 } from "./utils";
 
 const COLLAPSE_THRESHOLD = 3000;
@@ -56,7 +56,7 @@ interface MessageTextBlockProps {
   content: string;
   expandedBlockOverrides: ReadonlyMap<string, boolean>;
   onToggleBlock: (blockKey: string, expanded: boolean) => void;
-  searchQuery?: string;
+  searchTerms?: string[];
   className?: string;
   renderMarkdown?: boolean;
   onCopyCode?: (content: string) => void;
@@ -68,7 +68,7 @@ function MessageTextBlock({
   content,
   expandedBlockOverrides,
   onToggleBlock,
-  searchQuery,
+  searchTerms,
   className,
   renderMarkdown = false,
   onCopyCode,
@@ -80,8 +80,10 @@ function MessageTextBlock({
   const hasSearchMatch =
     isLong &&
     !expanded &&
-    !!searchQuery &&
-    content.toLowerCase().includes(searchQuery.toLowerCase());
+    !!searchTerms?.length &&
+    searchTerms.every((term) =>
+      content.toLowerCase().includes(term.toLowerCase()),
+    );
   const collapsed = isLong && !expanded && !hasSearchMatch;
   const displayContent = collapsed
     ? renderMarkdown
@@ -102,12 +104,12 @@ function MessageTextBlock({
         {canRenderMarkdown ? (
           <MarkdownMessageContent
             content={displayContent}
-            searchQuery={searchQuery}
+            searchTerms={searchTerms}
             onCopyCode={onCopyCode}
             onOpenLink={onOpenLink}
           />
-        ) : searchQuery ? (
-          highlightText(displayContent, searchQuery)
+        ) : searchTerms?.length ? (
+          highlightTerms(displayContent, searchTerms)
         ) : (
           displayContent
         )}
@@ -153,7 +155,7 @@ interface SessionMessageItemProps {
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
   renderMarkdown: boolean;
-  searchQuery?: string;
+  searchTerms?: string[];
   onCopy: (content: string) => void;
   onCopyCode: (content: string) => void;
   onOpenLink: (url: string) => void;
@@ -168,7 +170,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   defaultExpandTools,
   defaultExpandSystem,
   renderMarkdown,
-  searchQuery,
+  searchTerms,
   onCopy,
   onCopyCode,
   onOpenLink,
@@ -290,7 +292,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
                   }
                   expandedBlockOverrides={expandedBlockOverrides}
                   onToggleBlock={onToggleBlock}
-                  searchQuery={searchQuery}
+                  searchTerms={searchTerms}
                   className="font-mono text-xs"
                 />
               </div>
@@ -302,7 +304,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
                 content={group.toolOutput ?? ""}
                 expandedBlockOverrides={expandedBlockOverrides}
                 onToggleBlock={onToggleBlock}
-                searchQuery={searchQuery}
+                searchTerms={searchTerms}
                 className="font-mono text-xs"
               />
             )}
@@ -316,7 +318,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
             content={group.content}
             expandedBlockOverrides={expandedBlockOverrides}
             onToggleBlock={onToggleBlock}
-            searchQuery={searchQuery}
+            searchTerms={searchTerms}
           />
         )
       ) : (
@@ -348,7 +350,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
                     content={group.reasoning}
                     expandedBlockOverrides={expandedBlockOverrides}
                     onToggleBlock={onToggleBlock}
-                    searchQuery={searchQuery}
+                    searchTerms={searchTerms}
                     className="text-muted-foreground"
                   />
                 </div>
@@ -362,7 +364,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
               content={group.content}
               expandedBlockOverrides={expandedBlockOverrides}
               onToggleBlock={onToggleBlock}
-              searchQuery={searchQuery}
+              searchTerms={searchTerms}
               renderMarkdown={renderMarkdown}
               onCopyCode={onCopyCode}
               onOpenLink={onOpenLink}

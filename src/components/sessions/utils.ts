@@ -317,10 +317,13 @@ export const formatSessionMessagePreview = (
   return `${characters.slice(0, Math.max(maxLength, 0)).join("")}...`;
 };
 
-export const highlightText = (text: string, query: string): ReactNode => {
-  if (!query) return text;
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+export const highlightTerms = (text: string, terms: string[]): ReactNode => {
+  const escapedTerms = Array.from(
+    new Set(terms.map((term) => term.trim()).filter(Boolean)),
+  ).map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (escapedTerms.length === 0) return text;
+
+  const parts = text.split(new RegExp(`(${escapedTerms.join("|")})`, "gi"));
   if (parts.length === 1) return text;
   return parts.map((part, i) =>
     i % 2 === 1
@@ -336,3 +339,6 @@ export const highlightText = (text: string, query: string): ReactNode => {
       : part,
   );
 };
+
+export const highlightText = (text: string, query: string): ReactNode =>
+  highlightTerms(text, [query]);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 import {
   ChevronDown,
   ChevronRight,
@@ -13,6 +14,7 @@ import {
   ListTree,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Clock,
   CheckSquare,
   Trash2,
@@ -26,12 +28,14 @@ import {
 } from "@tanstack/react-virtual";
 import { useSessionSearch } from "@/hooks/useSessionSearch";
 import {
+  useSessionAdvancedSearchMutation,
   useSessionMessagesQuery,
   useSessionsQuery,
 } from "@/lib/query/sessions";
 import { useSession2mdSettingsQuery } from "@/lib/query/session2mdSettings";
 import { sessionsApi } from "@/lib/api/sessions";
 import { extractErrorMessage } from "@/utils/errorUtils";
+import { generateUUID } from "@/utils/uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -52,12 +56,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { SessionMeta } from "@/types";
+import type {
+  SessionMeta,
+  SessionSearchHit,
+  SessionSearchProgress,
+  SessionSearchRequest,
+  SessionSearchResult,
+} from "@/types";
 import {
   SESSION_PROVIDER_IDS,
   type SessionProviderId,
 } from "@/lib/sessionProviders";
 import { SessionItem } from "./SessionItem";
+import {
+  AdvancedSessionSearchPanel,
+  type AdvancedSessionSearchHandle,
+} from "./AdvancedSessionSearchPanel";
+import { AdvancedSessionSearchResults } from "./AdvancedSessionSearchResults";
 import {
   SessionExportDialog,
   type SessionExportOptions,
@@ -119,6 +134,9 @@ type SessionListRow =
 
 const isDeletableSession = (session: SessionMeta) =>
   Boolean(session.sourcePath) && session.canDelete !== false;
+
+const hasExportableMessageText = (content: string) =>
+  content.replace(/\[Tool:[^\]]*]/g, "").trim().length > 0;
 
 const observeElementRectWithFallback = <T extends Element>(
   instance: Virtualizer<T, Element>,
@@ -202,9 +220,22 @@ export function SessionManagerPage() {
   const queryClient = useQueryClient();
   const { data, isLoading, isFetching, refetch } = useSessionsQuery();
   const { data: sessionSettings } = useSession2mdSettingsQuery();
+  const advancedSearchMutation = useSessionAdvancedSearchMutation();
   const sessions = data ?? [];
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
   const [search, setSearch] = useState("");
+  const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+  const [advancedRequest, setAdvancedRequest] =
+    useState<SessionSearchRequest | null>(null);
+  const [advancedProgress, setAdvancedProgress] =
+    useState<SessionSearchProgress>();
+  const [pendingMessageJump, setPendingMessageJump] = useState<{
+    sessionKey: string;
+    messageIndex: number;
+    terms: string[];
+    kind?: SessionSearchHit["kind"];
+  } | null>(null);
+  const advancedPanelRef = useRef<AdvancedSessionSearchHandle>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [listViewMode, setListViewMode] = useState<SessionListViewMode>(
     readInitialListViewMode,
@@ -257,6 +288,27 @@ export function SessionManagerPage() {
     [],
   );
 
+  useEffect(() => {
+    const requestId = advancedRequest?.requestId;
+    if (!requestId) return;
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<SessionSearchProgress>("session-search-progress", (event) => {
+      if (event.payload.requestId === requestId) {
+        setAdvancedProgress(event.payload);
+      }
+    }).then((cleanup) => {
+      if (disposed) cleanup();
+      else unlisten = cleanup;
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [advancedRequest?.requestId]);
+
   const hiddenProviderIds = useMemo(
     () => new Set<string>(sessionSettings?.hiddenProviders ?? []),
     [sessionSettings?.hiddenProviders],
@@ -280,10 +332,29 @@ export function SessionManagerPage() {
     sessions: visibleSessions,
     providerFilter,
   });
-  const filteredSessions = useMemo(
+  const basicFilteredSessions = useMemo(
     () => searchSessions(search),
     [search, searchSessions],
   );
+  const advancedMode = advancedRequest !== null;
+  const advancedTerms = useMemo(
+    () => advancedRequest?.query.trim().split(/\s+/).filter(Boolean) ?? [],
+    [advancedRequest?.query],
+  );
+  const messageSearchTerms = useMemo(() => {
+    if (advancedMode) return advancedTerms;
+    const trimmed = search.trim();
+    return trimmed ? [trimmed] : undefined;
+  }, [advancedMode, advancedTerms, search]);
+  const advancedSessions = useMemo(
+    () =>
+      advancedSearchMutation.data?.results.map((result) => result.session) ??
+      [],
+    [advancedSearchMutation.data],
+  );
+  const filteredSessions = advancedMode
+    ? advancedSessions
+    : basicFilteredSessions;
   const groupedSessions = useMemo(
     () =>
       groupSessionsByProviderAndDirectory(
@@ -516,7 +587,7 @@ export function SessionManagerPage() {
         }
         if (role !== "user" && role !== "assistant") return false;
         return Boolean(
-          group.content.trim() ||
+          hasExportableMessageText(group.content) ||
             (options.includeThinking && group.reasoning.trim()),
         );
       }),
@@ -851,6 +922,112 @@ export function SessionManagerPage() {
     }, 2000);
   };
 
+  const runAdvancedSearch = useCallback(
+    (request: SessionSearchRequest, forceRefresh = false) => {
+      const nextRequest = {
+        ...request,
+        requestId: generateUUID(),
+        forceRefresh,
+      };
+      setAdvancedRequest(nextRequest);
+      setAdvancedProgress(undefined);
+      setPendingMessageJump(null);
+      setSelectionMode(false);
+      setSelectedSessionKeys(new Set());
+      advancedSearchMutation.reset();
+      advancedSearchMutation.mutate(nextRequest);
+    },
+    [advancedSearchMutation],
+  );
+
+  const handleAdvancedSearch = useCallback(
+    (request: SessionSearchRequest) => {
+      runAdvancedSearch(request);
+    },
+    [runAdvancedSearch],
+  );
+
+  const handleAdvancedSearchSubmit = useCallback(() => {
+    const submitted = advancedPanelRef.current?.submit() ?? false;
+    if (!submitted) {
+      setAdvancedSearchOpen(true);
+    }
+  }, []);
+
+  const handleRefreshAdvancedSearch = useCallback(() => {
+    if (!advancedRequest) return;
+    runAdvancedSearch(advancedRequest, true);
+  }, [advancedRequest, runAdvancedSearch]);
+
+  const handleClearAdvancedSearch = useCallback(() => {
+    setSearch("");
+    setAdvancedRequest(null);
+    setAdvancedProgress(undefined);
+    setPendingMessageJump(null);
+    advancedSearchMutation.reset();
+  }, [advancedSearchMutation]);
+
+  const handleAdvancedHitSelect = useCallback(
+    (result: SessionSearchResult, hit: SessionSearchHit) => {
+      const sessionKey = getSessionKey(result.session);
+      setSelectedKey(sessionKey);
+      if (hit.messageIndex === undefined) {
+        setPendingMessageJump(null);
+        return;
+      }
+      setPendingMessageJump({
+        sessionKey,
+        messageIndex: hit.messageIndex,
+        terms: advancedTerms,
+        kind: hit.kind,
+      });
+    },
+    [advancedTerms],
+  );
+
+  const handleAdvancedSessionSelect = useCallback(
+    (result: SessionSearchResult) => {
+      setPendingMessageJump(null);
+      setSelectedKey(getSessionKey(result.session));
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const pending = pendingMessageJump;
+    if (!pending || !selectedSession || isLoadingMessages) return;
+    if (getSessionKey(selectedSession) !== pending.sessionKey) return;
+
+    const groupIndex = messageGroups.findIndex((group) =>
+      group.sourceMessageIndexes.includes(pending.messageIndex),
+    );
+    if (groupIndex < 0) {
+      setPendingMessageJump(null);
+      return;
+    }
+
+    const group = messageGroups[groupIndex];
+    setExpandedBlockOverrides((current) => {
+      const next = new Map(current);
+      if (pending.kind === "reasoning") {
+        next.set(`${group.id}:reasoning-section`, true);
+      } else if (pending.kind === "toolCall" || pending.kind === "toolResult") {
+        next.set(`${group.id}:tool-section`, true);
+      } else if (group.role.toLowerCase() === "system") {
+        next.set(`${group.id}:system-section`, true);
+      }
+      return next;
+    });
+    scrollToMessage(groupIndex);
+    setPendingMessageJump(null);
+  }, [
+    isLoadingMessages,
+    messageGroups,
+    pendingMessageJump,
+    selectedSession,
+    scrollToMessage,
+  ]);
+
   const setProviderGroupOpen = (providerId: string, open: boolean) => {
     setExpandedProviderGroups((current) => {
       const next = new Set(current);
@@ -1011,7 +1188,11 @@ export function SessionManagerPage() {
                   <CardTitle className="text-sm">
                     {t("sessionManager.sessionList")}
                   </CardTitle>
-                  <Badge variant="secondary">{filteredSessions.length}</Badge>
+                  <Badge variant="secondary">
+                    {advancedMode
+                      ? (advancedSearchMutation.data?.totalSessions ?? 0)
+                      : filteredSessions.length}
+                  </Badge>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {(selectionMode || deletableFilteredSessions.length > 0) && (
@@ -1029,7 +1210,7 @@ export function SessionManagerPage() {
                             if (selectionMode) exitSelectionMode();
                             else setSelectionMode(true);
                           }}
-                          disabled={isDeleting}
+                          disabled={isDeleting || advancedMode}
                         >
                           <CheckSquare className="size-4" />
                         </Button>
@@ -1049,6 +1230,7 @@ export function SessionManagerPage() {
                           size="icon"
                           aria-label={t("sessionManager.collapseAllGroups")}
                           onClick={handleCollapseAllGroups}
+                          disabled={advancedMode}
                         >
                           <ChevronsDownUp className="size-4" />
                         </Button>
@@ -1078,21 +1260,83 @@ export function SessionManagerPage() {
                   </Tooltip>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("sessionManager.searchPlaceholder")}
-                  className="h-8 pl-8 text-sm"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAdvancedSearchSubmit();
+                      }
+                    }}
+                    placeholder={t("sessionManager.searchPlaceholder")}
+                    className="h-8 pl-8 text-sm"
+                    disabled={advancedSearchMutation.isPending}
+                  />
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={
+                        advancedSearchOpen || advancedMode
+                          ? "secondary"
+                          : "outline"
+                      }
+                      size="icon"
+                      className="size-8 shrink-0"
+                      aria-label={t("sessionManager.advanced.open")}
+                      onClick={() => setAdvancedSearchOpen((open) => !open)}
+                    >
+                      <SlidersHorizontal className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t("sessionManager.advanced.open")}
+                  </TooltipContent>
+                </Tooltip>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+                  onClick={handleAdvancedSearchSubmit}
+                  disabled={advancedSearchMutation.isPending}
+                >
+                  <Search className="size-3.5" />
+                  {advancedSearchMutation.isPending
+                    ? t("sessionManager.advanced.searching")
+                    : t("sessionManager.advanced.search")}
+                </Button>
               </div>
+              <AdvancedSessionSearchPanel
+                ref={advancedPanelRef}
+                open={advancedSearchOpen}
+                query={search}
+                providerOptions={providerFilterOptions.filter(
+                  (provider) => provider !== "all",
+                )}
+                isSearching={advancedSearchMutation.isPending}
+                progress={advancedProgress}
+                error={
+                  advancedSearchMutation.error
+                    ? extractErrorMessage(advancedSearchMutation.error)
+                    : undefined
+                }
+                hasActiveSearch={advancedMode}
+                onSearch={handleAdvancedSearch}
+                onClear={handleClearAdvancedSearch}
+                onRefresh={handleRefreshAdvancedSearch}
+              />
               <div className="grid grid-cols-2 gap-2">
                 <Select
                   value={providerFilter}
                   onValueChange={(value) =>
                     setProviderFilter(value as ProviderFilter)
                   }
+                  disabled={advancedMode}
                 >
                   <SelectTrigger
                     aria-label={t("sessionManager.providerFilterTooltip")}
@@ -1123,6 +1367,7 @@ export function SessionManagerPage() {
                   onValueChange={(value) =>
                     setListViewMode(value as SessionListViewMode)
                   }
+                  disabled={advancedMode}
                 >
                   <SelectTrigger
                     aria-label={t("sessionManager.viewModeTooltip")}
@@ -1200,6 +1445,19 @@ export function SessionManagerPage() {
                 <p className="p-4 text-center text-sm text-muted-foreground">
                   {t("sessionManager.loadingSessions")}
                 </p>
+              ) : advancedMode ? (
+                <AdvancedSessionSearchResults
+                  response={advancedSearchMutation.data}
+                  terms={advancedTerms}
+                  isSearching={advancedSearchMutation.isPending}
+                  error={
+                    advancedSearchMutation.error
+                      ? extractErrorMessage(advancedSearchMutation.error)
+                      : undefined
+                  }
+                  onSelectHit={handleAdvancedHitSelect}
+                  onSelectSession={handleAdvancedSessionSelect}
+                />
               ) : filteredSessions.length === 0 ? (
                 <p className="p-4 text-center text-sm text-muted-foreground">
                   {t("sessionManager.noSessions")}
@@ -1455,7 +1713,7 @@ export function SessionManagerPage() {
                                   renderMarkdown={
                                     sessionSettings?.renderMarkdown ?? true
                                   }
-                                  searchQuery={search}
+                                  searchTerms={messageSearchTerms}
                                   onCopy={handleCopyMessage}
                                   onCopyCode={handleCopyCode}
                                   onOpenLink={handleOpenLink}

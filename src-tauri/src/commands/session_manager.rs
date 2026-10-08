@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
-use crate::session_manager;
+use crate::session_manager::{self, search::SessionSearchRequest};
 use std::path::PathBuf;
+use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
@@ -29,6 +30,31 @@ pub async fn get_session_messages(
     })
     .await
     .map_err(|e| format!("Failed to load session messages: {e}"))?
+}
+
+#[tauri::command]
+pub async fn search_sessions<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, session_manager::search::SessionSearchState>,
+    request: SessionSearchRequest,
+) -> Result<session_manager::search::SessionSearchResponse, String> {
+    let hidden_provider_ids = crate::session2md_settings::load_settings()
+        .map(|settings| settings.hidden_providers)
+        .unwrap_or_default();
+    let search_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let progress_app = app.clone();
+        session_manager::search::search_sessions_with_progress(
+            &search_state,
+            request,
+            &hidden_provider_ids,
+            move |progress| {
+                let _ = progress_app.emit("session-search-progress", progress);
+            },
+        )
+    })
+    .await
+    .map_err(|e| format!("Failed to search sessions: {e}"))
 }
 
 #[tauri::command]

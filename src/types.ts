@@ -480,13 +480,72 @@ export interface SessionMeta {
   canDelete?: boolean;
 }
 
+export type SessionMessageKind =
+  | "text"
+  | "reasoning"
+  | "toolCall"
+  | "toolResult";
+
 export interface SessionMessage {
   role: string;
   content: string;
-  kind?: "text" | "reasoning" | "toolCall" | "toolResult";
+  kind?: SessionMessageKind;
   toolCallId?: string;
   toolName?: string;
   ts?: number;
+}
+
+export type SessionSearchField =
+  | "title"
+  | "summary"
+  | "sessionId"
+  | "projectDir"
+  | "sourcePath"
+  | "message";
+
+export interface SessionSearchRequest {
+  requestId: string;
+  query: string;
+  providerIds: string[];
+  projectDir?: string;
+  activeFrom?: number;
+  activeTo?: number;
+  roles: string[];
+  messageKinds: SessionMessageKind[];
+  forceRefresh?: boolean;
+}
+
+export interface SessionSearchHit {
+  field: SessionSearchField;
+  messageIndex?: number;
+  role?: string;
+  kind?: SessionMessageKind;
+  ts?: number;
+  snippet: string;
+}
+
+export interface SessionSearchResult {
+  session: SessionMeta;
+  score: number;
+  totalMatches: number;
+  hits: SessionSearchHit[];
+}
+
+export interface SessionSearchResponse {
+  results: SessionSearchResult[];
+  totalSessions: number;
+  totalMatches: number;
+  truncated: boolean;
+  failedSessions: number;
+}
+
+export type SessionSearchPhase = "scanning" | "indexing" | "searching";
+
+export interface SessionSearchProgress {
+  requestId: string;
+  phase: SessionSearchPhase;
+  indexed: number;
+  total: number;
 }
 
 // MCP 服务器连接参数（宽松：允许扩展字段）

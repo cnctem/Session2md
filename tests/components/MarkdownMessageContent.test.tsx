@@ -65,7 +65,7 @@ describe("MarkdownMessageContent", () => {
           "| **alpha** | 42 |",
           "| beta | 7 |",
         ].join("\n")}
-        searchQuery="alpha"
+        searchTerms={["alpha", "beta"]}
         onCopyCode={vi.fn()}
         onOpenLink={vi.fn()}
       />,
@@ -81,6 +81,7 @@ describe("MarkdownMessageContent", () => {
       container.querySelector<HTMLElement>("table th + th")?.style.textAlign,
     ).toBe("right");
     expect(screen.getByText("alpha").tagName).toBe("MARK");
+    expect(screen.getByText("beta").tagName).toBe("MARK");
   });
 
   it("renders fenced code cards and copies their source", () => {
@@ -102,7 +103,7 @@ describe("MarkdownMessageContent", () => {
     const { container } = render(
       <MarkdownMessageContent
         content={"alpha <script>alert('x')</script> beta"}
-        searchQuery="alpha"
+        searchTerms={["alpha"]}
         onCopyCode={vi.fn()}
         onOpenLink={vi.fn()}
       />,

@@ -18,7 +18,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { highlightText } from "./utils";
+import { highlightTerms } from "./utils";
 
 const ALLOWED_ELEMENTS = [
   "p",
@@ -73,12 +73,12 @@ const nodeToText = (node: ReactNode): string => {
   return "";
 };
 
-const highlightNode = (node: ReactNode, searchQuery?: string): ReactNode => {
-  if (!searchQuery) return node;
-  if (typeof node === "string") return highlightText(node, searchQuery);
+const highlightNode = (node: ReactNode, searchTerms?: string[]): ReactNode => {
+  if (!searchTerms?.length) return node;
+  if (typeof node === "string") return highlightTerms(node, searchTerms);
   if (Array.isArray(node)) {
     return node.map((child, index) => (
-      <Fragment key={index}>{highlightNode(child, searchQuery)}</Fragment>
+      <Fragment key={index}>{highlightNode(child, searchTerms)}</Fragment>
     ));
   }
   if (isValidElement<{ children?: ReactNode }>(node)) {
@@ -86,7 +86,7 @@ const highlightNode = (node: ReactNode, searchQuery?: string): ReactNode => {
     return cloneElement(
       node,
       {},
-      highlightNode(node.props.children, searchQuery),
+      highlightNode(node.props.children, searchTerms),
     );
   }
   return node;
@@ -94,7 +94,7 @@ const highlightNode = (node: ReactNode, searchQuery?: string): ReactNode => {
 
 interface MarkdownMessageContentProps {
   content: string;
-  searchQuery?: string;
+  searchTerms?: string[];
   onCopyCode: (content: string) => void;
   onOpenLink: (url: string) => void;
 }
@@ -106,7 +106,7 @@ interface CodeElementProps {
 
 export const MarkdownMessageContent = memo(function MarkdownMessageContent({
   content,
-  searchQuery,
+  searchTerms,
   onCopyCode,
   onOpenLink,
 }: MarkdownMessageContentProps) {
@@ -116,37 +116,37 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
     () => ({
       p: ({ children }) => (
         <p className="my-2 first:mt-0 last:mb-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </p>
       ),
       h1: ({ children }) => (
         <h1 className="mb-2 mt-4 text-base font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h1>
       ),
       h2: ({ children }) => (
         <h2 className="mb-2 mt-4 text-base font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h2>
       ),
       h3: ({ children }) => (
         <h3 className="mb-1.5 mt-3 text-sm font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h3>
       ),
       h4: ({ children }) => (
         <h4 className="mb-1.5 mt-3 text-sm font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h4>
       ),
       h5: ({ children }) => (
         <h5 className="mb-1.5 mt-3 text-sm font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h5>
       ),
       h6: ({ children }) => (
         <h6 className="mb-1.5 mt-3 text-sm font-semibold first:mt-0">
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </h6>
       ),
       ul: ({ children }) => (
@@ -160,7 +160,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
         </ol>
       ),
       li: ({ children }) => (
-        <li className="pl-0.5">{highlightNode(children, searchQuery)}</li>
+        <li className="pl-0.5">{highlightNode(children, searchTerms)}</li>
       ),
       blockquote: ({ children }) => (
         <blockquote className="my-3 border-l-2 border-primary/35 pl-3 text-muted-foreground">
@@ -188,7 +188,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
           className="border-r border-border/60 px-3 py-2 align-top font-medium last:border-r-0 [&_ol]:my-0 [&_p]:my-0 [&_ul]:my-0"
           style={style}
         >
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </th>
       ),
       td: ({ children, style }) => (
@@ -196,13 +196,13 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
           className="border-r border-border/60 px-3 py-2 align-top last:border-r-0 [&_ol]:my-0 [&_p]:my-0 [&_ul]:my-0"
           style={style}
         >
-          {highlightNode(children, searchQuery)}
+          {highlightNode(children, searchTerms)}
         </td>
       ),
       a: ({ href, children }) => {
         const url = href?.trim();
         if (!url) {
-          return <span>{highlightNode(children, searchQuery)}</span>;
+          return <span>{highlightNode(children, searchTerms)}</span>;
         }
         return (
           <a
@@ -213,7 +213,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
               onOpenLink(url);
             }}
           >
-            {highlightNode(children, searchQuery)}
+            {highlightNode(children, searchTerms)}
           </a>
         );
       },
@@ -222,7 +222,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
           <code className="font-mono">{children}</code>
         ) : (
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">
-            {highlightNode(children, searchQuery)}
+            {highlightNode(children, searchTerms)}
           </code>
         ),
       pre: ({ children }) => {
@@ -258,7 +258,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
             </div>
             <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-5">
               <code>
-                {searchQuery ? highlightText(code, searchQuery) : code}
+                {searchTerms?.length ? highlightTerms(code, searchTerms) : code}
               </code>
             </pre>
           </div>
@@ -275,7 +275,7 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
           </span>
         ) : null,
     }),
-    [onCopyCode, onOpenLink, searchQuery, t],
+    [onCopyCode, onOpenLink, searchTerms, t],
   );
 
   return (
