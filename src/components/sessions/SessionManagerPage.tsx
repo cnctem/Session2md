@@ -18,6 +18,7 @@ import {
   Clock,
   CheckSquare,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -1292,9 +1293,22 @@ export function SessionManagerPage({
                       }
                     }}
                     placeholder={t("sessionManager.searchPlaceholder")}
-                    className="h-8 pl-8 text-sm"
+                    className="h-8 pl-8 pr-8 text-sm"
                     disabled={advancedSearchMutation.isPending}
                   />
+                  {search.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={t("common.clear")}
+                      onClick={handleClearAdvancedSearch}
+                      disabled={advancedSearchMutation.isPending}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>

@@ -154,13 +154,10 @@ export const AdvancedSessionSearchPanel = forwardRef<
   ref,
 ) {
   const { t } = useTranslation();
+  const [defaultDateRange] = useState(getDefaultActiveDateRange);
   const [projectDir, setProjectDir] = useState("");
-  const [activeFrom, setActiveFrom] = useState(
-    () => getDefaultActiveDateRange().from,
-  );
-  const [activeTo, setActiveTo] = useState(
-    () => getDefaultActiveDateRange().to,
-  );
+  const [activeFrom, setActiveFrom] = useState(defaultDateRange.from);
+  const [activeTo, setActiveTo] = useState(defaultDateRange.to);
   const [providers, setProviders] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>(DEFAULT_ROLES);
   const [messageKinds, setMessageKinds] = useState<SessionMessageKind[]>(
@@ -198,7 +195,6 @@ export const AdvancedSessionSearchPanel = forwardRef<
   );
 
   const resetForm = () => {
-    const defaultDateRange = getDefaultActiveDateRange();
     setProjectDir("");
     setActiveFrom(defaultDateRange.from);
     setActiveTo(defaultDateRange.to);
@@ -214,6 +210,9 @@ export const AdvancedSessionSearchPanel = forwardRef<
     const projectDirValue = projectDir.trim();
     const from = toStartOfLocalDay(activeFrom);
     const to = toEndOfLocalDay(activeTo);
+    const hasCustomDateRange =
+      (Boolean(activeFrom) && activeFrom !== defaultDateRange.from) ||
+      (Boolean(activeTo) && activeTo !== defaultDateRange.to);
     const hasCustomMessageScope =
       roles.length !== DEFAULT_ROLES.length ||
       roles.some((role) => !DEFAULT_ROLES.includes(role)) ||
@@ -222,7 +221,7 @@ export const AdvancedSessionSearchPanel = forwardRef<
     const hasCondition =
       Boolean(queryValue) ||
       Boolean(projectDirValue) ||
-      Boolean(from || to) ||
+      hasCustomDateRange ||
       providers.length > 0 ||
       hasCustomMessageScope;
 

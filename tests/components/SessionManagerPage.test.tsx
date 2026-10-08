@@ -129,6 +129,37 @@ describe("SessionManagerPage", () => {
     ).toBeVisible();
   });
 
+  it("does not submit an empty search with only default filters", async () => {
+    const user = userEvent.setup();
+    const searchSpy = vi.spyOn(sessionsApi, "searchAdvanced");
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.advanced.search",
+      }),
+    );
+
+    expect(
+      screen.getByText("sessionManager.advanced.noConditions"),
+    ).toBeVisible();
+    expect(searchSpy).not.toHaveBeenCalled();
+    searchSpy.mockRestore();
+  });
+
+  it("clears the search from inside the input", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const input = await screen.findByPlaceholderText(
+      "sessionManager.searchPlaceholder",
+    );
+    await user.type(input, "alpha");
+    await user.click(screen.getByRole("button", { name: "common.clear" }));
+
+    expect(input).toHaveValue("");
+  });
+
   it("submits advanced search with Enter while options are closed", async () => {
     const user = userEvent.setup();
     const searchSpy = vi.spyOn(sessionsApi, "searchAdvanced");
