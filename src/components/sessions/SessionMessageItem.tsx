@@ -35,6 +35,9 @@ const COLLAPSED_LENGTH = 1500;
 const truncateByCodePoint = (content: string, maxLength: number) =>
   Array.from(content).slice(0, maxLength).join("");
 
+const getFirstContentLine = (content: string) =>
+  content.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
+
 const truncateMarkdownPreview = (content: string, maxLength: number) => {
   const hardCut = truncateByCodePoint(content, maxLength);
   const lastNewline = hardCut.lastIndexOf("\n");
@@ -181,6 +184,11 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   const isTool = group.kind === "tool";
   const isSystem = role === "system";
   const isOuterCollapsible = isTool || isSystem;
+  const systemHeaderLabel = isSystem
+    ? [getRoleLabel(group.role, t), getFirstContentLine(group.content)]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
   const toolInput = isTool ? getToolInputDisplay(group) : null;
   const hasReasoning = Boolean(group.reasoning.trim());
   const hasContent = Boolean(group.content.trim());
@@ -240,11 +248,17 @@ export const SessionMessageItem = memo(function SessionMessageItem({
           className="mb-1.5 flex w-full items-center justify-between gap-3 pr-8 text-left text-xs"
         >
           <span
-            className={cn("min-w-0 font-semibold", getRoleTone(group.role))}
+            className={cn(
+              "min-w-0 flex-1 truncate font-semibold",
+              getRoleTone(group.role),
+            )}
+            title={isSystem ? systemHeaderLabel : undefined}
           >
             {isTool && toolName
               ? `${getRoleLabel(group.role, t)} · ${toolName}`
-              : getRoleLabel(group.role, t)}
+              : isSystem
+                ? systemHeaderLabel
+                : getRoleLabel(group.role, t)}
           </span>
           <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
             {outerExpanded ? (
@@ -371,6 +385,94 @@ export const SessionMessageItem = memo(function SessionMessageItem({
             />
           )}
         </>
+      )}
+    </div>
+  );
+});
+
+interface SystemMessageRunProps {
+  groups: SessionMessageGroup[];
+  isActive: boolean;
+  expandedBlockOverrides: ReadonlyMap<string, boolean>;
+  defaultExpandThinking: boolean;
+  defaultExpandTools: boolean;
+  defaultExpandSystem: boolean;
+  renderMarkdown: boolean;
+  searchTerms?: string[];
+  onCopy: (content: string) => void;
+  onCopyCode: (content: string) => void;
+  onOpenLink: (url: string) => void;
+  onToggleBlock: (blockKey: string, expanded: boolean) => void;
+}
+
+export const getSystemMessageRunBlockKey = (groups: SessionMessageGroup[]) =>
+  `system-run:${groups[0]?.id ?? "empty"}`;
+
+export const SystemMessageRun = memo(function SystemMessageRun({
+  groups,
+  isActive,
+  expandedBlockOverrides,
+  defaultExpandThinking,
+  defaultExpandTools,
+  defaultExpandSystem,
+  renderMarkdown,
+  searchTerms,
+  onCopy,
+  onCopyCode,
+  onOpenLink,
+  onToggleBlock,
+}: SystemMessageRunProps) {
+  const { t } = useTranslation();
+  const blockKey = getSystemMessageRunBlockKey(groups);
+  const expanded = expandedBlockOverrides.get(blockKey) ?? defaultExpandSystem;
+  const firstTimestamp = groups.find((group) => group.ts)?.ts;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 transition-shadow min-w-0",
+        isActive && "ring-2 ring-primary ring-offset-2",
+      )}
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => onToggleBlock(blockKey, !expanded)}
+        className="flex w-full items-center justify-between gap-3 text-left text-xs"
+      >
+        <span className="min-w-0 font-semibold text-amber-500">
+          {getRoleLabel("system", t)} · {groups.length}
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+          {expanded ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronRight className="size-3.5" />
+          )}
+          {firstTimestamp && <span>{formatTimestamp(firstTimestamp)}</span>}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {groups.map((group) => (
+            <SessionMessageItem
+              key={group.id}
+              group={group}
+              isActive={false}
+              expandedBlockOverrides={expandedBlockOverrides}
+              defaultExpandThinking={defaultExpandThinking}
+              defaultExpandTools={defaultExpandTools}
+              defaultExpandSystem={false}
+              renderMarkdown={renderMarkdown}
+              searchTerms={searchTerms}
+              onCopy={onCopy}
+              onCopyCode={onCopyCode}
+              onOpenLink={onOpenLink}
+              onToggleBlock={onToggleBlock}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

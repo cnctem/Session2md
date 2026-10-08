@@ -6,7 +6,7 @@ import {
   getRoleTone,
   getSessionMarkdownFileName,
   groupSessionsByProviderAndDirectory,
-  shouldHideCodexMessageFromToc,
+  isInjectedUserMessage,
 } from "@/components/sessions/utils";
 import type { SessionMessage, SessionMeta } from "@/types";
 
@@ -100,23 +100,35 @@ describe("session utils", () => {
     expect(extractCodexPromptPreview(content)).toBe(content);
   });
 
-  it("hides Codex context messages without user prompts from the TOC", () => {
+  it("classifies known injected user messages without hiding real content", () => {
+    const injectedMessages = [
+      "# AGENTS.md instructions for F:/project",
+      "<environment_context>\n<cwd>F:/project</cwd>\n</environment_context>",
+      "<turn_aborted>\nThe user interrupted the previous turn.\n</turn_aborted>",
+      "<user_action>\n<context>Internal review</context>\n</user_action>",
+      "<task-notification>\n<task-id>1</task-id>\n</task-notification>",
+      "<skill>\n<name>review</name>\n</skill>",
+      '<codex_internal_context source="goal">Continue</codex_internal_context>',
+      "<local-command-caveat>Caveat</local-command-caveat>",
+      "<command-name>/compact</command-name>\n<command-message>compact</command-message>",
+      "<local-command-stdout>Compacted</local-command-stdout>",
+      "<system-reminder>Context only</system-reminder>",
+    ];
+
+    injectedMessages.forEach((content) => {
+      expect(isInjectedUserMessage(content)).toBe(true);
+    });
+
     expect(
-      shouldHideCodexMessageFromToc("# AGENTS.md instructions for F:/project"),
-    ).toBe(true);
-    expect(
-      shouldHideCodexMessageFromToc(
-        "<environment_context>\n<cwd>F:/project</cwd>",
-      ),
-    ).toBe(true);
-    expect(shouldHideCodexMessageFromToc("# Context from my IDE setup:")).toBe(
-      true,
-    );
-    expect(
-      shouldHideCodexMessageFromToc(
-        "# Context from my IDE setup:\n\n## My request for Codex:\nFix it",
+      isInjectedUserMessage(
+        "<system-reminder>Context</system-reminder>\nPlease explain this file.",
       ),
     ).toBe(false);
+    expect(isInjectedUserMessage('<image name="capture.png" />')).toBe(false);
+    expect(isInjectedUserMessage("<task>Implement the feature</task>")).toBe(
+      false,
+    );
+    expect(isInjectedUserMessage("<span>Real user text</span>")).toBe(false);
   });
 
   it("formats legacy text messages and groups consecutive assistant text", () => {

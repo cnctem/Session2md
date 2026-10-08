@@ -9,6 +9,23 @@ import {
 
 const CODEX_IDE_CONTEXT_PREFIX = "# Context from my IDE setup:";
 const CODEX_REQUEST_MARKER = "my request for codex";
+const INJECTED_MESSAGE_BLOCK_TAGS = [
+  "local-command-caveat",
+  "command-name",
+  "command-message",
+  "command-args",
+  "local-command-stdout",
+  "local-command-stderr",
+  "system-reminder",
+  "project_context",
+  "connector-status",
+  "expert_selection",
+  "turn_aborted",
+  "user_action",
+  "task-notification",
+  "skill",
+  "codex_internal_context",
+] as const;
 export const UNKNOWN_PROJECT_DIR_KEY = "__unknown_project_dir__";
 
 export interface SessionDirectoryGroup {
@@ -69,6 +86,31 @@ const extractCodexPromptFromIdeContext = (content: string) => {
   }
 
   return prompt;
+};
+
+const stripInjectedMessageBlocks = (content: string) =>
+  INJECTED_MESSAGE_BLOCK_TAGS.reduce((current, tag) => {
+    const pattern = new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}>`, "gi");
+    return current.replace(pattern, "");
+  }, content).trim();
+
+export const isInjectedUserMessage = (content: string) => {
+  const trimmed = content.trim();
+  if (!trimmed) return false;
+
+  if (
+    trimmed.startsWith("# AGENTS.md instructions for ") ||
+    trimmed.startsWith("<environment_context") ||
+    (trimmed.startsWith(CODEX_IDE_CONTEXT_PREFIX) &&
+      !extractCodexPromptFromIdeContext(trimmed))
+  ) {
+    return true;
+  }
+
+  const hasKnownBlock = INJECTED_MESSAGE_BLOCK_TAGS.some((tag) =>
+    trimmed.includes(`<${tag}`),
+  );
+  return hasKnownBlock && stripInjectedMessageBlocks(trimmed).length === 0;
 };
 
 export const getSessionKey = (session: SessionMeta) =>
@@ -283,16 +325,6 @@ export const groupSessionsByProviderAndDirectory = (
   });
 
   return providerGroups;
-};
-
-export const shouldHideCodexMessageFromToc = (content: string) => {
-  const trimmed = content.trim();
-  return (
-    trimmed.startsWith("# AGENTS.md instructions for ") ||
-    trimmed.startsWith("<environment_context>") ||
-    (trimmed.startsWith(CODEX_IDE_CONTEXT_PREFIX) &&
-      !extractCodexPromptFromIdeContext(trimmed))
-  );
 };
 
 export const extractCodexPromptPreview = (content: string) => {

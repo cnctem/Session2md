@@ -78,10 +78,17 @@ import {
   SessionExportDialog,
   type SessionExportOptions,
 } from "./SessionExportDialog";
-import { SessionMessageItem } from "./SessionMessageItem";
+import {
+  getSystemMessageRunBlockKey,
+  SessionMessageItem,
+  SystemMessageRun,
+} from "./SessionMessageItem";
 import { SessionProviderIcon } from "./SessionProviderIcon";
 import { SessionTocDialog, SessionTocSidebar } from "./SessionToc";
-import { groupSessionMessages } from "./messageGroups";
+import {
+  groupSessionMessages,
+  type SessionMessageGroup,
+} from "./messageGroups";
 import {
   extractCodexPromptPreview,
   formatSessionGroupsMarkdown,
@@ -94,7 +101,7 @@ import {
   getSessionMarkdownFileName,
   getSessionKey,
   groupSessionsByProviderAndDirectory,
-  shouldHideCodexMessageFromToc,
+  isInjectedUserMessage,
   type SessionDirectoryGroup,
   type SessionProviderGroup,
 } from "./utils";
@@ -131,6 +138,20 @@ type SessionListRow =
       key: string;
       session: SessionMeta;
       indent: number;
+    };
+
+type SessionDisplayRow =
+  | {
+      kind: "group";
+      key: string;
+      group: SessionMessageGroup;
+      groupIndex: number;
+    }
+  | {
+      kind: "systemRun";
+      key: string;
+      groups: SessionMessageGroup[];
+      groupIndexes: number[];
     };
 
 const isDeletableSession = (session: SessionMeta) =>
@@ -524,9 +545,19 @@ export function SessionManagerPage({
       selectedSession?.sourcePath,
     );
   const isCodexSession = selectedSession?.providerId === "codex";
-  const messageGroups = useMemo(
-    () => groupSessionMessages(messages),
+  const normalizedMessages = useMemo(
+    () =>
+      messages.map((message) =>
+        message.role.toLowerCase() === "user" &&
+        isInjectedUserMessage(message.content)
+          ? { ...message, role: "system" }
+          : message,
+      ),
     [messages],
+  );
+  const messageGroups = useMemo(
+    () => groupSessionMessages(normalizedMessages),
+    [normalizedMessages],
   );
   const displayMessageGroups = useMemo(() => {
     if (!minimalMode) return messageGroups;
@@ -541,6 +572,58 @@ export function SessionManagerPage({
       return group.reasoning ? [{ ...group, reasoning: "" }] : [group];
     });
   }, [messageGroups, minimalMode]);
+  const displayRows = useMemo<SessionDisplayRow[]>(() => {
+    const rows: SessionDisplayRow[] = [];
+    let systemRun: SessionMessageGroup[] = [];
+    let systemRunIndexes: number[] = [];
+
+    const flushSystemRun = () => {
+      if (systemRun.length === 1) {
+        rows.push({
+          kind: "group",
+          key: systemRun[0].id,
+          group: systemRun[0],
+          groupIndex: systemRunIndexes[0],
+        });
+      } else if (systemRun.length > 1) {
+        rows.push({
+          kind: "systemRun",
+          key: getSystemMessageRunBlockKey(systemRun),
+          groups: systemRun,
+          groupIndexes: systemRunIndexes,
+        });
+      }
+      systemRun = [];
+      systemRunIndexes = [];
+    };
+
+    displayMessageGroups.forEach((group, groupIndex) => {
+      if (group.kind === "message" && group.role.toLowerCase() === "system") {
+        systemRun.push(group);
+        systemRunIndexes.push(groupIndex);
+        return;
+      }
+
+      flushSystemRun();
+      rows.push({ kind: "group", key: group.id, group, groupIndex });
+    });
+    flushSystemRun();
+
+    return rows;
+  }, [displayMessageGroups]);
+  const displayGroupToRowIndex = useMemo(() => {
+    const indexes = new Map<number, number>();
+    displayRows.forEach((row, rowIndex) => {
+      if (row.kind === "group") {
+        indexes.set(row.groupIndex, rowIndex);
+      } else {
+        row.groupIndexes.forEach((groupIndex) =>
+          indexes.set(groupIndex, rowIndex),
+        );
+      }
+    });
+    return indexes;
+  }, [displayRows]);
   const getMessageListScrollElement = useCallback(
     () =>
       messageListScrollRef.current?.closest<HTMLElement>(
@@ -549,12 +632,12 @@ export function SessionManagerPage({
     [],
   );
   const messageVirtualizer = useVirtualizer({
-    count: displayMessageGroups.length,
+    count: displayRows.length,
     getScrollElement: getMessageListScrollElement,
     observeElementRect: observeElementRectWithFallback,
     initialRect: { width: 1024, height: 768 },
     estimateSize: () => 140,
-    getItemKey: (index) => displayMessageGroups[index]?.id ?? index,
+    getItemKey: (index) => displayRows[index]?.key ?? index,
     overscan: 8,
     gap: 12,
     paddingStart: 16,
@@ -569,19 +652,7 @@ export function SessionManagerPage({
     );
     if (scrollElement) scrollElement.scrollTop = 0;
   }, [selectedSession?.providerId, selectedSession?.sourcePath]);
-  const exportGroups = useMemo(
-    () =>
-      isCodexSession
-        ? messageGroups.filter(
-            (group) =>
-              !(
-                group.role.toLowerCase() === "user" &&
-                shouldHideCodexMessageFromToc(group.content)
-              ),
-          )
-        : messageGroups,
-    [isCodexSession, messageGroups],
-  );
+  const exportGroups = messageGroups;
   const exportOptions = useMemo(
     () => ({
       includeThinking: sessionSettings?.exportThinking ?? false,
@@ -631,10 +702,7 @@ export function SessionManagerPage({
       displayMessageGroups
         .map((group, index) => ({ group, index }))
         .filter(({ group }) => {
-          return (
-            group.role.toLowerCase() === "user" &&
-            !(isCodexSession && shouldHideCodexMessageFromToc(group.content))
-          );
+          return group.role.toLowerCase() === "user";
         })
         .map(({ group, index }) => ({
           index,
@@ -927,11 +995,12 @@ export function SessionManagerPage({
   };
 
   const scrollToMessage = (index: number) => {
-    messageVirtualizer.scrollToIndex(index, {
+    const rowIndex = displayGroupToRowIndex.get(index) ?? index;
+    messageVirtualizer.scrollToIndex(rowIndex, {
       align: "center",
       behavior: "smooth",
     });
-    setActiveMessageIndex(index);
+    setActiveMessageIndex(rowIndex);
     setTocDialogOpen(false);
     if (activeMessageTimeoutRef.current !== null) {
       window.clearTimeout(activeMessageTimeoutRef.current);
@@ -1029,12 +1098,19 @@ export function SessionManagerPage({
     const group = displayMessageGroups[groupIndex];
     setExpandedBlockOverrides((current) => {
       const next = new Map(current);
-      if (pending.kind === "reasoning") {
+      if (group.role.toLowerCase() === "system") {
+        const systemRow = displayRows.find(
+          (row) =>
+            row.kind === "systemRun" && row.groupIndexes.includes(groupIndex),
+        );
+        if (systemRow?.kind === "systemRun") {
+          next.set(getSystemMessageRunBlockKey(systemRow.groups), true);
+        }
+        next.set(`${group.id}:system-section`, true);
+      } else if (pending.kind === "reasoning") {
         next.set(`${group.id}:reasoning-section`, true);
       } else if (pending.kind === "toolCall" || pending.kind === "toolResult") {
         next.set(`${group.id}:tool-section`, true);
-      } else if (group.role.toLowerCase() === "system") {
-        next.set(`${group.id}:system-section`, true);
       }
       return next;
     });
@@ -1042,6 +1118,7 @@ export function SessionManagerPage({
     setPendingMessageJump(null);
   }, [
     displayMessageGroups,
+    displayRows,
     isLoadingMessages,
     pendingMessageJump,
     selectedSession,
@@ -1698,7 +1775,7 @@ export function SessionManagerPage({
                       <p className="p-4 text-center text-sm text-muted-foreground">
                         {t("sessionManager.loadingMessages")}
                       </p>
-                    ) : displayMessageGroups.length === 0 ? (
+                    ) : displayRows.length === 0 ? (
                       <p className="p-4 text-center text-sm text-muted-foreground">
                         {t("sessionManager.emptySession")}
                       </p>
@@ -1711,9 +1788,8 @@ export function SessionManagerPage({
                         {messageVirtualizer
                           .getVirtualItems()
                           .map((virtualMessage) => {
-                            const group =
-                              displayMessageGroups[virtualMessage.index];
-                            if (!group) return null;
+                            const row = displayRows[virtualMessage.index];
+                            if (!row) return null;
                             return (
                               <div
                                 key={virtualMessage.key}
@@ -1725,34 +1801,69 @@ export function SessionManagerPage({
                                   transform: `translateY(${virtualMessage.start}px)`,
                                 }}
                               >
-                                <SessionMessageItem
-                                  group={group}
-                                  isActive={
-                                    activeMessageIndex === virtualMessage.index
-                                  }
-                                  expandedBlockOverrides={
-                                    expandedBlockOverrides
-                                  }
-                                  defaultExpandThinking={
-                                    sessionSettings?.defaultExpandThinking ??
-                                    false
-                                  }
-                                  defaultExpandTools={
-                                    sessionSettings?.defaultExpandTools ?? false
-                                  }
-                                  defaultExpandSystem={
-                                    sessionSettings?.defaultExpandSystem ??
-                                    false
-                                  }
-                                  renderMarkdown={
-                                    sessionSettings?.renderMarkdown ?? true
-                                  }
-                                  searchTerms={messageSearchTerms}
-                                  onCopy={handleCopyMessage}
-                                  onCopyCode={handleCopyCode}
-                                  onOpenLink={handleOpenLink}
-                                  onToggleBlock={toggleMessageBlock}
-                                />
+                                {row.kind === "systemRun" ? (
+                                  <SystemMessageRun
+                                    groups={row.groups}
+                                    isActive={
+                                      activeMessageIndex ===
+                                      virtualMessage.index
+                                    }
+                                    expandedBlockOverrides={
+                                      expandedBlockOverrides
+                                    }
+                                    defaultExpandThinking={
+                                      sessionSettings?.defaultExpandThinking ??
+                                      false
+                                    }
+                                    defaultExpandTools={
+                                      sessionSettings?.defaultExpandTools ??
+                                      false
+                                    }
+                                    defaultExpandSystem={
+                                      sessionSettings?.defaultExpandSystem ??
+                                      false
+                                    }
+                                    renderMarkdown={
+                                      sessionSettings?.renderMarkdown ?? true
+                                    }
+                                    searchTerms={messageSearchTerms}
+                                    onCopy={handleCopyMessage}
+                                    onCopyCode={handleCopyCode}
+                                    onOpenLink={handleOpenLink}
+                                    onToggleBlock={toggleMessageBlock}
+                                  />
+                                ) : (
+                                  <SessionMessageItem
+                                    group={row.group}
+                                    isActive={
+                                      activeMessageIndex ===
+                                      virtualMessage.index
+                                    }
+                                    expandedBlockOverrides={
+                                      expandedBlockOverrides
+                                    }
+                                    defaultExpandThinking={
+                                      sessionSettings?.defaultExpandThinking ??
+                                      false
+                                    }
+                                    defaultExpandTools={
+                                      sessionSettings?.defaultExpandTools ??
+                                      false
+                                    }
+                                    defaultExpandSystem={
+                                      sessionSettings?.defaultExpandSystem ??
+                                      false
+                                    }
+                                    renderMarkdown={
+                                      sessionSettings?.renderMarkdown ?? true
+                                    }
+                                    searchTerms={messageSearchTerms}
+                                    onCopy={handleCopyMessage}
+                                    onCopyCode={handleCopyCode}
+                                    onOpenLink={handleOpenLink}
+                                    onToggleBlock={toggleMessageBlock}
+                                  />
+                                )}
                               </div>
                             );
                           })}

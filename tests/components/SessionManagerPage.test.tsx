@@ -428,6 +428,11 @@ describe("SessionManagerPage", () => {
             role: "user",
             content: "# AGENTS.md instructions for /mock/codex",
           },
+          {
+            role: "user",
+            content:
+              "<environment_context>\n<cwd>/mock/codex</cwd>\n</environment_context>",
+          },
           { role: "user", content: "Keep this request" },
           { role: "tool", content: "[Tool: shell]\n[Tool: shell]" },
           { role: "assistant", content: "Here is the answer." },
@@ -500,7 +505,7 @@ describe("SessionManagerPage", () => {
         "dsh:/mock/dsh/detailed-session.jsonl": [
           {
             role: "system",
-            content: "hidden system instructions",
+            content: "hidden system instructions\nsystem details",
             kind: "text",
           },
           { role: "user", content: "run it", kind: "text" },
@@ -530,9 +535,7 @@ describe("SessionManagerPage", () => {
     expect(screen.queryByText("hidden thinking")).not.toBeInTheDocument();
     expect(screen.queryByText("$ ls -la")).not.toBeInTheDocument();
     expect(screen.queryByText(/file-a\s+file-b/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("hidden system instructions"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/system details/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Thinking" }));
     expect(await screen.findByText("hidden thinking")).toBeInTheDocument();
@@ -549,25 +552,37 @@ describe("SessionManagerPage", () => {
     expect(screen.getByText(/file-a\s+file-b/)).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: "sessionManager.roleSystem" }),
+      screen.getByRole("button", {
+        name: "sessionManager.roleSystem · hidden system instructions",
+      }),
     );
-    expect(
-      await screen.findByText("hidden system instructions"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/system details/)).toBeInTheDocument();
   });
 
   it("shows only user and assistant text in minimal mode", async () => {
     setSessionFixtures(
       [
         {
-          providerId: "dsh",
+          providerId: "codex",
           sessionId: "minimal-session",
           title: "Minimal Session",
-          sourcePath: "/mock/dsh/minimal-session.jsonl",
+          sourcePath: "/mock/codex/minimal-session.jsonl",
         },
       ],
       {
-        "dsh:/mock/dsh/minimal-session.jsonl": [
+        "codex:/mock/codex/minimal-session.jsonl": [
+          {
+            role: "user",
+            content:
+              "# AGENTS.md instructions for /tmp/project\n<INSTRUCTIONS>context</INSTRUCTIONS>",
+            kind: "text",
+          },
+          {
+            role: "user",
+            content:
+              "<environment_context>\n<cwd>/tmp/project</cwd>\n</environment_context>",
+            kind: "text",
+          },
           {
             role: "system",
             content: "hidden system instructions",
@@ -601,9 +616,130 @@ describe("SessionManagerPage", () => {
     expect(
       screen.queryByText("hidden system instructions"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/AGENTS\.md instructions for/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/environment_context/)).not.toBeInTheDocument();
     expect(screen.queryByText("hidden thinking")).not.toBeInTheDocument();
     expect(screen.queryByText("$ ls -la")).not.toBeInTheDocument();
     expect(screen.queryByText(/file-a\s+file-b/)).not.toBeInTheDocument();
+  });
+
+  it("renders non-user messages as system and expands each one on demand", async () => {
+    const user = userEvent.setup();
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "collapsed-context-session",
+          title: "Collapsed Context Session",
+          sourcePath: "/mock/codex/collapsed-context-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/collapsed-context-session.jsonl": [
+          {
+            role: "user",
+            content:
+              "# AGENTS.md instructions for /mock/codex\n<INSTRUCTIONS>agents body</INSTRUCTIONS>",
+          },
+          {
+            role: "user",
+            content:
+              "<environment_context>\n<cwd>/mock/codex</cwd>\n</environment_context>",
+          },
+          { role: "user", content: "Keep this request" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Keep this request")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/AGENTS\.md instructions for/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/environment_context/)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", {
+        name: "sessionManager.roleSystem · 2",
+      }),
+    ).toHaveLength(1);
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "sessionManager.roleSystem · 2",
+      }),
+    );
+
+    const agentsItem = screen.getByRole("button", {
+      name: "sessionManager.roleSystem · # AGENTS.md instructions for /mock/codex",
+    });
+    const environmentItem = screen.getByRole("button", {
+      name: "sessionManager.roleSystem · <environment_context>",
+    });
+    expect(screen.queryByText(/agents body/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/<cwd>\/mock\/codex<\/cwd>/),
+    ).not.toBeInTheDocument();
+
+    await user.click(agentsItem);
+
+    expect(await screen.findByText(/agents body/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/<cwd>\/mock\/codex<\/cwd>/),
+    ).not.toBeInTheDocument();
+
+    await user.click(environmentItem);
+
+    expect(screen.getByText(/<cwd>\/mock\/codex<\/cwd>/)).toBeInTheDocument();
+  });
+
+  it("uses the existing system expansion setting for non-user messages", async () => {
+    setSession2mdDefaultExpansion({ defaultExpandSystem: true });
+    setSessionFixtures(
+      [
+        {
+          providerId: "codex",
+          sessionId: "uncollapsed-context-session",
+          title: "Uncollapsed Context Session",
+          sourcePath: "/mock/codex/uncollapsed-context-session.jsonl",
+        },
+      ],
+      {
+        "codex:/mock/codex/uncollapsed-context-session.jsonl": [
+          {
+            role: "user",
+            content: "# AGENTS.md instructions for /mock/codex",
+          },
+          {
+            role: "user",
+            content:
+              "<environment_context>\n<cwd>/mock/codex</cwd>\n</environment_context>",
+          },
+          { role: "user", content: "Keep this request" },
+        ],
+      },
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", {
+        name: "sessionManager.roleSystem · 2",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", {
+        name: "sessionManager.roleSystem · # AGENTS.md instructions for /mock/codex",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "sessionManager.roleSystem · <environment_context>",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/agents body/)).not.toBeInTheDocument();
   });
 
   it("renders user and assistant message bodies as Markdown by default", async () => {
@@ -724,7 +860,11 @@ describe("SessionManagerPage", () => {
       ],
       {
         "dsh:/mock/dsh/expanded-session.jsonl": [
-          { role: "system", content: "system body", kind: "text" },
+          {
+            role: "system",
+            content: "system body\nsystem details",
+            kind: "text",
+          },
           { role: "assistant", content: "reasoning body", kind: "reasoning" },
           { role: "assistant", content: "answer body", kind: "text" },
           {
@@ -740,7 +880,7 @@ describe("SessionManagerPage", () => {
 
     renderPage();
 
-    expect(await screen.findByText("system body")).toBeInTheDocument();
+    expect(await screen.findByText(/system details/)).toBeInTheDocument();
     expect(screen.getByText("reasoning body")).toBeInTheDocument();
     expect(screen.getByText("$ pwd")).toBeInTheDocument();
 
@@ -751,10 +891,12 @@ describe("SessionManagerPage", () => {
       }),
     );
     await user.click(
-      screen.getByRole("button", { name: "sessionManager.roleSystem" }),
+      screen.getByRole("button", {
+        name: "sessionManager.roleSystem · system body",
+      }),
     );
 
-    expect(screen.queryByText("system body")).not.toBeInTheDocument();
+    expect(screen.queryByText(/system details/)).not.toBeInTheDocument();
     expect(screen.queryByText("reasoning body")).not.toBeInTheDocument();
     expect(screen.queryByText("$ pwd")).not.toBeInTheDocument();
   });

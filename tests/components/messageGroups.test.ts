@@ -64,4 +64,37 @@ describe("message groups", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].toolOutput).toBe("orphan output");
   });
+
+  it("keeps consecutive system messages as separate groups", () => {
+    const groups = groupSessionMessages([
+      { role: "system", content: "first", ts: 1 },
+      { role: "system", content: "second", ts: 2 },
+      { role: "user", content: "question" },
+      { role: "system", content: "third", ts: 3 },
+    ]);
+
+    expect(groups).toHaveLength(4);
+    expect(groups[0]).toMatchObject({
+      role: "system",
+      content: "first",
+      sourceMessageIndexes: [0],
+      ts: 1,
+    });
+    expect(groups[1]).toMatchObject({
+      role: "system",
+      content: "second",
+      sourceMessageIndexes: [1],
+      ts: 2,
+    });
+    expect(groups[2]).toMatchObject({
+      role: "user",
+      content: "question",
+      sourceMessageIndexes: [2],
+    });
+    expect(groups[3]).toMatchObject({
+      role: "system",
+      content: "third",
+      sourceMessageIndexes: [3],
+    });
+  });
 });
