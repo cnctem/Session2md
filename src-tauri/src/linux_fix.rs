@@ -45,8 +45,8 @@ pub(crate) fn nudge_main_window(window: WebviewWindow) {
     // 但成本极低（线程安全，内部 run_on_main_thread），顺手做掉。
     let _ = window.set_focus();
 
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(REALIZE_WAIT).await;
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(REALIZE_WAIT);
 
         // 第二次 set_focus：此时 webview realize 已完成，在绝大多数
         // 发行版上这一次会真的生效，消除失效模式 A。
@@ -62,7 +62,7 @@ pub(crate) fn nudge_main_window(window: WebviewWindow) {
             Ok(original) => {
                 let bumped = PhysicalSize::new(original.width.saturating_add(1), original.height);
                 let _ = window.set_size(bumped);
-                tokio::time::sleep(RESIZE_GAP).await;
+                std::thread::sleep(RESIZE_GAP);
                 let _ = window.set_size(original);
                 log::info!("Linux: 已对主窗口执行 focus + surface 重激活");
 
@@ -76,7 +76,7 @@ pub(crate) fn nudge_main_window(window: WebviewWindow) {
                 // `set_size`，此时对账永远 drift=0（因为两次 set_size 都是 no-op），
                 // 看起来"没问题"但失效模式 B 其实没被修复；这是已知限制，需要用户
                 // 侧用 GDK_BACKEND=x11 绕过，README 应该有说明。
-                tokio::time::sleep(RECONCILE_WAIT).await;
+                std::thread::sleep(RECONCILE_WAIT);
                 match window.inner_size() {
                     Ok(after) => {
                         if after.width != original.width || after.height != original.height {

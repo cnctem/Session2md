@@ -18,14 +18,14 @@
         "height": 650,
         "minWidth": 900,
         "minHeight": 600,
-        "visible": true,
+        "visible": false,
         "resizable": true,
         "fullscreen": false,
         "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: https: http:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http:"
+      "csp": "default-src 'self'; img-src 'self' data: https: http:; script-src 'self' 'sha256-eY3r+H6b7Kuix4hNYbel1+hry+O7zJfdUHpCV91gb1M='; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http:"
     }
   },
   "bundle": {

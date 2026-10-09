@@ -1,4 +1,6 @@
 mod commands;
+#[cfg(target_os = "linux")]
+mod linux_fix;
 mod session2md_settings;
 mod session_manager;
 
@@ -18,7 +20,15 @@ pub fn run() {
             commands::get_session2md_settings,
             commands::save_session2md_settings,
             commands::check_app_update,
+            commands::show_main_window,
         ])
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main"
+                && payload.event() == tauri::webview::PageLoadEvent::Finished
+            {
+                let _ = webview.window().show();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Session2md");
 }
