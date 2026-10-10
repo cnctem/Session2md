@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Brain,
+  Cpu,
   FileCode2,
   FileQuestion,
   FileText,
@@ -76,6 +77,8 @@ const buildSettingsPayload = (
   defaultExpandTools: settings.defaultExpandTools,
   defaultExpandSystem: settings.defaultExpandSystem,
   renderMarkdown: settings.renderMarkdown,
+  showMessageModel: settings.showMessageModel,
+  exportModel: settings.exportModel,
   ...overrides,
 });
 
@@ -231,7 +234,8 @@ export function Session2mdSettingsPage({
       | "exportThinking"
       | "exportToolInputs"
       | "exportToolOutputs"
-      | "exportSystem",
+      | "exportSystem"
+      | "exportModel",
     value: boolean,
   ) => {
     if (!settings) return;
@@ -274,11 +278,14 @@ export function Session2mdSettingsPage({
     }
   };
 
-  const saveRenderMarkdown = async (value: boolean) => {
+  const saveMessagePreviewOption = async (
+    key: "renderMarkdown" | "showMessageModel",
+    value: boolean,
+  ) => {
     if (!settings) return;
 
     const previousSettings = settings;
-    const nextSettings = { ...settings, renderMarkdown: value };
+    const nextSettings = { ...settings, [key]: value };
     queryClient.setQueryData(session2mdSettingsKey, nextSettings);
 
     try {
@@ -379,7 +386,23 @@ export function Session2mdSettingsPage({
                     "sessionSettings.messagePreview.renderMarkdown.description",
                   )}
                   checked={settings.renderMarkdown}
-                  onCheckedChange={(value) => void saveRenderMarkdown(value)}
+                  onCheckedChange={(value) =>
+                    void saveMessagePreviewOption("renderMarkdown", value)
+                  }
+                  disabled={saveMutation.isPending}
+                />
+                <ToggleRow
+                  icon={<Cpu className="size-4 text-blue-500" />}
+                  title={t(
+                    "sessionSettings.messagePreview.showMessageModel.label",
+                  )}
+                  description={t(
+                    "sessionSettings.messagePreview.showMessageModel.description",
+                  )}
+                  checked={settings.showMessageModel}
+                  onCheckedChange={(value) =>
+                    void saveMessagePreviewOption("showMessageModel", value)
+                  }
                   disabled={saveMutation.isPending}
                 />
               </section>
@@ -445,6 +468,20 @@ export function Session2mdSettingsPage({
                         "defaultExpandSystem",
                         value,
                       )
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={<Cpu className="size-4 text-blue-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.includeModel.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeModel.description",
+                    )}
+                    checked={settings.exportModel}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportModel", value)
                     }
                     disabled={saveMutation.isPending}
                   />

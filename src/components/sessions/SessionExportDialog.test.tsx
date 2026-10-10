@@ -6,6 +6,7 @@ import {
 } from "./SessionExportDialog";
 
 const initialOptions: SessionExportOptions = {
+  includeModel: false,
   includeSystem: false,
   includeThinking: false,
   includeToolInputs: true,
@@ -25,7 +26,7 @@ describe("SessionExportDialog", () => {
     );
 
     const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[3]);
+    fireEvent.click(checkboxes[4]);
     fireEvent.click(
       screen.getByRole("button", {
         name: "sessionManager.exportOptions.confirm",
@@ -33,6 +34,7 @@ describe("SessionExportDialog", () => {
     );
 
     expect(onConfirm).toHaveBeenCalledWith({
+      includeModel: false,
       includeSystem: true,
       includeThinking: false,
       includeToolInputs: true,
@@ -69,8 +71,8 @@ describe("SessionExportDialog", () => {
     );
 
     const initialCheckboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(initialCheckboxes[3]);
-    expect(initialCheckboxes[3]).toBeChecked();
+    fireEvent.click(initialCheckboxes[4]);
+    expect(initialCheckboxes[4]).toBeChecked();
 
     rerender(
       <SessionExportDialog
@@ -91,8 +93,9 @@ describe("SessionExportDialog", () => {
 
     const reopenedCheckboxes = screen.getAllByRole("checkbox");
     expect(reopenedCheckboxes[0]).not.toBeChecked();
-    expect(reopenedCheckboxes[1]).toBeChecked();
-    expect(reopenedCheckboxes[2]).not.toBeChecked();
+    expect(reopenedCheckboxes[1]).not.toBeChecked();
+    expect(reopenedCheckboxes[2]).toBeChecked();
     expect(reopenedCheckboxes[3]).not.toBeChecked();
+    expect(reopenedCheckboxes[4]).not.toBeChecked();
   });
 });

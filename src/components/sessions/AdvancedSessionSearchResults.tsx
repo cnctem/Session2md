@@ -149,7 +149,9 @@ export function AdvancedSessionSearchResults({
             {visibleHits.length > 0 && (
               <div className="border-t border-border/60 bg-muted/15">
                 {visibleHits.map((hit, index) => {
-                  const metadataHit = hit.field !== "message";
+                  const messageHit =
+                    hit.field === "message" || hit.field === "model";
+                  const metadataHit = !messageHit;
                   const kindLabel = hit.kind
                     ? t(kindTranslationKey[hit.kind])
                     : null;

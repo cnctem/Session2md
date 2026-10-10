@@ -117,7 +117,39 @@ fn parse_session(path: &Path, index: &HashMap<String, IndexEntry>) -> Result<Ses
         source_path: Some(path.display().to_string()),
         resume_command: None,
         can_delete: false,
+        models: continue_session_models(&value),
     })
+}
+
+fn continue_session_models(value: &Value) -> Option<Vec<String>> {
+    let mut models = Vec::new();
+    if let Some(model) = super::model(
+        value
+            .get("chatModelTitle")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    ) {
+        models.push(model);
+    }
+    if let Some(history) = value.get("history").and_then(Value::as_array) {
+        for entry in history {
+            let Some(prompt_logs) = entry.get("promptLogs").and_then(Value::as_array) else {
+                continue;
+            };
+            for prompt in prompt_logs {
+                if let Some(model) = super::model(
+                    prompt
+                        .get("modelTitle")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                ) {
+                    models.push(model);
+                }
+            }
+        }
+    }
+    let models = super::dedupe_models(models);
+    (!models.is_empty()).then_some(models)
 }
 
 #[derive(Default)]
@@ -191,5 +223,23 @@ mod tests {
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[1].content, "answer");
         assert_eq!(messages[2].content, "hidden");
+    }
+
+    #[test]
+    fn collects_session_level_model_summary() {
+        let models = continue_session_models(&serde_json::json!({
+            "chatModelTitle": "GLM-4.7",
+            "history": [{
+                "promptLogs": [
+                    {"modelTitle": "qwen3.5_9b", "modelProvider": "lmstudio"},
+                    {"modelTitle": "GLM-4.7", "modelProvider": "zAI"}
+                ]
+            }]
+        }))
+        .expect("models");
+
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0], "GLM-4.7");
+        assert_eq!(models[1], "qwen3.5_9b");
     }
 }

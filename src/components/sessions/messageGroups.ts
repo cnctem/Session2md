@@ -12,6 +12,7 @@ export interface SessionMessageGroup {
   toolInput?: string;
   toolOutput?: string;
   ts?: number;
+  models?: string[];
 }
 
 type MessageGroupBuffers = {
@@ -22,6 +23,28 @@ type MessageGroupBuffers = {
 };
 
 const getMessageKind = (message: SessionMessage) => message.kind ?? "text";
+
+const modelsEqual = (
+  left: string[] | undefined,
+  right: string[] | undefined,
+) => {
+  const a = left ?? [];
+  const b = right ?? [];
+  return a.length === b.length && a.every((model, index) => model === b[index]);
+};
+
+export const mergeModelLists = (
+  current: string[] | undefined,
+  incoming: string[] | undefined,
+) => {
+  const merged = [...(current ?? [])];
+  for (const model of incoming ?? []) {
+    if (!merged.includes(model)) {
+      merged.push(model);
+    }
+  }
+  return merged.length ? merged : undefined;
+};
 
 export const groupSessionMessages = (
   messages: SessionMessage[],
@@ -48,6 +71,7 @@ export const groupSessionMessages = (
       content: "",
       reasoning: "",
       ts: message.ts,
+      models: message.metadata?.models,
     };
     groups.push(group);
     groupBuffers.set(group, {
@@ -75,9 +99,20 @@ export const groupSessionMessages = (
     if (kind === "reasoning" || kind === "text") {
       lastTool = null;
       if (role === "assistant") {
+        if (
+          currentAssistant?.models?.length &&
+          message.metadata?.models?.length &&
+          !modelsEqual(currentAssistant.models, message.metadata.models)
+        ) {
+          flushAssistant();
+        }
         if (!currentAssistant) {
           currentAssistant = createGroup(message, "message");
         }
+        currentAssistant.models = mergeModelLists(
+          currentAssistant.models,
+          message.metadata?.models,
+        );
         if (kind === "reasoning") {
           append(currentAssistant, "reasoning", message.content);
         } else {

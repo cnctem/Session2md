@@ -126,7 +126,11 @@ pub fn delete_session(root: &Path, path: &Path, session_id: &str) -> Result<bool
 
 fn canonical_records(values: &[Value]) -> Vec<OrderedMessage> {
     let mut output = Vec::new();
+    let mut current_model = None;
     for (record_index, value) in values.iter().enumerate() {
+        if let Some(model) = kimi_model_from_record(value) {
+            current_model = Some(model);
+        }
         let mut part_index = 0;
         let ts = record_time(value);
         if let Some(record_type) = value.get("type").and_then(Value::as_str) {
@@ -159,18 +163,18 @@ fn canonical_records(values: &[Value]) -> Vec<OrderedMessage> {
                         {
                             continue;
                         }
-                        append_ordered(
-                            &mut output,
-                            record_index,
-                            &mut part_index,
-                            normalized_messages,
-                        );
+                        let mut messages = normalized_messages;
+                        attach_kimi_model(&mut messages, current_model.as_ref());
+                        append_ordered(&mut output, record_index, &mut part_index, messages);
                         if let Some(tool_calls) = message.get("toolCalls") {
+                            let mut tool_messages =
+                                messages_from_content("assistant", tool_calls, ts);
+                            attach_kimi_model(&mut tool_messages, current_model.as_ref());
                             append_ordered(
                                 &mut output,
                                 record_index,
                                 &mut part_index,
-                                messages_from_content("assistant", tool_calls, ts),
+                                tool_messages,
                             );
                         }
                     }
@@ -192,18 +196,16 @@ fn canonical_records(values: &[Value]) -> Vec<OrderedMessage> {
                             ts,
                         ),
                     ),
-                    "TextPart" | "ThinkPart" => append_ordered(
-                        &mut output,
-                        record_index,
-                        &mut part_index,
-                        messages_from_content("assistant", payload, ts),
-                    ),
-                    "ToolCall" | "ToolResult" => append_ordered(
-                        &mut output,
-                        record_index,
-                        &mut part_index,
-                        messages_from_content("tool", payload, ts),
-                    ),
+                    "TextPart" | "ThinkPart" => {
+                        let mut messages = messages_from_content("assistant", payload, ts);
+                        attach_kimi_model(&mut messages, current_model.as_ref());
+                        append_ordered(&mut output, record_index, &mut part_index, messages);
+                    }
+                    "ToolCall" | "ToolResult" => {
+                        let mut messages = messages_from_content("tool", payload, ts);
+                        attach_kimi_model(&mut messages, current_model.as_ref());
+                        append_ordered(&mut output, record_index, &mut part_index, messages);
+                    }
                     _ => {}
                 }
             }
@@ -218,20 +220,46 @@ fn loop_event_records(
 ) -> Vec<OrderedMessage> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
+    let mut current_model = None;
     for (record_index, value) in values.iter().enumerate() {
+        if let Some(model) = kimi_model_from_record(value) {
+            current_model = Some(model);
+        }
         if value.get("type").and_then(Value::as_str) != Some("context.append_loop_event") {
             continue;
         }
         let mut part_index = 0;
-        for message in loop_event_messages(value) {
+        for mut message in loop_event_messages(value) {
             let key = message_key(&message);
             if canonical_keys.contains(&key) || !seen.insert(key) {
                 continue;
+            }
+            if let Some(model) = current_model.as_ref() {
+                super::attach_models(std::slice::from_mut(&mut message), vec![model.clone()]);
             }
             append_ordered(&mut output, record_index, &mut part_index, vec![message]);
         }
     }
     output
+}
+
+fn kimi_model_from_record(value: &Value) -> Option<String> {
+    super::model(
+        value
+            .get("model")
+            .or_else(|| value.get("modelAlias"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
+}
+
+fn attach_kimi_model(
+    messages: &mut [crate::session_manager::SessionMessage],
+    model: Option<&String>,
+) {
+    if let Some(model) = model {
+        super::attach_models(messages, vec![model.clone()]);
+    }
 }
 
 fn loop_event_messages(value: &Value) -> Vec<SessionMessage> {
@@ -382,6 +410,7 @@ fn parse_session(dir: &Path) -> Result<SessionMeta, String> {
     Ok(SessionMeta {
         provider_id: PROVIDER_ID.to_string(),
         can_delete: is_valid_session_id(&session_id),
+        models: None,
         session_id,
         title,
         summary: None,

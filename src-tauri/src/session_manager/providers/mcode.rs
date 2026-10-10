@@ -66,6 +66,7 @@ fn scan(conn: &Connection, data_dir: &Path) -> rusqlite::Result<Vec<SessionMeta>
             created_at: row.get(3)?,
             last_active_at: row.get(4)?,
             can_delete: false,
+            models: None,
         })
     })?;
     rows.collect()
@@ -119,6 +120,7 @@ fn read_messages(conn: &Connection, id: &str) -> rusqlite::Result<Vec<SessionMes
                     .filter(|time| time.is_finite())
                     .map(|time| time.floor() as i64)
             }),
+            metadata: None,
         })
     })?;
     rows.filter_map(|result| match result {

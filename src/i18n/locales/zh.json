@@ -972,6 +972,7 @@
         "sessionId": "会话 ID",
         "projectDir": "项目目录",
         "sourcePath": "来源路径",
+        "model": "模型",
         "message": "消息"
       }
     },
@@ -1103,6 +1104,10 @@
       "renderMarkdown": {
         "label": "渲染 Markdown",
         "description": "渲染标题、列表、引用、表格、链接和代码；关闭后显示原始 Markdown。"
+      },
+      "showMessageModel": {
+        "label": "在回复中显示模型",
+        "description": "在 AI 回复和由模型发起的工具调用上显示模型 ID。"
       }
     },
     "exportContent": {
@@ -1128,6 +1133,10 @@
       "includeToolOutputs": {
         "label": "导出含工具输出",
         "description": "导出工具执行结果。"
+      },
+      "includeModel": {
+        "label": "导出含模型 ID",
+        "description": "在 AI 和工具章节标题中附加模型 ID；其他模型元数据永不导出。"
       }
     },
     "directories": {

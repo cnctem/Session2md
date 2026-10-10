@@ -266,11 +266,13 @@ pub fn load_database(source: &str, provider_id: &str) -> Result<Vec<SessionMessa
                 _ => parts.extend(normalize_content_parts(&part)),
             }
         }
-        messages.extend(messages_from_parts(
-            role,
-            &parts,
-            (row.1 > 0).then_some(row.1),
-        ));
+        let mut normalized = messages_from_parts(role, &parts, (row.1 > 0).then_some(row.1));
+        if role == "assistant" {
+            if let Some(model) = family_message_model(&message) {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+        }
+        messages.extend(normalized);
     }
     Ok(messages)
 }
@@ -314,7 +316,19 @@ fn session_to_meta(
         source_path: Some(source),
         resume_command: None,
         can_delete,
+        models: None,
     })
+}
+
+fn family_message_model(message: &Value) -> Option<String> {
+    let nested = message.get("model").and_then(Value::as_object);
+    super::model(
+        nested
+            .and_then(|model| model.get("modelID"))
+            .or_else(|| message.get("modelID"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
 }
 
 fn first_user_text(conn: &rusqlite::Connection, session_id: &str) -> Option<String> {

@@ -125,6 +125,7 @@ fn parse_session(root: &Path, id: &str) -> Result<SessionMeta, String> {
         source_path: Some(transcript.display().to_string()),
         resume_command: None,
         can_delete: false,
+        models: None,
     })
 }
 

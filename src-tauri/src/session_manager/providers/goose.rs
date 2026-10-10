@@ -92,6 +92,7 @@ fn scan_database(path: &Path) -> Result<Vec<SessionMeta>, String> {
             source_path: Some(sqlite_source(path, id)),
             resume_command: None,
             can_delete: false,
+            models: None,
         });
     }
     Ok(sessions)

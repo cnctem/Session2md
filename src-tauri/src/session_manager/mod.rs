@@ -32,6 +32,8 @@ pub struct SessionMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resume_command: Option<String>,
     pub can_delete: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub models: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,6 +43,13 @@ pub enum SessionMessageKind {
     Reasoning,
     ToolCall,
     ToolResult,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMessageMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub models: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -55,6 +64,8 @@ pub struct SessionMessage {
     pub tool_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<SessionMessageMetadata>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

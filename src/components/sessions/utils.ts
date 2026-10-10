@@ -192,6 +192,7 @@ export const formatSessionTitle = (session: SessionMeta) => {
 };
 
 export interface SessionMarkdownOptions {
+  includeModel?: boolean;
   includeThinking?: boolean;
   includeToolInputs?: boolean;
   includeToolOutputs?: boolean;
@@ -205,6 +206,15 @@ const fencedCodeBlock = (content: string, language: string) => {
   );
   const fence = "`".repeat(longestFence);
   return `${fence}${language}\n${content}\n${fence}`;
+};
+
+const inlineCode = (content: string) => {
+  const longestRun = Math.max(
+    0,
+    ...Array.from(content.matchAll(/`+/g), (match) => match[0].length),
+  );
+  const fence = "`".repeat(longestRun + 1);
+  return `${fence}${content}${fence}`;
 };
 
 const formatToolGroupMarkdown = (
@@ -227,7 +237,11 @@ const formatToolGroupMarkdown = (
   }
   if (sections.length === 0) return null;
 
-  return `## Tool${name !== "Tool" ? `: ${name}` : ""}\n\n${sections.join("\n\n")}`;
+  const modelSuffix =
+    options.includeModel && group.models?.length
+      ? ` · ${group.models.map(inlineCode).join(", ")}`
+      : "";
+  return `## Tool${name !== "Tool" ? `: ${name}` : ""}${modelSuffix}\n\n${sections.join("\n\n")}`;
 };
 
 export const formatSessionGroupsMarkdown = (
@@ -258,7 +272,13 @@ export const formatSessionGroupsMarkdown = (
     ]
       .filter(Boolean)
       .join("\n\n");
-    return [`## ${role === "user" ? "User" : "Assistant"}\n\n${body}`];
+    const heading = role === "user" ? "User" : "Assistant";
+    const modelIds =
+      options.includeModel && role === "assistant" ? (group.models ?? []) : [];
+    const modelSuffix = modelIds.length
+      ? ` · ${modelIds.map(inlineCode).join(", ")}`
+      : "";
+    return [`## ${heading}${modelSuffix}\n\n${body}`];
   });
 
   return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";

@@ -32,8 +32,14 @@ pub struct SessionSearchRequest {
     pub roles: Vec<String>,
     #[serde(default)]
     pub message_kinds: Vec<SessionMessageKind>,
+    #[serde(default = "default_true")]
+    pub include_model_metadata: bool,
     #[serde(default)]
     pub force_refresh: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -44,6 +50,7 @@ pub enum SessionSearchField {
     SessionId,
     ProjectDir,
     SourcePath,
+    Model,
     Message,
 }
 
@@ -276,6 +283,26 @@ impl SearchDocument {
         )
     }
 
+    fn model(message_index: usize, message: &super::SessionMessage) -> Option<Self> {
+        let models = message.metadata.as_ref()?.models.as_ref()?;
+        let text = models
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ");
+        if text.trim().is_empty() {
+            return None;
+        }
+        Some(Self::new(
+            SessionSearchField::Model,
+            Some(message_index),
+            Some(message.role.clone()),
+            Some(message.kind.clone()),
+            message.ts,
+            &text,
+        ))
+    }
+
     fn new(
         field: SessionSearchField,
         message_index: Option<usize>,
@@ -462,7 +489,14 @@ fn load_session_documents(
         messages
             .iter()
             .enumerate()
-            .map(|(index, message)| SearchDocument::message(index, message))
+            .flat_map(|(index, message)| {
+                [
+                    Some(SearchDocument::message(index, message)),
+                    SearchDocument::model(index, message),
+                ]
+                .into_iter()
+                .flatten()
+            })
             .collect::<Vec<_>>(),
     );
 
@@ -652,6 +686,9 @@ fn search_session_result(
 
     if has_query {
         for document in &metadata_documents {
+            if document.field == SessionSearchField::Model && !request.include_model_metadata {
+                continue;
+            }
             if !document.matches(terms) {
                 continue;
             }
@@ -717,10 +754,21 @@ fn metadata_documents(session: &SessionMeta) -> Vec<SearchDocument> {
     ]
     .into_iter()
     .filter_map(|(field, text)| SearchDocument::metadata(field, text))
+    .chain(session.models.as_ref().into_iter().flat_map(|models| {
+        let text = models
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ");
+        SearchDocument::metadata(SessionSearchField::Model, Some(text.as_str())).into_iter()
+    }))
     .collect()
 }
 
 fn message_matches_filters(document: &SearchDocument, request: &SessionSearchRequest) -> bool {
+    if document.field == SessionSearchField::Model && !request.include_model_metadata {
+        return false;
+    }
     if !request.roles.is_empty() {
         let Some(role) = document.role.as_deref() else {
             return false;
@@ -752,6 +800,7 @@ fn metadata_score(field: SessionSearchField) -> u32 {
         SessionSearchField::Summary => 60,
         SessionSearchField::SessionId => 50,
         SessionSearchField::ProjectDir => 40,
+        SessionSearchField::Model => 35,
         SessionSearchField::SourcePath => 20,
         SessionSearchField::Message => 0,
     }
@@ -828,6 +877,7 @@ mod tests {
                 tool_call_id: None,
                 tool_name: None,
                 ts: Some(1_700_000_000_000),
+                metadata: None,
             },
         )
     }
@@ -844,6 +894,7 @@ mod tests {
             source_path: Some("/tmp/session.jsonl".to_string()),
             resume_command: None,
             can_delete: true,
+            models: None,
         }
     }
 
@@ -857,6 +908,7 @@ mod tests {
             active_to: None,
             roles: Vec::new(),
             message_kinds: Vec::new(),
+            include_model_metadata: true,
             force_refresh: false,
         }
     }
@@ -889,6 +941,30 @@ mod tests {
             .expect("tool result matches");
         assert_eq!(result.total_matches, 1);
         assert_eq!(result.hits[0].kind, Some(SessionMessageKind::ToolResult));
+    }
+
+    #[test]
+    fn model_hits_follow_minimal_mode_flag() {
+        let message = SessionMessage {
+            role: "assistant".to_string(),
+            content: "answer".to_string(),
+            kind: SessionMessageKind::Text,
+            tool_call_id: None,
+            tool_name: None,
+            ts: Some(1_700_000_000_000),
+            metadata: Some(crate::session_manager::SessionMessageMetadata {
+                models: Some(vec!["gpt-5.4".to_string()]),
+            }),
+        };
+        let documents = vec![SearchDocument::model(0, &message).expect("model document")];
+        let mut request = request("gpt-5.4");
+        let terms = query_terms(&request.query);
+        let result = search_session_result(session(), Some(&documents), &request, &terms)
+            .expect("model matches");
+        assert_eq!(result.hits[0].field, SessionSearchField::Model);
+        assert_eq!(result.hits[0].message_index, Some(0));
+        request.include_model_metadata = false;
+        assert!(search_session_result(session(), Some(&documents), &request, &terms).is_none());
     }
 
     #[test]

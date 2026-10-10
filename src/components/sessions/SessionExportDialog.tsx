@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 
 export interface SessionExportOptions {
+  includeModel: boolean;
   includeThinking: boolean;
   includeToolInputs: boolean;
   includeToolOutputs: boolean;
@@ -39,6 +40,11 @@ export function SessionExportDialog({
   }, [open, options]);
 
   const optionRows = [
+    {
+      key: "includeModel" as const,
+      label: t("sessionSettings.exportContent.includeModel.label"),
+      description: t("sessionSettings.exportContent.includeModel.description"),
+    },
     {
       key: "includeThinking" as const,
       label: t("sessionSettings.exportContent.includeThinking.label"),

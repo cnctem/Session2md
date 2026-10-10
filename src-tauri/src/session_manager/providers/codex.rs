@@ -208,6 +208,8 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let reader = BufReader::new(file);
     let mut messages = Vec::new();
     let mut tool_state = CodexToolState::default();
+    let mut current_model = None;
+    let mut pending_model_indexes = Vec::new();
 
     for line in reader.lines() {
         let line = match line {
@@ -225,14 +227,102 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             continue;
         };
 
-        if record_type == "response_item" {
+        if record_type == "turn_context" {
+            current_model = codex_model(payload);
+            pending_model_indexes.clear();
+        } else if record_type == "response_item" {
+            let start = messages.len();
             map_codex_response_item(&mut messages, &mut tool_state, payload, ts);
+            attach_codex_model(
+                &mut messages,
+                start,
+                current_model.as_ref(),
+                &mut pending_model_indexes,
+            );
         } else if record_type == "event_msg" {
+            if current_model.is_none()
+                && payload.get("type").and_then(Value::as_str) == Some("token_count")
+            {
+                current_model = payload
+                    .get("info")
+                    .and_then(codex_model_from_info)
+                    .or_else(|| codex_model(payload));
+                if current_model.is_some() {
+                    backfill_codex_models(
+                        &mut messages,
+                        &mut pending_model_indexes,
+                        current_model.as_ref(),
+                    );
+                }
+            }
+            let start = messages.len();
             map_codex_event_message(&mut messages, &mut tool_state, payload, ts);
+            attach_codex_model(
+                &mut messages,
+                start,
+                current_model.as_ref(),
+                &mut pending_model_indexes,
+            );
         }
     }
 
     Ok(messages)
+}
+
+fn codex_model(payload: &Value) -> Option<String> {
+    super::model(
+        payload
+            .get("model")
+            .or_else(|| {
+                payload
+                    .get("collaboration_mode")
+                    .and_then(|mode| mode.get("settings"))
+                    .and_then(|settings| settings.get("model"))
+            })
+            .or_else(|| payload.get("info").and_then(|info| info.get("model")))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
+}
+
+fn codex_model_from_info(info: &Value) -> Option<String> {
+    super::model(
+        info.get("model")
+            .or_else(|| info.get("model_name"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
+}
+
+fn attach_codex_model(
+    messages: &mut [SessionMessage],
+    start: usize,
+    model: Option<&String>,
+    pending: &mut Vec<usize>,
+) {
+    if start >= messages.len() {
+        return;
+    }
+    if let Some(model) = model {
+        super::attach_models(&mut messages[start..], vec![model.clone()]);
+    } else {
+        pending.extend(start..messages.len());
+    }
+}
+
+fn backfill_codex_models(
+    messages: &mut [SessionMessage],
+    pending: &mut Vec<usize>,
+    model: Option<&String>,
+) {
+    let Some(model) = model else {
+        return;
+    };
+    for index in pending.drain(..) {
+        if let Some(message) = messages.get_mut(index) {
+            super::attach_models(std::slice::from_mut(message), vec![model.clone()]);
+        }
+    }
 }
 
 #[derive(Default)]
@@ -471,6 +561,7 @@ fn upsert_codex_tool_call(
         tool_call_id: id.clone(),
         tool_name: Some(name.to_string()),
         ts,
+        metadata: None,
     });
     if let Some(id) = id {
         if actual_name {
@@ -511,6 +602,7 @@ fn upsert_codex_tool_result(
         tool_call_id: id.clone(),
         tool_name,
         ts,
+        metadata: None,
     });
     if let Some(id) = id {
         state.result_indexes.insert(id, message_index);
@@ -754,6 +846,7 @@ fn parse_session_with_titles(
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
+        models: None,
         resume_command: Some(format!("codex resume {session_id}")),
     })
 }
@@ -1428,5 +1521,47 @@ mod tests {
         assert!(messages[0].content.contains("screenshot.png"));
         assert_eq!(messages[1].tool_name.as_deref(), Some("wait"));
         assert!(messages[1].content.contains("completed"));
+    }
+
+    #[test]
+    fn load_messages_tracks_turn_model_and_backfills_fallback_model() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-model.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"timestamp\":\"2026-09-21T10:00:00Z\",\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"t1\",\"model\":\"gpt-5.4\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:01Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"role\":\"assistant\",\"content\":\"one\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:02Z\",\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"t2\",\"model\":\"deepseek-v4-flash\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:03Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"function_call\",\"name\":\"exec\",\"arguments\":\"{}\",\"call_id\":\"c1\"}}\n",
+                "{\"timestamp\":\"2026-09-21T10:00:04Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"model\":\"gpt-6-astra\",\"last_token_usage\":{\"input_tokens\":1,\"output_tokens\":1}}}}\n"
+            ),
+        )
+        .expect("write session");
+
+        let messages = load_messages(&path).expect("load");
+        assert_eq!(
+            messages[0]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0]
+                .as_str(),
+            "gpt-5.4"
+        );
+        assert_eq!(
+            messages[1]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0]
+                .as_str(),
+            "deepseek-v4-flash"
+        );
+        assert_eq!(messages[1].kind, SessionMessageKind::ToolCall);
     }
 }

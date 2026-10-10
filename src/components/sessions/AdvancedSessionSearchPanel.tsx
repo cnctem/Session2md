@@ -100,6 +100,7 @@ interface AdvancedSessionSearchPanelProps {
   progress?: SessionSearchProgress;
   error?: string;
   hasActiveSearch: boolean;
+  includeModelMetadata: boolean;
   onSearch: (request: SessionSearchRequest) => void;
   onClear: () => void;
   onRefresh: () => void;
@@ -147,6 +148,7 @@ export const AdvancedSessionSearchPanel = forwardRef<
     progress,
     error,
     hasActiveSearch,
+    includeModelMetadata,
     onSearch,
     onClear,
     onRefresh,
@@ -249,6 +251,7 @@ export const AdvancedSessionSearchPanel = forwardRef<
       activeTo: to,
       roles: useMessageScope ? roles : [],
       messageKinds: useMessageScope ? messageKinds : [],
+      includeModelMetadata,
       forceRefresh: false,
     });
     return true;

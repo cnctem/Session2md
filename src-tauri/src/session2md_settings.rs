@@ -60,6 +60,10 @@ pub struct Session2mdSettings {
     pub default_expand_system: bool,
     #[serde(default = "default_render_markdown")]
     pub render_markdown: bool,
+    #[serde(default = "default_true")]
+    pub show_message_model: bool,
+    #[serde(default)]
+    pub export_model: bool,
 }
 
 impl Default for Session2mdSettings {
@@ -77,6 +81,8 @@ impl Default for Session2mdSettings {
             default_expand_tools: false,
             default_expand_system: false,
             render_markdown: true,
+            show_message_model: true,
+            export_model: false,
         }
     }
 }
@@ -86,6 +92,10 @@ fn default_prompt_before_export() -> bool {
 }
 
 fn default_render_markdown() -> bool {
+    true
+}
+
+fn default_true() -> bool {
     true
 }
 
@@ -104,6 +114,8 @@ pub struct Session2mdSettingsSnapshot {
     pub default_expand_tools: bool,
     pub default_expand_system: bool,
     pub render_markdown: bool,
+    pub show_message_model: bool,
+    pub export_model: bool,
     pub resolved_directories: BTreeMap<String, String>,
 }
 
@@ -170,6 +182,8 @@ fn snapshot_from(settings: Session2mdSettings) -> Session2mdSettingsSnapshot {
         default_expand_tools: settings.default_expand_tools,
         default_expand_system: settings.default_expand_system,
         render_markdown: settings.render_markdown,
+        show_message_model: settings.show_message_model,
+        export_model: settings.export_model,
         resolved_directories: crate::session_manager::paths::resolved_directories(),
     }
 }
@@ -278,6 +292,8 @@ mod tests {
         assert!(!settings.default_expand_tools);
         assert!(!settings.default_expand_system);
         assert!(settings.render_markdown);
+        assert!(settings.show_message_model);
+        assert!(!settings.export_model);
     }
 
     #[test]

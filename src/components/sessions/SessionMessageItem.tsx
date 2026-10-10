@@ -150,6 +150,21 @@ function MessageTextBlock({
 
 const SectionDivider = () => <div className="my-3 border-t" />;
 
+function MessageModel({ models }: { models: string[] }) {
+  const primary = models[0];
+  if (!primary) return null;
+  const extraCount = Math.max(models.length - 1, 0);
+  const label = `${primary}${extraCount ? ` +${extraCount}` : ""}`;
+  return (
+    <span
+      className="max-w-[12rem] truncate text-muted-foreground"
+      title={models.join(", ")}
+    >
+      {label}
+    </span>
+  );
+}
+
 interface SessionMessageItemProps {
   group: SessionMessageGroup;
   isActive: boolean;
@@ -158,6 +173,7 @@ interface SessionMessageItemProps {
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
   renderMarkdown: boolean;
+  showModel: boolean;
   searchTerms?: string[];
   onCopy: (content: string) => void;
   onCopyCode: (content: string) => void;
@@ -173,6 +189,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   defaultExpandTools,
   defaultExpandSystem,
   renderMarkdown,
+  showModel,
   searchTerms,
   onCopy,
   onCopyCode,
@@ -247,18 +264,20 @@ export const SessionMessageItem = memo(function SessionMessageItem({
           onClick={() => onToggleBlock(outerBlockKey, !outerExpanded)}
           className="mb-1.5 flex w-full items-center justify-between gap-3 pr-8 text-left text-xs"
         >
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate font-semibold",
-              getRoleTone(group.role),
-            )}
-            title={isSystem ? systemHeaderLabel : undefined}
-          >
-            {isTool && toolName
-              ? `${getRoleLabel(group.role, t)} · ${toolName}`
-              : isSystem
-                ? systemHeaderLabel
-                : getRoleLabel(group.role, t)}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className={cn(
+                "min-w-0 truncate font-semibold",
+                getRoleTone(group.role),
+              )}
+              title={isSystem ? systemHeaderLabel : undefined}
+            >
+              {isTool && toolName
+                ? `${getRoleLabel(group.role, t)} · ${toolName}`
+                : isSystem
+                  ? systemHeaderLabel
+                  : getRoleLabel(group.role, t)}
+            </span>
           </span>
           <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
             {outerExpanded ? (
@@ -266,19 +285,25 @@ export const SessionMessageItem = memo(function SessionMessageItem({
             ) : (
               <ChevronRight className="size-3.5" />
             )}
+            {showModel && group.models?.length ? (
+              <MessageModel models={group.models} />
+            ) : null}
             {group.ts && <span>{formatTimestamp(group.ts)}</span>}
           </span>
         </button>
       ) : (
-        <div className="mb-1.5 flex items-center justify-between pr-6 text-xs">
-          <span className={cn("font-semibold", getRoleTone(group.role))}>
+        <div className="mb-1.5 flex items-center justify-between gap-2 pr-6 text-xs">
+          <span
+            className={cn("shrink-0 font-semibold", getRoleTone(group.role))}
+          >
             {getRoleLabel(group.role, t)}
           </span>
-          {group.ts && (
-            <span className="text-muted-foreground">
-              {formatTimestamp(group.ts)}
-            </span>
-          )}
+          <span className="flex min-w-0 shrink items-center gap-2 text-muted-foreground">
+            {showModel && group.models?.length ? (
+              <MessageModel models={group.models} />
+            ) : null}
+            {group.ts && <span>{formatTimestamp(group.ts)}</span>}
+          </span>
         </div>
       )}
 
@@ -398,6 +423,7 @@ interface SystemMessageRunProps {
   defaultExpandTools: boolean;
   defaultExpandSystem: boolean;
   renderMarkdown: boolean;
+  showModel: boolean;
   searchTerms?: string[];
   onCopy: (content: string) => void;
   onCopyCode: (content: string) => void;
@@ -416,6 +442,7 @@ export const SystemMessageRun = memo(function SystemMessageRun({
   defaultExpandTools,
   defaultExpandSystem,
   renderMarkdown,
+  showModel,
   searchTerms,
   onCopy,
   onCopyCode,
@@ -465,6 +492,7 @@ export const SystemMessageRun = memo(function SystemMessageRun({
               defaultExpandTools={defaultExpandTools}
               defaultExpandSystem={defaultExpandSystem}
               renderMarkdown={renderMarkdown}
+              showModel={showModel}
               searchTerms={searchTerms}
               onCopy={onCopy}
               onCopyCode={onCopyCode}

@@ -478,6 +478,7 @@ export interface SessionMeta {
   sourcePath?: string;
   resumeCommand?: string;
   canDelete?: boolean;
+  models?: string[];
 }
 
 export type SessionMessageKind =
@@ -493,6 +494,11 @@ export interface SessionMessage {
   toolCallId?: string;
   toolName?: string;
   ts?: number;
+  metadata?: SessionMessageMetadata;
+}
+
+export interface SessionMessageMetadata {
+  models?: string[];
 }
 
 export type SessionSearchField =
@@ -501,6 +507,7 @@ export type SessionSearchField =
   | "sessionId"
   | "projectDir"
   | "sourcePath"
+  | "model"
   | "message";
 
 export interface SessionSearchRequest {
@@ -512,6 +519,7 @@ export interface SessionSearchRequest {
   activeTo?: number;
   roles: string[];
   messageKinds: SessionMessageKind[];
+  includeModelMetadata?: boolean;
   forceRefresh?: boolean;
 }
 

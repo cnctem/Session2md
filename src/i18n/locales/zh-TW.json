@@ -973,6 +973,7 @@
         "sessionId": "工作階段 ID",
         "projectDir": "專案目錄",
         "sourcePath": "來源路徑",
+        "model": "模型",
         "message": "訊息"
       }
     },
@@ -1104,6 +1105,10 @@
       "renderMarkdown": {
         "label": "渲染 Markdown",
         "description": "渲染標題、清單、引用、表格、連結與程式碼；關閉後顯示原始 Markdown。"
+      },
+      "showMessageModel": {
+        "label": "在回覆中顯示模型",
+        "description": "在 AI 回覆和由模型發起的工具呼叫上顯示模型 ID。"
       }
     },
     "exportContent": {
@@ -1129,6 +1134,10 @@
       "includeToolOutputs": {
         "label": "匯出含工具輸出",
         "description": "匯出工具執行結果。"
+      },
+      "includeModel": {
+        "label": "匯出含模型 ID",
+        "description": "在 AI 與工具章節標題附加模型 ID；其他模型中介資料永不匯出。"
       }
     },
     "directories": {

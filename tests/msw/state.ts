@@ -32,6 +32,8 @@ const createDefaultSettings = (): Session2mdSettings => ({
   defaultExpandTools: false,
   defaultExpandSystem: false,
   renderMarkdown: true,
+  showMessageModel: true,
+  exportModel: false,
 });
 
 let sessionsState: SessionMeta[] = [];
@@ -62,7 +64,9 @@ export const searchSessions = (
     }
     if (
       request.projectDir &&
-      !session.projectDir?.toLowerCase().includes(request.projectDir.toLowerCase())
+      !session.projectDir
+        ?.toLowerCase()
+        .includes(request.projectDir.toLowerCase())
     ) {
       return [];
     }
@@ -93,20 +97,14 @@ export const searchSessions = (
     if (terms.length > 0) {
       for (const item of metadata) {
         const text = item.text?.trim();
-        if (
-          text &&
-          terms.every((term) => text.toLowerCase().includes(term))
-        ) {
+        if (text && terms.every((term) => text.toLowerCase().includes(term))) {
           hits.push({ field: item.field, snippet: text });
         }
       }
       messages.forEach((message, messageIndex) => {
         const role = message.role.toLowerCase();
         const kind = message.kind ?? "text";
-        if (
-          request.roles.length > 0 &&
-          !request.roles.includes(role)
-        ) {
+        if (request.roles.length > 0 && !request.roles.includes(role)) {
           return;
         }
         if (
@@ -128,10 +126,7 @@ export const searchSessions = (
           });
         }
       });
-    } else if (
-      request.roles.length > 0 ||
-      request.messageKinds.length > 0
-    ) {
+    } else if (request.roles.length > 0 || request.messageKinds.length > 0) {
       messages.forEach((message, messageIndex) => {
         const role = message.role.toLowerCase();
         const kind = message.kind ?? "text";

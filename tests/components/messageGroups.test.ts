@@ -6,6 +6,8 @@ import {
 import type { SessionMessage } from "@/types";
 
 describe("message groups", () => {
+  const model = (id: string) => id;
+
   it("groups thinking and assistant text into one bubble", () => {
     const messages: SessionMessage[] = [
       { role: "assistant", content: "thinking", kind: "reasoning", ts: 1 },
@@ -96,5 +98,78 @@ describe("message groups", () => {
       content: "third",
       sourceMessageIndexes: [3],
     });
+  });
+
+  it("keeps model metadata across assistant fragments", () => {
+    const groups = groupSessionMessages([
+      {
+        role: "assistant",
+        content: "thinking",
+        kind: "reasoning",
+        metadata: { models: [model("gpt-5.4")] },
+      },
+      {
+        role: "assistant",
+        content: "answer",
+        kind: "text",
+        metadata: { models: [model("gpt-5.4")] },
+      },
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].models).toEqual([model("gpt-5.4")]);
+  });
+
+  it("splits assistant groups when the model changes", () => {
+    const groups = groupSessionMessages([
+      {
+        role: "assistant",
+        content: "first",
+        metadata: { models: [model("gpt-5.4")] },
+      },
+      {
+        role: "assistant",
+        content: "second",
+        metadata: { models: [model("deepseek-v4-flash")] },
+      },
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].models?.[0]).toBe("gpt-5.4");
+    expect(groups[1].models?.[0]).toBe("deepseek-v4-flash");
+  });
+
+  it("keeps tool-call model metadata without copying it to a result", () => {
+    const groups = groupSessionMessages([
+      {
+        role: "tool",
+        content: "{}",
+        kind: "toolCall",
+        toolCallId: "call-1",
+        toolName: "exec",
+        metadata: { models: [model("gpt-5.4")] },
+      },
+      {
+        role: "tool",
+        content: "ok",
+        kind: "toolResult",
+        toolCallId: "call-1",
+      },
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].models).toEqual([model("gpt-5.4")]);
+  });
+
+  it("preserves a single model id", () => {
+    const groups = groupSessionMessages([
+      {
+        role: "assistant",
+        content: "answer",
+        metadata: { models: [model("requested-model")] },
+      },
+    ]);
+
+    expect(groups[0].models).toEqual([model("requested-model")]);
   });
 });

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   Copy,
+  Cpu,
   Download,
   FileText,
   FolderOpen,
@@ -87,6 +88,7 @@ import { SessionProviderIcon } from "./SessionProviderIcon";
 import { SessionTocDialog, SessionTocSidebar } from "./SessionToc";
 import {
   groupSessionMessages,
+  mergeModelLists,
   type SessionMessageGroup,
 } from "./messageGroups";
 import {
@@ -559,6 +561,14 @@ export function SessionManagerPage({
     () => groupSessionMessages(normalizedMessages),
     [normalizedMessages],
   );
+  const sessionModels = useMemo(
+    () =>
+      mergeModelLists(
+        selectedSession?.models,
+        messageGroups.flatMap((group) => group.models ?? []),
+      ),
+    [messageGroups, selectedSession?.models],
+  );
   const displayMessageGroups = useMemo(() => {
     if (!minimalMode) return messageGroups;
 
@@ -655,12 +665,14 @@ export function SessionManagerPage({
   const exportGroups = messageGroups;
   const exportOptions = useMemo(
     () => ({
+      includeModel: sessionSettings?.exportModel ?? false,
       includeThinking: sessionSettings?.exportThinking ?? false,
       includeToolInputs: sessionSettings?.exportToolInputs ?? false,
       includeToolOutputs: sessionSettings?.exportToolOutputs ?? false,
       includeSystem: sessionSettings?.exportSystem ?? false,
     }),
     [
+      sessionSettings?.exportModel,
       sessionSettings?.exportThinking,
       sessionSettings?.exportToolInputs,
       sessionSettings?.exportToolOutputs,
@@ -698,6 +710,7 @@ export function SessionManagerPage({
   const hasAnyExportableMessages = useMemo(
     () =>
       hasExportableContent({
+        includeModel: true,
         includeThinking: true,
         includeToolInputs: true,
         includeToolOutputs: true,
@@ -1444,6 +1457,7 @@ export function SessionManagerPage({
                     : undefined
                 }
                 hasActiveSearch={advancedMode}
+                includeModelMetadata={!minimalMode}
                 onSearch={handleAdvancedSearch}
                 onClear={handleClearAdvancedSearch}
                 onRefresh={handleRefreshAdvancedSearch}
@@ -1666,6 +1680,17 @@ export function SessionManagerPage({
                           </TooltipContent>
                         </Tooltip>
                       )}
+                      {sessionModels?.length && (
+                        <span
+                          className="flex min-w-0 items-center gap-1"
+                          title={sessionModels.join(", ")}
+                        >
+                          <Cpu className="size-3 shrink-0" />
+                          <span className="max-w-[280px] truncate font-mono">
+                            {sessionModels.join(", ")}
+                          </span>
+                        </span>
+                      )}
                     </div>
                     {selectedSession.sourcePath && (
                       <div className="min-w-0 text-xs text-muted-foreground">
@@ -1834,6 +1859,9 @@ export function SessionManagerPage({
                                     renderMarkdown={
                                       sessionSettings?.renderMarkdown ?? true
                                     }
+                                    showModel={
+                                      sessionSettings?.showMessageModel ?? true
+                                    }
                                     searchTerms={messageSearchTerms}
                                     onCopy={handleCopyMessage}
                                     onCopyCode={handleCopyCode}
@@ -1864,6 +1892,9 @@ export function SessionManagerPage({
                                     }
                                     renderMarkdown={
                                       sessionSettings?.renderMarkdown ?? true
+                                    }
+                                    showModel={
+                                      sessionSettings?.showMessageModel ?? true
                                     }
                                     searchTerms={messageSearchTerms}
                                     onCopy={handleCopyMessage}

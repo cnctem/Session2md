@@ -266,6 +266,7 @@ fn parse_session_with_origin(path: &Path) -> Result<(SessionMeta, bool), String>
             source_path: Some(path.display().to_string()),
             resume_command: None,
             can_delete: true,
+            models: None,
         },
         is_subagent,
     ))
@@ -345,6 +346,7 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
     let mut output = Vec::new();
     let mut emitted_partial_steps = std::collections::HashSet::new();
     let mut seen_tool_call_ids = std::collections::HashSet::<String>::new();
+    let mut current_request_model = None;
 
     for value in values {
         let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
@@ -352,6 +354,13 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
             .get("time")
             .and_then(crate::session_manager::providers::utils::parse_timestamp_to_ms);
         match event_type {
+            "request/header" => {
+                current_request_model = value
+                    .get("data")
+                    .and_then(|data| data.get("header"))
+                    .and_then(|header| header.get("config"))
+                    .and_then(dsh_request_model);
+            }
             "user/message" => {
                 if let Some(content) = value.get("data").and_then(|data| data.get("content")) {
                     output.extend(messages_from_content("user", content, ts));
@@ -364,7 +373,17 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                     .and_then(|message| message.get("content"))
                 {
                     collect_tool_call_ids(content, &mut seen_tool_call_ids);
-                    output.extend(messages_from_content("assistant", content, ts));
+                    let mut normalized = messages_from_content("assistant", content, ts);
+                    if let Some(model) = value
+                        .get("data")
+                        .and_then(|data| data.get("message"))
+                        .and_then(|message| message.get("source"))
+                        .and_then(dsh_actual_model)
+                        .or_else(|| current_request_model.clone())
+                    {
+                        super::attach_models(&mut normalized, vec![model]);
+                    }
+                    output.extend(normalized);
                 }
             }
             "assistant/chunk" => {
@@ -382,7 +401,11 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                 }
                 if let Some(block) = chunk.get("block") {
                     collect_tool_call_ids(block, &mut seen_tool_call_ids);
-                    output.extend(messages_from_content("assistant", block, ts));
+                    let mut normalized = messages_from_content("assistant", block, ts);
+                    if let Some(model) = current_request_model.clone() {
+                        super::attach_models(&mut normalized, vec![model]);
+                    }
+                    output.extend(normalized);
                 }
             }
             "tool/call" => {
@@ -414,11 +437,15 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                         _ => value.to_string(),
                     })
                     .unwrap_or_else(|| "{}".to_string());
-                output.extend(messages_from_parts(
+                let mut normalized = messages_from_parts(
                     "tool",
                     &[ContentPart::tool_call_with_metadata(name, arguments, id)],
                     ts,
-                ));
+                );
+                if let Some(model) = current_request_model.clone() {
+                    super::attach_models(&mut normalized, vec![model]);
+                }
+                output.extend(normalized);
             }
             "tool/result" => {
                 if let Some(content) = value
@@ -436,7 +463,11 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
                 let key = (turn, step);
                 if emitted_partial_steps.insert(key) {
                     if let Some(parts) = partial_by_step.get(&key) {
-                        output.extend(messages_from_parts("assistant", parts, ts));
+                        let mut normalized = messages_from_parts("assistant", parts, ts);
+                        if let Some(model) = current_request_model.clone() {
+                            super::attach_models(&mut normalized, vec![model]);
+                        }
+                        output.extend(normalized);
                     }
                 }
             }
@@ -450,6 +481,24 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
 fn dsh_step_key(value: &Value) -> Option<(u64, u64)> {
     let data = value.get("data")?;
     Some((data.get("turn")?.as_u64()?, data.get("step")?.as_u64()?))
+}
+
+fn dsh_request_model(config: &Value) -> Option<String> {
+    super::model(
+        config
+            .get("model")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
+}
+
+fn dsh_actual_model(source: &Value) -> Option<String> {
+    super::model(
+        source
+            .get("model")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
 }
 
 fn dsh_chunk_key(value: &Value) -> Option<(u64, u64, u64)> {
@@ -880,6 +929,22 @@ mod tests {
             crate::session_manager::SessionMessageKind::Text
         );
         assert_eq!(messages[2].content, "partial answer");
+    }
+
+    #[test]
+    fn assistant_message_source_model_is_attached() {
+        let messages = visible_messages(&[
+            json!({"type":"assistant/message","time":1_i64,"data":{"message":{"source":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"content":[{"type":"text","text":"answer"}]}}}),
+        ]);
+        assert_eq!(messages.len(), 1);
+        let model = &messages[0]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .models
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(model, "deepseek-v4-flash");
     }
 
     #[test]

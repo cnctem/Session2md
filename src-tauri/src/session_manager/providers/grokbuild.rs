@@ -174,6 +174,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             tool_call_id: Some(id),
             tool_name: completion.tool_name,
             ts: None,
+            metadata: None,
         });
     }
 
@@ -325,6 +326,7 @@ fn parse_summary(path: &Path) -> Option<SessionMeta> {
         .or(summary.updated_at.as_ref())
         .and_then(parse_timestamp_to_ms);
 
+    let session_dir = path.parent();
     Some(SessionMeta {
         provider_id: "grokbuild".to_string(),
         session_id: session_id.clone(),
@@ -335,8 +337,40 @@ fn parse_summary(path: &Path) -> Option<SessionMeta> {
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
+        models: session_dir.and_then(grok_session_models),
         resume_command: Some(format!("grok --resume {session_id}")),
     })
+}
+
+fn grok_session_models(session_dir: &Path) -> Option<Vec<String>> {
+    let file = File::open(session_dir.join("updates.jsonl")).ok()?;
+    let reader = BufReader::new(file);
+    let mut models = Vec::new();
+    for line in reader.lines().map_while(Result::ok) {
+        let Ok(value) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        let Some(usage) = value
+            .get("params")
+            .and_then(|params| params.get("update"))
+            .filter(|update| {
+                update.get("sessionUpdate").and_then(Value::as_str) == Some("turn_completed")
+            })
+            .and_then(|update| update.get("usage"))
+        else {
+            continue;
+        };
+        let Some(model_usage) = usage.get("modelUsage").and_then(Value::as_object) else {
+            continue;
+        };
+        for (id, _) in model_usage {
+            if let Some(model) = super::model(Some(id.clone())) {
+                models.push(model);
+            }
+        }
+    }
+    let models = super::dedupe_models(models);
+    (!models.is_empty()).then_some(models)
 }
 
 #[cfg(test)]
@@ -458,5 +492,23 @@ mod tests {
         assert_eq!(messages[0].tool_call_id.as_deref(), Some("call-2"));
         assert!(messages[0].content.contains("status: success"));
         assert!(messages[0].content.contains("duration: 3 ms"));
+    }
+
+    #[test]
+    fn aggregates_models_from_turn_usage() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            temp.path().join("updates.jsonl"),
+            concat!(
+                "{\"params\":{\"update\":{\"sessionUpdate\":\"turn_completed\",\"usage\":{\"modelUsage\":{\"grok-4.5-build\":{\"inputTokens\":1}}}}}}\n",
+                "{\"params\":{\"update\":{\"sessionUpdate\":\"turn_completed\",\"usage\":{\"modelUsage\":{\"grok-4.5-build\":{\"inputTokens\":2},\"grok-4.5-fast\":{\"inputTokens\":1}}}}}}\n"
+            ),
+        )
+        .expect("write updates");
+
+        let models = grok_session_models(temp.path()).expect("models");
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0], "grok-4.5-build");
+        assert_eq!(models[1], "grok-4.5-fast");
     }
 }

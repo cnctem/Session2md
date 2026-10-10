@@ -110,7 +110,15 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             }
         }
         let ts = msg.get("timestamp").and_then(parse_timestamp_to_ms);
-        result.extend(messages_from_parts(role, &parts, ts));
+        let mut normalized = messages_from_parts(role, &parts, ts);
+        if role == "assistant" {
+            if let Some(model) =
+                super::model(msg.get("model").and_then(Value::as_str).map(str::to_string))
+            {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+        }
+        result.extend(normalized);
     }
 
     Ok(result)
@@ -171,6 +179,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         last_active_at: last_active_at.or(created_at),
         source_path: Some(source_path),
         can_delete: true,
+        models: None,
         resume_command: Some(format!("gemini --resume {session_id}")),
     })
 }
@@ -217,8 +226,8 @@ mod tests {
             r#"{
               "sessionId": "test",
               "messages": [
-                {"id":"1","timestamp":"2026-03-10T08:24:50Z","type":"gemini","content":"","toolCalls":[{"id":"call_1","name":"web_search","args":{"query":"test"}}]},
-                {"id":"2","timestamp":"2026-03-10T08:25:00Z","type":"gemini","content":"Here are the results.","toolCalls":[{"id":"call_2","name":"web_fetch","args":{"url":"http://example.com"}}]}
+                {"id":"1","timestamp":"2026-03-10T08:24:50Z","type":"gemini","model":"gemini-3-pro","content":"","toolCalls":[{"id":"call_1","name":"web_search","args":{"query":"test"}}]},
+                {"id":"2","timestamp":"2026-03-10T08:25:00Z","type":"gemini","model":"gemini-3-pro","content":"Here are the results.","toolCalls":[{"id":"call_2","name":"web_fetch","args":{"url":"http://example.com"}}]}
               ]
             }"#,
         )
@@ -235,6 +244,10 @@ mod tests {
         assert_eq!(msgs[0].tool_call_id.as_deref(), Some("call_1"));
         assert_eq!(msgs[1].role, "assistant");
         assert!(msgs[1].content.contains("Here are the results."));
+        assert_eq!(
+            &msgs[1].metadata.as_ref().unwrap().models.as_ref().unwrap()[0],
+            "gemini-3-pro"
+        );
         assert_eq!(
             msgs[2].kind,
             crate::session_manager::SessionMessageKind::ToolCall

@@ -112,6 +112,7 @@ fn scan_database(path: &Path) -> Vec<SessionMeta> {
                 source_path: Some(sqlite_source(path, id)),
                 resume_command: None,
                 can_delete: false,
+                models: None,
             })
         })
         .collect()

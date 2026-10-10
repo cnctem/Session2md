@@ -154,6 +154,7 @@ fn scan_sessions_sqlite() -> Vec<SessionMeta> {
             last_active_at: Some(updated),
             source_path: Some(format!("sqlite:{db_display}:{session_id}")),
             can_delete: true,
+            models: None,
             resume_command: Some(format!("opencode -s {session_id}")),
         });
     }
@@ -174,7 +175,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let mut msg_files = Vec::new();
     collect_json_files(path, &mut msg_files);
 
-    let mut entries = Vec::<(i64, String, Vec<ContentPart>)>::new();
+    let mut entries = Vec::<(i64, String, Vec<ContentPart>, Option<String>)>::new();
 
     for msg_path in &msg_files {
         let data = match std::fs::read_to_string(msg_path) {
@@ -211,15 +212,24 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             continue;
         }
 
-        entries.push((created_ts, role, normalized_parts));
+        let model = (role == "assistant")
+            .then(|| message_model(&value))
+            .flatten();
+        entries.push((created_ts, role, normalized_parts, model));
     }
 
     // Sort by created timestamp
-    entries.sort_by_key(|(ts, _, _)| *ts);
+    entries.sort_by_key(|(ts, _, _, _)| *ts);
 
     let messages = entries
         .into_iter()
-        .flat_map(|(ts, role, parts)| messages_from_parts(&role, &parts, (ts > 0).then_some(ts)))
+        .flat_map(|(ts, role, parts, model)| {
+            let mut normalized = messages_from_parts(&role, &parts, (ts > 0).then_some(ts));
+            if let Some(model) = model {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+            normalized
+        })
         .collect();
 
     Ok(messages)
@@ -335,10 +345,27 @@ pub fn load_messages_sqlite(source: &str) -> Result<Vec<SessionMessage>, String>
                 }
             }
         }
-        messages.extend(messages_from_parts(&role, &parts, Some(ts)));
+        let mut normalized = messages_from_parts(&role, &parts, Some(ts));
+        if role == "assistant" {
+            if let Some(model) = message_model(&msg_value) {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+        }
+        messages.extend(normalized);
     }
 
     Ok(messages)
+}
+
+fn message_model(message: &Value) -> Option<String> {
+    let nested = message.get("model").and_then(Value::as_object);
+    super::model(
+        nested
+            .and_then(|model| model.get("modelID"))
+            .or_else(|| message.get("modelID"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    )
 }
 
 pub fn delete_session(storage: &Path, path: &Path, session_id: &str) -> Result<bool, String> {
@@ -495,6 +522,7 @@ fn parse_session(storage: &Path, path: &Path) -> Option<SessionMeta> {
         last_active_at: updated_at.or(created_at),
         source_path: Some(source_path),
         can_delete: true,
+        models: None,
         resume_command: Some(format!("opencode -s {session_id}")),
     })
 }
@@ -892,7 +920,7 @@ mod tests {
         .expect("insert message 1");
         conn.execute(
             "INSERT INTO message (id, session_id, time_created, data) VALUES (?1, ?2, ?3, ?4)",
-            ("msg_2", "ses_1", 2000_i64, r#"{"role":"assistant"}"#),
+            ("msg_2", "ses_1", 2000_i64, r#"{"role":"assistant","modelID":"deepseek-v4-flash","providerID":"deepseek","variant":"max"}"#),
         )
         .expect("insert message 2");
         conn.execute(
@@ -937,8 +965,29 @@ mod tests {
             crate::session_manager::SessionMessageKind::ToolCall
         );
         assert_eq!(messages[1].tool_name.as_deref(), Some("bash"));
+        assert_eq!(
+            messages[1]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0]
+                .as_str(),
+            "deepseek-v4-flash"
+        );
         assert_eq!(messages[2].role, "assistant");
         assert_eq!(messages[2].content, "Done");
         assert_eq!(messages[2].ts, Some(2000));
+        assert_eq!(
+            messages[2]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0],
+            "deepseek-v4-flash"
+        );
     }
 }

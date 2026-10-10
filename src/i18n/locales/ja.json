@@ -972,6 +972,7 @@
         "sessionId": "セッション ID",
         "projectDir": "プロジェクトディレクトリ",
         "sourcePath": "ソースパス",
+        "model": "モデル",
         "message": "メッセージ"
       }
     },
@@ -1103,6 +1104,10 @@
       "renderMarkdown": {
         "label": "Markdown をレンダリング",
         "description": "見出し、リスト、引用、表、リンク、コードを整形して表示します。オフにすると元の Markdown を表示します。"
+      },
+      "showMessageModel": {
+        "label": "返信にモデルを表示",
+        "description": "AI の返信とモデルが実行したツール呼び出しにモデル ID を表示します。"
       }
     },
     "exportContent": {
@@ -1128,6 +1133,10 @@
       "includeToolOutputs": {
         "label": "ツール出力を含める",
         "description": "ツールの実行結果を出力します。"
+      },
+      "includeModel": {
+        "label": "モデル ID を含める",
+        "description": "AI とツールの見出しにモデル ID を追加します。その他のモデルメタデータは出力しません。"
       }
     },
     "directories": {

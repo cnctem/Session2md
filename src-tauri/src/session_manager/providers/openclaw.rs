@@ -75,6 +75,7 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open session file: {e}"))?;
     let reader = BufReader::new(file);
     let mut messages = Vec::new();
+    let mut current_model = None;
 
     for line in reader.lines() {
         let line = match line {
@@ -86,7 +87,18 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             Err(_) => continue,
         };
 
-        if value.get("type").and_then(Value::as_str) != Some("message") {
+        let record_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+        if record_type == "model_change" {
+            current_model = super::model(
+                value
+                    .get("modelId")
+                    .or_else(|| value.get("model"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            );
+            continue;
+        }
+        if record_type != "message" {
             continue;
         }
 
@@ -106,11 +118,20 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             other => other,
         };
         let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-        messages.extend(messages_from_content(
-            role,
-            message.get("content").unwrap_or(&Value::Null),
-            ts,
-        ));
+        let mut normalized =
+            messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts);
+        if role == "assistant" {
+            let direct_model = super::model(
+                message
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            );
+            if let Some(model) = direct_model.or_else(|| current_model.clone()) {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+        }
+        messages.extend(normalized);
     }
 
     Ok(messages)
@@ -286,6 +307,7 @@ fn parse_session(
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
+        models: None,
         resume_command: None,
     })
 }
@@ -429,5 +451,44 @@ mod tests {
         let title = meta.title.unwrap();
         assert!(title.len() <= TITLE_MAX_CHARS + 3); // +3 for "..."
         assert!(title.ends_with("..."));
+    }
+
+    #[test]
+    fn load_messages_prefers_message_model_and_uses_model_change_fallback() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-model.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"model_change\",\"modelId\":\"claude-haiku-4-5\",\"provider\":\"anthropic\"}\n",
+                "{\"type\":\"message\",\"message\":{\"role\":\"assistant\",\"content\":\"first\"}}\n",
+                "{\"type\":\"message\",\"message\":{\"role\":\"assistant\",\"model\":\"claude-sonnet-4-6\",\"provider\":\"anthropic\",\"content\":\"second\"}}\n"
+            ),
+        )
+        .expect("write");
+
+        let messages = load_messages(&path).expect("messages");
+        assert_eq!(
+            messages[0]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0]
+                .as_str(),
+            "claude-haiku-4-5"
+        );
+        assert_eq!(
+            messages[1]
+                .metadata
+                .as_ref()
+                .unwrap()
+                .models
+                .as_ref()
+                .unwrap()[0]
+                .as_str(),
+            "claude-sonnet-4-6"
+        );
     }
 }

@@ -972,6 +972,7 @@
         "sessionId": "Session ID",
         "projectDir": "Project directory",
         "sourcePath": "Source path",
+        "model": "Model",
         "message": "Message"
       }
     },
@@ -1103,6 +1104,10 @@
       "renderMarkdown": {
         "label": "Render Markdown",
         "description": "Render headings, lists, quotes, tables, links, and code. Turn this off to show the original Markdown."
+      },
+      "showMessageModel": {
+        "label": "Show model on replies",
+        "description": "Show the model ID on assistant replies and model-initiated tool calls."
       }
     },
     "exportContent": {
@@ -1128,6 +1133,10 @@
       "includeToolOutputs": {
         "label": "Include tool output",
         "description": "Export tool execution results."
+      },
+      "includeModel": {
+        "label": "Include model IDs",
+        "description": "Append model IDs to assistant and tool headings. Other model metadata is never exported."
       }
     },
     "directories": {

@@ -344,8 +344,8 @@ describe("SessionManagerPage", () => {
     fireEvent.click(exportButton);
 
     const checkboxes = await screen.findAllByRole("checkbox");
-    expect(checkboxes[0]).toBeChecked();
-    fireEvent.click(checkboxes[0]);
+    expect(checkboxes[1]).toBeChecked();
+    fireEvent.click(checkboxes[1]);
     fireEvent.click(
       screen.getByRole("button", {
         name: "sessionManager.exportOptions.confirm",
@@ -634,7 +634,7 @@ describe("SessionManagerPage", () => {
     expect(await screen.findByText(/system details/)).toBeInTheDocument();
   });
 
-  it("shows only user and assistant text in minimal mode", async () => {
+  it("keeps model labels while showing only user and assistant text in minimal mode", async () => {
     setSessionFixtures(
       [
         {
@@ -665,7 +665,12 @@ describe("SessionManagerPage", () => {
           },
           { role: "user", content: "visible question", kind: "text" },
           { role: "assistant", content: "hidden thinking", kind: "reasoning" },
-          { role: "assistant", content: "visible answer", kind: "text" },
+          {
+            role: "assistant",
+            content: "visible answer",
+            kind: "text",
+            metadata: { models: ["gpt-5.4"] },
+          },
           {
             role: "tool",
             content: '{"command":"ls -la"}',
@@ -688,6 +693,10 @@ describe("SessionManagerPage", () => {
 
     expect(await screen.findByText("visible question")).toBeInTheDocument();
     expect(await screen.findByText("visible answer")).toBeInTheDocument();
+    expect(screen.getByText("sessionManager.roleUser")).toHaveClass(
+      "text-green-600",
+    );
+    expect(screen.getByText("AI")).toHaveClass("text-blue-600");
     expect(
       screen.queryByText("hidden system instructions"),
     ).not.toBeInTheDocument();
@@ -696,6 +705,9 @@ describe("SessionManagerPage", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/environment_context/)).not.toBeInTheDocument();
     expect(screen.queryByText("hidden thinking")).not.toBeInTheDocument();
+    expect(
+      (await screen.findAllByText("gpt-5.4")).length,
+    ).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText("$ ls -la")).not.toBeInTheDocument();
     expect(screen.queryByText(/file-a\s+file-b/)).not.toBeInTheDocument();
   });

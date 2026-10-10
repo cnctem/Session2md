@@ -207,6 +207,38 @@ describe("session utils", () => {
     );
   });
 
+  it("exports only model IDs when model export is enabled", () => {
+    const messages: SessionMessage[] = [
+      {
+        role: "assistant",
+        content: "answer",
+        metadata: {
+          models: ["gpt-5.4"],
+        },
+      },
+      {
+        role: "tool",
+        content: '{"command":"ls"}',
+        kind: "toolCall",
+        toolCallId: "call-1",
+        toolName: "bash",
+        metadata: { models: ["gpt-5.4"] },
+      },
+    ];
+
+    const defaultMarkdown = formatSessionMarkdown(messages, {
+      includeToolInputs: true,
+    });
+    expect(defaultMarkdown).not.toContain("gpt-5.4");
+
+    const withModel = formatSessionMarkdown(messages, {
+      includeModel: true,
+      includeToolInputs: true,
+    });
+    expect(withModel).toContain("## Assistant · `gpt-5.4`");
+    expect(withModel).toContain("## Tool: bash · `gpt-5.4`");
+  });
+
   it("uses the original tool name for non-shell argument tags", () => {
     const markdown = formatSessionMarkdown(
       [

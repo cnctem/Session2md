@@ -58,11 +58,19 @@ pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
             .and_then(Value::as_str)
             .unwrap_or("unknown");
         let ts = value.get("timestamp").and_then(parse_timestamp_to_ms);
-        messages.extend(messages_from_content(
-            role,
-            message.get("content").unwrap_or(&Value::Null),
-            ts,
-        ));
+        let mut normalized =
+            messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts);
+        if role == "assistant" {
+            if let Some(model) = super::model(
+                message
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            ) {
+                super::attach_models(&mut normalized, vec![model]);
+            }
+        }
+        messages.extend(normalized);
     }
 
     Ok(messages)
@@ -238,6 +246,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         last_active_at,
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
+        models: None,
         resume_command: Some(format!("claude --resume {session_id}")),
     })
 }
@@ -487,5 +496,34 @@ mod tests {
         assert_eq!(calls[1].tool_name.as_deref(), Some("Edit"));
         assert!(calls[0].content.contains("needle"));
         assert!(calls[1].content.contains("a.txt"));
+    }
+
+    #[test]
+    fn assistant_content_and_tools_share_model() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-model.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"message\":{\"role\":\"assistant\",\"model\":\"claude-opus-4-7\",\"content\":[{\"type\":\"text\",\"text\":\"answer\"},{\"type\":\"tool_use\",\"id\":\"tool-1\",\"name\":\"Read\",\"input\":{}}]},\"timestamp\":\"2026-03-06T10:00:00Z\"}\n",
+                "{\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"tool-1\",\"content\":\"result\"}]},\"timestamp\":\"2026-03-06T10:00:01Z\"}\n",
+            ),
+        )
+        .expect("write");
+
+        let messages = load_messages(&path).expect("load");
+        for message in messages.iter().filter(|message| {
+            message.role == "assistant"
+                || message.kind == crate::session_manager::SessionMessageKind::ToolCall
+        }) {
+            let model = &message.metadata.as_ref().unwrap().models.as_ref().unwrap()[0];
+            assert_eq!(model, "claude-opus-4-7");
+        }
+        assert!(messages
+            .iter()
+            .find(|message| message.kind == crate::session_manager::SessionMessageKind::ToolResult)
+            .unwrap()
+            .metadata
+            .is_none());
     }
 }

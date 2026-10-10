@@ -333,6 +333,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         last_active_at: summary.last_active_at.or(header.timestamp),
         source_path: Some(source_path.clone()),
         can_delete: true,
+        models: None,
         resume_command: Some(format!("pi --session {}", shell_escape(&source_path))),
     })
 }
@@ -537,7 +538,22 @@ fn pi_message_entries(message: &Value, ts: Option<i64>) -> Vec<SessionMessage> {
     };
     match role {
         "user" | "assistant" => {
-            messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts)
+            let mut messages =
+                messages_from_content(role, message.get("content").unwrap_or(&Value::Null), ts);
+            if role == "assistant" {
+                let requested = message
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                let response = message
+                    .get("responseModel")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                if let Some(model) = super::model(response.or(requested)) {
+                    super::attach_models(&mut messages, vec![model]);
+                }
+            }
+            messages
         }
         "toolResult" => {
             let tool_call_id = message
@@ -1209,5 +1225,44 @@ mod tests {
         assert_eq!(messages[1].tool_name.as_deref(), Some("search"));
         assert!(messages[0].content.contains("a.txt"));
         assert!(messages[1].content.contains("needle"));
+    }
+
+    #[test]
+    fn assistant_model_prefers_response_model_and_falls_back_to_model() {
+        let actual = pi_message_entries(
+            &serde_json::json!({
+                "role": "assistant",
+                "provider": "custom-pi",
+                "model": "requested-model",
+                "responseModel": "actual-model",
+                "content": "answer"
+            }),
+            None,
+        );
+        let model = &actual[0]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .models
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(model, "actual-model");
+
+        let fallback = pi_message_entries(
+            &serde_json::json!({
+                "role": "assistant",
+                "model": "requested-only",
+                "content": "answer"
+            }),
+            None,
+        );
+        let model = &fallback[0]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .models
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(model, "requested-only");
     }
 }
