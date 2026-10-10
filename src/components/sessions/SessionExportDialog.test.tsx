@@ -25,8 +25,11 @@ describe("SessionExportDialog", () => {
       />,
     );
 
-    const checkboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(checkboxes[4]);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /sessionSettings\.exportContent\.includeSystem\.label/,
+      }),
+    );
     fireEvent.click(
       screen.getByRole("button", {
         name: "sessionManager.exportOptions.confirm",
@@ -40,6 +43,30 @@ describe("SessionExportDialog", () => {
       includeToolInputs: true,
       includeToolOutputs: false,
     });
+  });
+
+  it("renders export options in the expected order", () => {
+    render(
+      <SessionExportDialog
+        open
+        options={initialOptions}
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    const labels = screen.getAllByRole("checkbox").map((checkbox) => {
+      const label = checkbox.closest("label");
+      return label?.querySelector(".text-sm.font-medium")?.textContent;
+    });
+
+    expect(labels).toEqual([
+      "sessionSettings.exportContent.includeThinking.label",
+      "sessionSettings.exportContent.includeToolInputs.label",
+      "sessionSettings.exportContent.includeToolOutputs.label",
+      "sessionSettings.exportContent.includeSystem.label",
+      "sessionSettings.exportContent.includeModel.label",
+    ]);
   });
 
   it("cancels without confirming", () => {
@@ -70,9 +97,11 @@ describe("SessionExportDialog", () => {
       />,
     );
 
-    const initialCheckboxes = screen.getAllByRole("checkbox");
-    fireEvent.click(initialCheckboxes[4]);
-    expect(initialCheckboxes[4]).toBeChecked();
+    const modelCheckbox = screen.getByRole("checkbox", {
+      name: /sessionSettings\.exportContent\.includeModel\.label/,
+    });
+    fireEvent.click(modelCheckbox);
+    expect(modelCheckbox).toBeChecked();
 
     rerender(
       <SessionExportDialog
@@ -91,11 +120,9 @@ describe("SessionExportDialog", () => {
       />,
     );
 
-    const reopenedCheckboxes = screen.getAllByRole("checkbox");
-    expect(reopenedCheckboxes[0]).not.toBeChecked();
-    expect(reopenedCheckboxes[1]).not.toBeChecked();
-    expect(reopenedCheckboxes[2]).toBeChecked();
-    expect(reopenedCheckboxes[3]).not.toBeChecked();
-    expect(reopenedCheckboxes[4]).not.toBeChecked();
+    const reopenedModelCheckbox = screen.getByRole("checkbox", {
+      name: /sessionSettings\.exportContent\.includeModel\.label/,
+    });
+    expect(reopenedModelCheckbox).not.toBeChecked();
   });
 });

@@ -392,6 +392,54 @@ export function Session2mdSettingsPage({
                   disabled={saveMutation.isPending}
                 />
                 <ToggleRow
+                  icon={<Brain className="size-4 text-blue-500" />}
+                  title={t(
+                    "sessionSettings.defaultExpansion.expandThinking.label",
+                  )}
+                  description={t(
+                    "sessionSettings.defaultExpansion.expandThinking.description",
+                  )}
+                  checked={settings.defaultExpandThinking}
+                  onCheckedChange={(value) =>
+                    void saveDefaultExpansionOption(
+                      "defaultExpandThinking",
+                      value,
+                    )
+                  }
+                  disabled={saveMutation.isPending}
+                />
+                <ToggleRow
+                  icon={<TerminalSquare className="size-4 text-green-500" />}
+                  title={t(
+                    "sessionSettings.defaultExpansion.expandTools.label",
+                  )}
+                  description={t(
+                    "sessionSettings.defaultExpansion.expandTools.description",
+                  )}
+                  checked={settings.defaultExpandTools}
+                  onCheckedChange={(value) =>
+                    void saveDefaultExpansionOption("defaultExpandTools", value)
+                  }
+                  disabled={saveMutation.isPending}
+                />
+                <ToggleRow
+                  icon={<MessageSquareText className="size-4 text-amber-500" />}
+                  title={t(
+                    "sessionSettings.defaultExpansion.expandSystem.label",
+                  )}
+                  description={t(
+                    "sessionSettings.defaultExpansion.expandSystem.description",
+                  )}
+                  checked={settings.defaultExpandSystem}
+                  onCheckedChange={(value) =>
+                    void saveDefaultExpansionOption(
+                      "defaultExpandSystem",
+                      value,
+                    )
+                  }
+                  disabled={saveMutation.isPending}
+                />
+                <ToggleRow
                   icon={<Cpu className="size-4 text-blue-500" />}
                   title={t(
                     "sessionSettings.messagePreview.showMessageModel.label",
@@ -405,87 +453,6 @@ export function Session2mdSettingsPage({
                   }
                   disabled={saveMutation.isPending}
                 />
-              </section>
-
-              <section className="space-y-5">
-                <header className="space-y-1">
-                  <h2 className="text-base font-semibold">
-                    {t("sessionSettings.defaultExpansion.title")}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {t("sessionSettings.defaultExpansion.description")}
-                  </p>
-                </header>
-
-                <div className="space-y-3">
-                  <ToggleRow
-                    icon={<Brain className="size-4 text-blue-500" />}
-                    title={t(
-                      "sessionSettings.defaultExpansion.expandThinking.label",
-                    )}
-                    description={t(
-                      "sessionSettings.defaultExpansion.expandThinking.description",
-                    )}
-                    checked={settings.defaultExpandThinking}
-                    onCheckedChange={(value) =>
-                      void saveDefaultExpansionOption(
-                        "defaultExpandThinking",
-                        value,
-                      )
-                    }
-                    disabled={saveMutation.isPending}
-                  />
-                  <ToggleRow
-                    icon={<TerminalSquare className="size-4 text-green-500" />}
-                    title={t(
-                      "sessionSettings.defaultExpansion.expandTools.label",
-                    )}
-                    description={t(
-                      "sessionSettings.defaultExpansion.expandTools.description",
-                    )}
-                    checked={settings.defaultExpandTools}
-                    onCheckedChange={(value) =>
-                      void saveDefaultExpansionOption(
-                        "defaultExpandTools",
-                        value,
-                      )
-                    }
-                    disabled={saveMutation.isPending}
-                  />
-                  <ToggleRow
-                    icon={
-                      <MessageSquareText className="size-4 text-amber-500" />
-                    }
-                    title={t(
-                      "sessionSettings.defaultExpansion.expandSystem.label",
-                    )}
-                    description={t(
-                      "sessionSettings.defaultExpansion.expandSystem.description",
-                    )}
-                    checked={settings.defaultExpandSystem}
-                    onCheckedChange={(value) =>
-                      void saveDefaultExpansionOption(
-                        "defaultExpandSystem",
-                        value,
-                      )
-                    }
-                    disabled={saveMutation.isPending}
-                  />
-                  <ToggleRow
-                    icon={<Cpu className="size-4 text-blue-500" />}
-                    title={t(
-                      "sessionSettings.exportContent.includeModel.label",
-                    )}
-                    description={t(
-                      "sessionSettings.exportContent.includeModel.description",
-                    )}
-                    checked={settings.exportModel}
-                    onCheckedChange={(value) =>
-                      void saveExportOption("exportModel", value)
-                    }
-                    disabled={saveMutation.isPending}
-                  />
-                </div>
               </section>
 
               <section className="space-y-5">
@@ -568,6 +535,20 @@ export function Session2mdSettingsPage({
                     checked={settings.exportSystem}
                     onCheckedChange={(value) =>
                       void saveExportOption("exportSystem", value)
+                    }
+                    disabled={saveMutation.isPending}
+                  />
+                  <ToggleRow
+                    icon={<Cpu className="size-4 text-blue-500" />}
+                    title={t(
+                      "sessionSettings.exportContent.includeModel.label",
+                    )}
+                    description={t(
+                      "sessionSettings.exportContent.includeModel.description",
+                    )}
+                    checked={settings.exportModel}
+                    onCheckedChange={(value) =>
+                      void saveExportOption("exportModel", value)
                     }
                     disabled={saveMutation.isPending}
                   />

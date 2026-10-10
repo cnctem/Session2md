@@ -91,6 +91,10 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Render Markdown",
             "sessionSettings.messagePreview.renderMarkdown.description":
               "Render markdown description",
+            "sessionSettings.messagePreview.showMessageModel.label":
+              "Show model on replies",
+            "sessionSettings.messagePreview.showMessageModel.description":
+              "Show model description",
             "sessionSettings.exportContent.title": "Markdown Export Content",
             "sessionSettings.exportContent.description": "Export options",
             "sessionSettings.exportContent.promptBeforeExport.label":
@@ -113,6 +117,10 @@ vi.mock("react-i18next", async (importOriginal) => {
               "Include tool output",
             "sessionSettings.exportContent.includeToolOutputs.description":
               "Include output description",
+            "sessionSettings.exportContent.includeModel.label":
+              "Include model IDs",
+            "sessionSettings.exportContent.includeModel.description":
+              "Include model description",
             "sessionSettings.about.title": "About Session2md",
             "sessionSettings.about.description": "App information",
             "sessionSettings.about.appDescription": "Session2md summary",
@@ -595,26 +603,53 @@ describe("Session2mdSettingsPage", () => {
     );
   });
 
-  it("places export switches before agent visibility", async () => {
+  it("groups preview switches and places export switches before agent visibility", async () => {
     renderWithProviders(<Session2mdSettingsPage />);
 
     const exportTitle = await screen.findByText("Markdown Export Content");
     const messagePreviewTitle = screen.getByText("Message Preview");
-    const defaultExpansionTitle = screen.getByText("Default Expansion");
     const agentTitle = screen.getByText("Agent Visibility");
 
     expect(
-      messagePreviewTitle.compareDocumentPosition(defaultExpansionTitle) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      defaultExpansionTitle.compareDocumentPosition(exportTitle) &
+      messagePreviewTitle.compareDocumentPosition(exportTitle) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       exportTitle.compareDocumentPosition(agentTitle) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+
+    expect(screen.queryByText("Default Expansion")).not.toBeInTheDocument();
+
+    const renderMarkdown = screen.getByRole("switch", {
+      name: "Render Markdown",
+    });
+    const expandThinking = screen.getByRole("switch", {
+      name: "Expand thinking by default",
+    });
+    const expandTools = screen.getByRole("switch", {
+      name: "Expand tools by default",
+    });
+    const expandSystem = screen.getByRole("switch", {
+      name: "Expand system by default",
+    });
+    const showMessageModel = screen.getByRole("switch", {
+      name: "Show model on replies",
+    });
+    const previewSwitches = [
+      renderMarkdown,
+      expandThinking,
+      expandTools,
+      expandSystem,
+      showMessageModel,
+    ];
+    previewSwitches.slice(0, -1).forEach((current, index) => {
+      expect(
+        current.compareDocumentPosition(previewSwitches[index + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
     const promptBeforeExport = screen.getByRole("switch", {
       name: "Ask before every export",
     });
@@ -627,6 +662,9 @@ describe("Session2mdSettingsPage", () => {
     const includeToolOutputs = screen.getByRole("switch", {
       name: /Include tool output/,
     });
+    const includeModel = screen.getByRole("switch", {
+      name: "Include model IDs",
+    });
     expect(
       exportTitle.compareDocumentPosition(includeThinking) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -637,6 +675,10 @@ describe("Session2mdSettingsPage", () => {
     ).toBeTruthy();
     expect(
       promptBeforeExport.compareDocumentPosition(includeThinking) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      includeSystem.compareDocumentPosition(includeModel) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(

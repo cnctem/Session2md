@@ -343,9 +343,11 @@ describe("SessionManagerPage", () => {
     await waitFor(() => expect(exportButton).not.toBeDisabled());
     fireEvent.click(exportButton);
 
-    const checkboxes = await screen.findAllByRole("checkbox");
-    expect(checkboxes[1]).toBeChecked();
-    fireEvent.click(checkboxes[1]);
+    const includeThinking = await screen.findByRole("checkbox", {
+      name: /sessionSettings\.exportContent\.includeThinking\.label/,
+    });
+    expect(includeThinking).toBeChecked();
+    fireEvent.click(includeThinking);
     fireEvent.click(
       screen.getByRole("button", {
         name: "sessionManager.exportOptions.confirm",

@@ -41,11 +41,6 @@ export function SessionExportDialog({
 
   const optionRows = [
     {
-      key: "includeModel" as const,
-      label: t("sessionSettings.exportContent.includeModel.label"),
-      description: t("sessionSettings.exportContent.includeModel.description"),
-    },
-    {
       key: "includeThinking" as const,
       label: t("sessionSettings.exportContent.includeThinking.label"),
       description: t(
@@ -70,6 +65,11 @@ export function SessionExportDialog({
       key: "includeSystem" as const,
       label: t("sessionSettings.exportContent.includeSystem.label"),
       description: t("sessionSettings.exportContent.includeSystem.description"),
+    },
+    {
+      key: "includeModel" as const,
+      label: t("sessionSettings.exportContent.includeModel.label"),
+      description: t("sessionSettings.exportContent.includeModel.description"),
     },
   ];
 

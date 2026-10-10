@@ -1099,7 +1099,7 @@
     },
     "messagePreview": {
       "title": "メッセージプレビュー",
-      "description": "ユーザーと AI の本文メッセージの表示方法を設定します。Markdown エクスポートには影響しません。",
+      "description": "メッセージのレンダリング、デフォルト展開、モデル表示を設定します。Markdown エクスポートには影響しません。",
       "saveFailed": "メッセージプレビュー設定を保存できませんでした: {{error}}",
       "renderMarkdown": {
         "label": "Markdown をレンダリング",

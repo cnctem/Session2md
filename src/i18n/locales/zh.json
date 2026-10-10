@@ -1099,7 +1099,7 @@
     },
     "messagePreview": {
       "title": "消息预览",
-      "description": "控制用户和 AI 正文气泡的显示方式，不会改变导出的 Markdown。",
+      "description": "控制消息的渲染、默认展开和模型显示；不会改变导出的 Markdown。",
       "saveFailed": "保存消息预览设置失败：{{error}}",
       "renderMarkdown": {
         "label": "渲染 Markdown",

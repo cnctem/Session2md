@@ -1100,7 +1100,7 @@
     },
     "messagePreview": {
       "title": "訊息預覽",
-      "description": "控制使用者與 AI 正文氣泡的顯示方式，不會改變匯出的 Markdown。",
+      "description": "控制訊息渲染、預設展開與模型顯示；不會改變匯出的 Markdown。",
       "saveFailed": "儲存訊息預覽設定失敗：{{error}}",
       "renderMarkdown": {
         "label": "渲染 Markdown",

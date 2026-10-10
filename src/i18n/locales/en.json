@@ -1099,7 +1099,7 @@
     },
     "messagePreview": {
       "title": "Message Preview",
-      "description": "Choose how user and AI message bubbles are displayed. This does not change the exported Markdown.",
+      "description": "Control message rendering, default expansion, and model display. This does not change the exported Markdown.",
       "saveFailed": "Failed to save message preview settings: {{error}}",
       "renderMarkdown": {
         "label": "Render Markdown",
