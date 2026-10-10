@@ -642,6 +642,7 @@ describe("SessionManagerPage", () => {
           sessionId: "minimal-session",
           title: "Minimal Session",
           sourcePath: "/mock/codex/minimal-session.jsonl",
+          resumeCommand: "codex resume minimal-session",
         },
       ],
       {
@@ -697,6 +698,16 @@ describe("SessionManagerPage", () => {
       "text-green-600",
     );
     expect(screen.getByText("AI")).toHaveClass("text-blue-600");
+    expect(
+      screen.queryByRole("button", { name: "sessionManager.copySourcePath" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("minimal-session.jsonl")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("codex resume minimal-session"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "sessionManager.copyCommand" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText("hidden system instructions"),
     ).not.toBeInTheDocument();

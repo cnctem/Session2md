@@ -1692,7 +1692,7 @@ export function SessionManagerPage({
                         </span>
                       )}
                     </div>
-                    {selectedSession.sourcePath && (
+                    {selectedSession.sourcePath && !minimalMode && (
                       <div className="min-w-0 text-xs text-muted-foreground">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1724,7 +1724,7 @@ export function SessionManagerPage({
                         </Tooltip>
                       </div>
                     )}
-                    {selectedSession.resumeCommand && (
+                    {selectedSession.resumeCommand && !minimalMode && (
                       <div className="flex min-w-0 items-center gap-2">
                         <div
                           className="min-w-0 flex-1 truncate rounded-md bg-muted/60 px-3 py-1.5 font-mono text-xs text-muted-foreground"
