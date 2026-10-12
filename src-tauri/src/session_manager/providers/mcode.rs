@@ -67,6 +67,7 @@ fn scan(conn: &Connection, data_dir: &Path) -> rusqlite::Result<Vec<SessionMeta>
             last_active_at: row.get(4)?,
             can_delete: false,
             models: None,
+            recovery: None,
         })
     })?;
     rows.collect()

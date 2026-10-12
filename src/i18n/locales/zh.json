@@ -914,6 +914,8 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
+    "trae": "Trae",
+    "traework": "TraeWork",
     "dsh": "DSH"
   },
   "appSwitcher": {
@@ -1024,6 +1026,9 @@
     "batchDeleteRequestFailed": "批量删除失败，请稍后重试",
     "loadingMessages": "加载会话内容中...",
     "emptySession": "该会话暂无可展示内容",
+    "recoveryPartial": "部分恢复",
+    "recoveryPartialTooltip": "Trae 的完整对话保存在本地加密数据库中，Session2md 当前仅能显示可读取的元数据和用户输入片段。",
+    "recoveryPartialExportWarning": "部分恢复：Trae 的完整对话保存在本地加密数据库中，本次导出仅包含本地可读取的内容。",
     "clickToCopyPath": "点击复制路径",
     "tocTitle": "对话目录",
     "justNow": "刚刚",
@@ -1166,6 +1171,8 @@
       "zed": "Zed 数据目录",
       "crush": "Crush 数据目录",
       "teleagent": "TeleAgent 数据目录",
+      "trae": "Trae 数据目录（默认国内版）",
+      "traework": "TraeWork 数据目录（默认国内版）",
       "dsh": "DeepSeek Harness 数据目录"
     },
     "autoUpdatePrompt": {

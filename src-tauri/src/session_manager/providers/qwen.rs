@@ -116,6 +116,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         resume_command: None,
         can_delete: false,
         models: None,
+        recovery: None,
     })
 }
 

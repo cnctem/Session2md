@@ -9,8 +9,15 @@ use std::path::{Path, PathBuf};
 use providers::{
     antigravity, claude, cline, codex, continue_session, crush, cursor, deveco, dsh, gemini, goose,
     grokbuild, hermes, kilocode, kimi, mcode, mimocode, openclaw, opencode, pi, qoder, qwen,
-    reasonix, teleagent, workbuddy, zcode, zed,
+    reasonix, teleagent, trae, traework, workbuddy, zcode, zed,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionRecovery {
+    Complete,
+    Partial,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +41,8 @@ pub struct SessionMeta {
     pub can_delete: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub models: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<SessionRecovery>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -117,6 +126,8 @@ pub fn scan_sessions_excluding(hidden_provider_ids: &BTreeSet<String>) -> Vec<Se
         ("workbuddy", workbuddy::scan_sessions),
         ("zcode", zcode::scan_sessions),
         ("zed", zed::scan_sessions),
+        ("trae", trae::scan_sessions),
+        ("traework", traework::scan_sessions),
     ];
     let mut sessions = std::thread::scope(|scope| {
         let handles = SCANNERS
@@ -176,6 +187,7 @@ pub fn load_messages(provider_id: &str, source_path: &str) -> Result<Vec<Session
         "reasonix" => reasonix::load_messages(path),
         "workbuddy" => workbuddy::load_messages(path),
         "antigravity" => antigravity::load_messages(path),
+        "trae" | "traework" => trae::load_messages(source_path),
         _ => Err(format!("Unsupported provider: {provider_id}")),
     }
 }
@@ -334,6 +346,18 @@ mod tests {
             .expect_err("outside path should be rejected");
 
         assert!(error.contains("outside provider roots"));
+    }
+
+    #[test]
+    fn recovery_status_uses_camel_case_wire_values() {
+        assert_eq!(
+            serde_json::to_value(SessionRecovery::Complete).expect("serialize"),
+            serde_json::json!("complete")
+        );
+        assert_eq!(
+            serde_json::to_value(SessionRecovery::Partial).expect("serialize"),
+            serde_json::json!("partial")
+        );
     }
 
     #[test]

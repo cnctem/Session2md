@@ -207,6 +207,17 @@ describe("session utils", () => {
     );
   });
 
+  it("prepends a partial recovery warning to exports", () => {
+    const markdown = formatSessionMarkdown(
+      [{ role: "user", content: "prompt" }],
+      { partialNotice: "Partial recovery notice" },
+    );
+
+    expect(markdown).toBe(
+      "> Partial recovery notice\n\n## User\n\nprompt\n",
+    );
+  });
+
   it("exports only model IDs when model export is enabled", () => {
     const messages: SessionMessage[] = [
       {

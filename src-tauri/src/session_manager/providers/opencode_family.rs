@@ -317,6 +317,7 @@ fn session_to_meta(
         resume_command: None,
         can_delete,
         models: None,
+        recovery: None,
     })
 }
 

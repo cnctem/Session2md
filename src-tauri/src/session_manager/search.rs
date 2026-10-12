@@ -895,6 +895,7 @@ mod tests {
             resume_command: None,
             can_delete: true,
             models: None,
+            recovery: None,
         }
     }
 

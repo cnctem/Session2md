@@ -411,6 +411,7 @@ fn parse_session(dir: &Path) -> Result<SessionMeta, String> {
         provider_id: PROVIDER_ID.to_string(),
         can_delete: is_valid_session_id(&session_id),
         models: None,
+        recovery: None,
         session_id,
         title,
         summary: None,

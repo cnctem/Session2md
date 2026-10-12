@@ -113,6 +113,7 @@ fn scan_database(path: &Path) -> Vec<SessionMeta> {
                 resume_command: None,
                 can_delete: false,
                 models: None,
+                recovery: None,
             })
         })
         .collect()

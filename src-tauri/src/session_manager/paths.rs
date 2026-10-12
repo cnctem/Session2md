@@ -223,6 +223,18 @@ pub fn dsh_dir() -> PathBuf {
     })
 }
 
+pub fn trae_dir() -> PathBuf {
+    directory_override_or("trae", || app_config_dir().join("Trae CN"))
+}
+
+pub fn traework_dir() -> PathBuf {
+    directory_override_or("traework", || app_config_dir().join("TRAE SOLO CN"))
+}
+
+fn app_config_dir() -> PathBuf {
+    dirs::config_dir().unwrap_or_else(|| home_dir().join(".config"))
+}
+
 fn xdg_data_home() -> PathBuf {
     std::env::var_os("XDG_DATA_HOME")
         .filter(|value| !value.is_empty())
@@ -276,6 +288,8 @@ pub fn resolved_directories() -> BTreeMap<String, String> {
             teleagent_data_dir().display().to_string(),
         ),
         ("dsh".to_string(), dsh_dir().display().to_string()),
+        ("trae".to_string(), trae_dir().display().to_string()),
+        ("traework".to_string(), traework_dir().display().to_string()),
     ])
 }
 

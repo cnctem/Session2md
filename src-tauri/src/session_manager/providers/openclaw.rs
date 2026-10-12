@@ -308,6 +308,7 @@ fn parse_session(
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: None,
     })
 }

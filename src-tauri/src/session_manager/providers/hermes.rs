@@ -145,6 +145,7 @@ fn sqlite_row_to_session_meta(row: &Value, db_source: &str) -> Option<SessionMet
         source_path: Some(source_path),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: None,
     })
 }
@@ -425,6 +426,7 @@ fn parse_jsonl_session(path: &Path) -> Option<SessionMeta> {
         source_path: Some(source_path),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: None,
     })
 }

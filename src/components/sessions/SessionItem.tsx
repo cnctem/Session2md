@@ -42,6 +42,7 @@ export function SessionItem({
   const title = formatSessionTitle(session);
   const lastActive = session.lastActiveAt || session.createdAt || undefined;
   const sessionKey = getSessionKey(session);
+  const isPartial = session.recovery === "partial";
 
   return (
     <div
@@ -86,6 +87,14 @@ export function SessionItem({
           <span className="text-sm font-medium line-clamp-2 flex-1">
             {searchQuery ? highlightText(title, searchQuery) : title}
           </span>
+          {isPartial && (
+            <span
+              className="shrink-0 rounded-full border border-amber-400/60 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:text-amber-400"
+              title={t("sessionManager.recoveryPartialTooltip")}
+            >
+              {t("sessionManager.recoveryPartial")}
+            </span>
+          )}
           <ChevronRight
             className={cn(
               "size-4 text-muted-foreground/50 shrink-0 transition-transform",

@@ -247,6 +247,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: Some(format!("claude --resume {session_id}")),
     })
 }

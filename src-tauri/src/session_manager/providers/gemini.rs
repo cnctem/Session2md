@@ -180,6 +180,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
         source_path: Some(source_path),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: Some(format!("gemini --resume {session_id}")),
     })
 }

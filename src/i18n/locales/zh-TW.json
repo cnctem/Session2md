@@ -915,6 +915,8 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
+    "trae": "Trae",
+    "traework": "TraeWork",
     "dsh": "DSH"
   },
   "appSwitcher": {
@@ -1025,6 +1027,9 @@
     "batchDeleteRequestFailed": "批次刪除失敗，請稍後重試",
     "loadingMessages": "載入對話內容中...",
     "emptySession": "該工作階段暫無可展示內容",
+    "recoveryPartial": "部分復原",
+    "recoveryPartialTooltip": "Trae 的完整對話保存在本機加密資料庫中，Session2md 目前僅能顯示可讀取的中繼資料與使用者輸入片段。",
+    "recoveryPartialExportWarning": "部分復原：Trae 的完整對話保存在本機加密資料庫中，本次匯出僅包含本機可讀取的內容。",
     "clickToCopyPath": "點擊複製路徑",
     "tocTitle": "對話目錄",
     "justNow": "剛剛",
@@ -1167,6 +1172,8 @@
       "zed": "Zed 資料目錄",
       "crush": "Crush 資料目錄",
       "teleagent": "TeleAgent 資料目錄",
+      "trae": "Trae 資料目錄（預設中國版）",
+      "traework": "TraeWork 資料目錄（預設中國版）",
       "dsh": "DeepSeek Harness 資料目錄"
     },
     "autoUpdatePrompt": {

@@ -267,6 +267,7 @@ fn parse_session_with_origin(path: &Path) -> Result<(SessionMeta, bool), String>
             resume_command: None,
             can_delete: true,
             models: None,
+            recovery: None,
         },
         is_subagent,
     ))

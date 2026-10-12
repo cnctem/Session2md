@@ -37,6 +37,8 @@ Session2md 可以从以下本地工具发现会话：
 - Continue
 - Crush
 - TeleAgent
+- Trae
+- TraeWork
 
 对发现的会话可以进行以下操作：
 
@@ -49,13 +51,13 @@ Session2md 可以从以下本地工具发现会话：
 
 ## 数据与安全
 
-Session2md 直接读取各工具的本地会话存储，不连接 CC Switch，不启动代理，不上传会话内容，也不会启动或恢复 CLI 会话。界面中的恢复命令仅在用户主动操作时复制到剪贴板。
+Session2md 直接读取各工具的本地会话存储，不连接 CC Switch，不启动代理，不上传会话内容，也不会启动或恢复 CLI 会话。界面中的恢复命令仅在用户主动操作时复制到剪贴板。新版 Trae/TraeWork 若在 `state.vscdb` 中只保留元数据或用户输入片段，会标记为“部分恢复”，因为完整正文保存在本地加密数据库中。
 
 只有应用标记为可删除的供应商才提供删除操作，并且该操作需要确认且不可逆。确认后，Session2md 会通过对应供应商的清理逻辑修改本地会话文件或数据库；删除 DeepSeek Harness 会话前会校验记录中的会话 ID，再移除该会话专属目录。应用无法恢复已删除的会话，删除可能仍在写入的会话前应先关闭对应 Agent。请在删除前备份重要数据。应用自身的语言、主题和目录覆盖设置会单独保存。导出功能只会写入用户在系统保存对话框中选择的 Markdown 文件。
 
 ## 会话目录
 
-默认情况下，Session2md 使用各供应商的标准本地目录。进入 **设置 → 高级** 可以查看或覆盖任意供应商的目录，保存后刷新会话列表即可生效，适合便携配置或多套配置目录。未设置覆盖目录时，Codex 还会读取 `CODEX_HOME`，Hermes 读取 `HERMES_HOME`，OpenCode 读取 `XDG_DATA_HOME`，MiniMax Code 读取 `MINIMAX_DATA_DIR` 和 `MAVIS_DATA_DIR`。
+默认情况下，Session2md 使用各供应商的标准本地目录。进入 **设置 → 高级** 可以查看或覆盖任意供应商的目录，保存后刷新会话列表即可生效，适合便携配置或多套配置目录。Trae 和 TraeWork 默认读取国内版用户数据目录；如需国际版，可在覆盖目录中选择对应的国际版 App 数据根目录。未设置覆盖目录时，Codex 还会读取 `CODEX_HOME`，Hermes 读取 `HERMES_HOME`，OpenCode 读取 `XDG_DATA_HOME`，MiniMax Code 读取 `MINIMAX_DATA_DIR` 和 `MAVIS_DATA_DIR`。
 
 ## 下载
 

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
+  AlertTriangle,
   Copy,
   Cpu,
   Download,
@@ -978,7 +979,13 @@ export function SessionManagerPage({
     setIsExporting(true);
     try {
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-      const markdown = formatSessionGroupsMarkdown(exportGroups, options);
+      const markdown = formatSessionGroupsMarkdown(exportGroups, {
+        ...options,
+        partialNotice:
+          selectedSession.recovery === "partial"
+            ? t("sessionManager.recoveryPartialExportWarning")
+            : undefined,
+      });
       if (!markdown) {
         toast.error(t("sessionManager.exportEmpty"));
         return;
@@ -1642,6 +1649,15 @@ export function SessionManagerPage({
                       <CardTitle className="truncate text-base">
                         {formatSessionTitle(selectedSession)}
                       </CardTitle>
+                      {selectedSession.recovery === "partial" && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 border-amber-400/60 px-1.5 py-0 text-[9px] text-amber-700 dark:text-amber-400"
+                          title={t("sessionManager.recoveryPartialTooltip")}
+                        >
+                          {t("sessionManager.recoveryPartial")}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {selectedSession.lastActiveAt && (
@@ -1692,6 +1708,14 @@ export function SessionManagerPage({
                         </span>
                       )}
                     </div>
+                    {selectedSession.recovery === "partial" && (
+                      <div className="flex items-start gap-2 rounded-md border border-amber-400/50 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                        <span>
+                          {t("sessionManager.recoveryPartialTooltip")}
+                        </span>
+                      </div>
+                    )}
                     {selectedSession.sourcePath && !minimalMode && (
                       <div className="min-w-0 text-xs text-muted-foreground">
                         <Tooltip>

@@ -118,6 +118,7 @@ fn parse_session(path: &Path, index: &HashMap<String, IndexEntry>) -> Result<Ses
         resume_command: None,
         can_delete: false,
         models: continue_session_models(&value),
+        recovery: None,
     })
 }
 

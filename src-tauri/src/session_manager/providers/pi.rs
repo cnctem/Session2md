@@ -334,6 +334,7 @@ fn parse_session(path: &Path) -> Result<SessionMeta, String> {
         source_path: Some(source_path.clone()),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: Some(format!("pi --session {}", shell_escape(&source_path))),
     })
 }

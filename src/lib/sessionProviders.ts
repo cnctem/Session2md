@@ -26,6 +26,8 @@ export const SESSION_PROVIDER_IDS = [
   "continue",
   "crush",
   "teleagent",
+  "trae",
+  "traework",
 ] as const;
 
 export type SessionProviderId = (typeof SESSION_PROVIDER_IDS)[number];
@@ -58,6 +60,8 @@ export const SESSION_DIRECTORY_IDS = [
   "continue",
   "crush",
   "teleagent",
+  "trae",
+  "traework",
 ] as const satisfies readonly SessionProviderId[];
 
 export type SessionDirectoryId = (typeof SESSION_DIRECTORY_IDS)[number];
@@ -91,4 +95,6 @@ export const SESSION_DIRECTORY_LABEL_KEYS: Record<SessionDirectoryId, string> =
     continue: "sessionSettings.directories.continue",
     crush: "sessionSettings.directories.crush",
     teleagent: "sessionSettings.directories.teleagent",
+    trae: "sessionSettings.directories.trae",
+    traework: "sessionSettings.directories.traework",
   };

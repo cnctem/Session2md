@@ -155,6 +155,7 @@ fn scan_sessions_sqlite() -> Vec<SessionMeta> {
             source_path: Some(format!("sqlite:{db_display}:{session_id}")),
             can_delete: true,
             models: None,
+            recovery: None,
             resume_command: Some(format!("opencode -s {session_id}")),
         });
     }
@@ -523,6 +524,7 @@ fn parse_session(storage: &Path, path: &Path) -> Option<SessionMeta> {
         source_path: Some(source_path),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: Some(format!("opencode -s {session_id}")),
     })
 }

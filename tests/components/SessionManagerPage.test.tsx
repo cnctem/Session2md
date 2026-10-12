@@ -1227,6 +1227,57 @@ describe("SessionManagerPage", () => {
     );
   });
 
+  it("marks partial Trae sessions and warns in the export", async () => {
+    const exportSpy = vi
+      .spyOn(sessionsApi, "exportMarkdown")
+      .mockResolvedValueOnce("/tmp/Partial Trae.md");
+    const user = userEvent.setup();
+    const partialSession: SessionMeta = {
+      providerId: "trae",
+      sessionId: "trae-partial-1",
+      title: "Partial Trae Session",
+      projectDir: "/mock/trae",
+      lastActiveAt: 50,
+      sourcePath: "sqlite:/mock/trae/state.vscdb#trae-partial-1",
+      recovery: "partial",
+    };
+    setSessionFixtures([partialSession], {
+      "trae:sqlite:/mock/trae/state.vscdb#trae-partial-1": [
+        { role: "user", content: "locally readable prompt" },
+      ],
+    });
+
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Partial Trae Session/ }),
+    );
+    expect(
+      screen.getAllByText("sessionManager.recoveryPartial").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText("sessionManager.recoveryPartialTooltip"),
+    ).toBeVisible();
+
+    const exportButton = await screen.findByRole("button", {
+      name: "sessionManager.export",
+    });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    await user.click(exportButton);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "sessionManager.exportOptions.confirm",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith(
+        "Partial Trae Session.md",
+        "> sessionManager.recoveryPartialExportWarning\n\n## User\n\nlocally readable prompt\n",
+      ),
+    );
+  });
+
   it("virtualizes large session and message lists", async () => {
     const sessions: SessionMeta[] = Array.from({ length: 500 }, (_, index) => ({
       providerId: "codex",

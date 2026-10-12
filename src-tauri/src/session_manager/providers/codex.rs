@@ -847,6 +847,7 @@ fn parse_session_with_titles(
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
         models: None,
+        recovery: None,
         resume_command: Some(format!("codex resume {session_id}")),
     })
 }

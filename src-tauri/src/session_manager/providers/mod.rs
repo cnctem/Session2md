@@ -24,6 +24,8 @@ pub mod qoder;
 pub mod qwen;
 pub mod reasonix;
 pub mod teleagent;
+pub mod trae;
+pub mod traework;
 mod utils;
 
 use crate::session_manager::{SessionMessage, SessionMessageMetadata};

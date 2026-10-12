@@ -338,6 +338,7 @@ fn parse_summary(path: &Path) -> Option<SessionMeta> {
         source_path: Some(path.to_string_lossy().to_string()),
         can_delete: true,
         models: session_dir.and_then(grok_session_models),
+        recovery: None,
         resume_command: Some(format!("grok --resume {session_id}")),
     })
 }

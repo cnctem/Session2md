@@ -192,6 +192,7 @@ export const formatSessionTitle = (session: SessionMeta) => {
 };
 
 export interface SessionMarkdownOptions {
+  partialNotice?: string;
   includeModel?: boolean;
   includeThinking?: boolean;
   includeToolInputs?: boolean;
@@ -281,7 +282,10 @@ export const formatSessionGroupsMarkdown = (
     return [`## ${heading}${modelSuffix}\n\n${body}`];
   });
 
-  return sections.length > 0 ? `${sections.join("\n\n")}\n` : "";
+  if (sections.length === 0) return "";
+  const notice = options.partialNotice?.trim();
+  const body = sections.join("\n\n");
+  return `${notice ? `> ${notice}\n\n` : ""}${body}\n`;
 };
 
 export const formatSessionMarkdown = (

@@ -93,6 +93,7 @@ fn scan_database(path: &Path) -> Result<Vec<SessionMeta>, String> {
             resume_command: None,
             can_delete: false,
             models: None,
+            recovery: None,
         });
     }
     Ok(sessions)

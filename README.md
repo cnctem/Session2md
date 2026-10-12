@@ -37,6 +37,8 @@ Session2md discovers sessions from these local tools:
 - Continue
 - Crush
 - TeleAgent
+- Trae
+- TraeWork
 
 For each discovered session you can:
 
@@ -49,13 +51,13 @@ For each discovered session you can:
 
 ## Data and safety
 
-Session2md reads the providers' local session stores. It does not connect to CC Switch, run a proxy, upload session content, or start/resume a CLI session. A displayed resume command is only copied to the clipboard when requested.
+Session2md reads the providers' local session stores. It does not connect to CC Switch, run a proxy, upload session content, or start/resume a CLI session. A displayed resume command is only copied to the clipboard when requested. Trae and TraeWork sessions that only retain metadata or prompt fragments in `state.vscdb` are marked as partial because newer versions keep full transcripts in an encrypted local database.
 
 Deletion is available only for providers marked as deletable in the app and is explicit and destructive. After confirmation, Session2md performs provider-specific cleanup in the selected local session file or database; DeepSeek Harness session-owned directories are removed after their stored session ID is verified. Deleted sessions cannot be recovered by the app, and the owning agent should be closed before deleting a potentially active session. Back up important data before using deletion. The app also stores its own language, theme, and directory-override settings separately. Markdown export writes only the file chosen in the native save dialog.
 
 ## Source directories
 
-By default, Session2md follows each provider's normal local directory. Open **Settings → Advanced** to inspect or override the directory used for any provider, then refresh the session list. Overrides are useful for portable setups or alternate profiles. Codex also respects `CODEX_HOME`, Hermes respects `HERMES_HOME`, OpenCode respects `XDG_DATA_HOME`, and MiniMax Code respects `MINIMAX_DATA_DIR` and `MAVIS_DATA_DIR` when no override is configured.
+By default, Session2md follows each provider's normal local directory. Open **Settings → Advanced** to inspect or override the directory used for any provider, then refresh the session list. Overrides are useful for portable setups or alternate profiles. Trae and TraeWork default to their CN user-data directories; choose the international app-data root in the override field to read the international build. Codex also respects `CODEX_HOME`, Hermes respects `HERMES_HOME`, OpenCode respects `XDG_DATA_HOME`, and MiniMax Code respects `MINIMAX_DATA_DIR` and `MAVIS_DATA_DIR` when no override is configured.
 
 ## Download
 

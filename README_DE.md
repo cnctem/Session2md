@@ -37,6 +37,8 @@ Session2md erkennt Sitzungen aus den folgenden lokal installierten Tools:
 - Continue
 - Crush
 - TeleAgent
+- Trae
+- TraeWork
 
 Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 
@@ -49,13 +51,13 @@ Für erkannte Sitzungen stehen folgende Funktionen zur Verfügung:
 
 ## Daten und Sicherheit
 
-Session2md liest die lokalen Sitzungsdaten der jeweiligen Tools direkt ein. Die App verbindet sich nicht mit CC Switch, startet keinen Proxy, lädt keine Gesprächsinhalte hoch und startet bzw. setzt keine CLI-Sitzung fort. Ein angezeigter Wiederaufnahmebefehl wird nur auf ausdrückliche Nutzeraktion in die Zwischenablage kopiert.
+Session2md liest die lokalen Sitzungsdaten der jeweiligen Tools direkt ein. Die App verbindet sich nicht mit CC Switch, startet keinen Proxy, lädt keine Gesprächsinhalte hoch und startet bzw. setzt keine CLI-Sitzung fort. Ein angezeigter Wiederaufnahmebefehl wird nur auf ausdrückliche Nutzeraktion in die Zwischenablage kopiert. Wenn neuere Trae-/TraeWork-Versionen in `state.vscdb` nur Metadaten oder Eingabefragmente behalten, wird die Sitzung als teilweise wiederhergestellt markiert, da das vollständige Transkript in einer verschlüsselten lokalen Datenbank liegt.
 
 Das Löschen ist nur für Anbieter verfügbar, die in der App als löschbar markiert sind, und ist eine bestätigungspflichtige, destruktive Aktion. Nach der Bestätigung verwendet Session2md eine anbieterspezifische Bereinigung und ändert die ausgewählte lokale Sitzungsdatei oder Datenbank. Bei DeepSeek Harness wird nach Prüfung der gespeicherten Sitzungs-ID das sitzungseigene Verzeichnis entfernt. Gelöschte Sitzungen können von der App nicht wiederhergestellt werden. Vor dem Löschen einer möglicherweise noch schreibenden Sitzung sollte der zugehörige Agent beendet und wichtige Daten sollten gesichert werden. Sprache, Design und Verzeichnisüberschreibungen der App werden separat gespeichert. Beim Export wird ausschließlich die im nativen Speicherdialog ausgewählte Markdown-Datei geschrieben.
 
 ## Sitzungsverzeichnisse
 
-Standardmäßig verwendet Session2md die üblichen lokalen Verzeichnisse der Anbieter. Unter **Einstellungen → Erweitert** können die Verzeichnisse angezeigt oder pro Anbieter überschrieben werden; nach dem Speichern muss die Sitzungsliste aktualisiert werden. Das ist für portable Installationen oder mehrere Profile gedacht. Ohne Überschreibung berücksichtigt Codex außerdem `CODEX_HOME`, Hermes `HERMES_HOME`, OpenCode `XDG_DATA_HOME` und MiniMax Code `MINIMAX_DATA_DIR` sowie `MAVIS_DATA_DIR`.
+Standardmäßig verwendet Session2md die üblichen lokalen Verzeichnisse der Anbieter. Unter **Einstellungen → Erweitert** können die Verzeichnisse angezeigt oder pro Anbieter überschrieben werden; nach dem Speichern muss die Sitzungsliste aktualisiert werden. Das ist für portable Installationen oder mehrere Profile gedacht. Trae und TraeWork verwenden standardmäßig ihre CN-Benutzerdatenverzeichnisse; für die internationale Version im Überschreibungsfeld den entsprechenden internationalen App-Datenstamm auswählen. Ohne Überschreibung berücksichtigt Codex außerdem `CODEX_HOME`, Hermes `HERMES_HOME`, OpenCode `XDG_DATA_HOME` und MiniMax Code `MINIMAX_DATA_DIR` sowie `MAVIS_DATA_DIR`.
 
 ## Download
 

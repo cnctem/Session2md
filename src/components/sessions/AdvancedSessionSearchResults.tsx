@@ -120,8 +120,19 @@ export function AdvancedSessionSearchResults({
                 size={16}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
-                  {formatSessionTitle(result.session)}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-sm font-medium">
+                    {formatSessionTitle(result.session)}
+                  </span>
+                  {result.session.recovery === "partial" && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 border-amber-400/60 px-1.5 py-0 text-[9px] text-amber-700 dark:text-amber-400"
+                      title={t("sessionManager.recoveryPartialTooltip")}
+                    >
+                      {t("sessionManager.recoveryPartial")}
+                    </Badge>
+                  )}
                 </span>
                 <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className="truncate">

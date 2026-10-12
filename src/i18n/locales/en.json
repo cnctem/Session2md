@@ -914,6 +914,8 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
+    "trae": "Trae",
+    "traework": "TraeWork",
     "dsh": "DSH"
   },
   "appSwitcher": {
@@ -1024,6 +1026,9 @@
     "batchDeleteRequestFailed": "Batch delete failed. Please try again later.",
     "loadingMessages": "Loading transcript...",
     "emptySession": "No messages available",
+    "recoveryPartial": "Partial recovery",
+    "recoveryPartialTooltip": "Trae keeps the full transcript in an encrypted local database. Session2md can only show locally readable metadata and prompt fragments.",
+    "recoveryPartialExportWarning": "Partial recovery: Trae keeps the full transcript in an encrypted local database. This export contains only locally readable content.",
     "clickToCopyPath": "Click to copy path",
     "tocTitle": "Contents",
     "justNow": "Just now",
@@ -1166,6 +1171,8 @@
       "zed": "Zed directory",
       "crush": "Crush directory",
       "teleagent": "TeleAgent directory",
+      "trae": "Trae data directory (CN version by default)",
+      "traework": "TraeWork data directory (CN version by default)",
       "dsh": "DeepSeek Harness directory"
     },
     "autoUpdatePrompt": {

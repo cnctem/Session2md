@@ -467,6 +467,8 @@ export interface Settings {
   };
 }
 
+export type SessionRecovery = "complete" | "partial";
+
 export interface SessionMeta {
   providerId: string;
   sessionId: string;
@@ -479,6 +481,7 @@ export interface SessionMeta {
   resumeCommand?: string;
   canDelete?: boolean;
   models?: string[];
+  recovery?: SessionRecovery;
 }
 
 export type SessionMessageKind =

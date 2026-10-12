@@ -914,6 +914,8 @@
     "zed": "Zed",
     "crush": "Crush",
     "teleagent": "TeleAgent",
+    "trae": "Trae",
+    "traework": "TraeWork",
     "dsh": "DSH"
   },
   "appSwitcher": {
@@ -1024,6 +1026,9 @@
     "batchDeleteRequestFailed": "一括削除に失敗しました。しばらくしてから再試行してください。",
     "loadingMessages": "内容を読み込み中...",
     "emptySession": "表示できる内容がありません",
+    "recoveryPartial": "部分復元",
+    "recoveryPartialTooltip": "Trae の完全な会話はローカルの暗号化データベースに保存されています。Session2md は読み取れるメタデータとユーザー入力の断片のみ表示できます。",
+    "recoveryPartialExportWarning": "部分復元：Trae の完全な会話はローカルの暗号化データベースに保存されています。この書き出しにはローカルで読み取れる内容のみが含まれます。",
     "clickToCopyPath": "クリックしてパスをコピー",
     "tocTitle": "目次",
     "justNow": "たった今",
@@ -1166,6 +1171,8 @@
       "zed": "Zed データディレクトリ",
       "crush": "Crush データディレクトリ",
       "teleagent": "TeleAgent データディレクトリ",
+      "trae": "Trae データディレクトリ（既定は中国版）",
+      "traework": "TraeWork データディレクトリ（既定は中国版）",
       "dsh": "DeepSeek Harness データディレクトリ"
     },
     "autoUpdatePrompt": {
