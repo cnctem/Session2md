@@ -104,6 +104,13 @@ module.exports = {
           "Consolas",
           '"Liberation Mono"',
           "Menlo",
+          // Consolas 等常见等宽字体不含中文字形。显式回退到无衬线 CJK
+          // 字体，避免 Windows 在通用 monospace 下将汉字渲染成宋体。
+          '"Microsoft YaHei UI"',
+          '"Microsoft YaHei"',
+          '"PingFang SC"',
+          '"Hiragino Sans GB"',
+          '"Noto Sans CJK SC"',
           "monospace",
         ],
       },
