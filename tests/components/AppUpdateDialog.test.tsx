@@ -22,7 +22,8 @@ vi.mock("react-i18next", () => ({
         "sessionSettings.updateDialog.currentVersion": "Current version",
         "sessionSettings.updateDialog.latestVersion": "Latest version",
         "sessionSettings.updateDialog.releaseNotes": "Release notes",
-        "sessionSettings.updateDialog.later": "Later",
+        "sessionSettings.updateDialog.skipVersion":
+          "Skip until next version",
         "sessionSettings.updateDialog.close": "Close update dialog",
         "sessionSettings.about.updates.publishedAt": "Published {{date}}",
         "sessionSettings.about.updates.viewRelease": "View release",
@@ -62,6 +63,7 @@ describe("AppUpdateDialog", () => {
         update={availableUpdate}
         currentVersion="3.0.0"
         onDismiss={vi.fn()}
+        onSkipVersion={vi.fn()}
       />,
     );
 
@@ -84,6 +86,7 @@ describe("AppUpdateDialog", () => {
         update={availableUpdate}
         currentVersion="3.0.0"
         onDismiss={vi.fn()}
+        onSkipVersion={vi.fn()}
       />,
     );
 
@@ -102,19 +105,44 @@ describe("AppUpdateDialog", () => {
     );
   });
 
-  it("closes from the later action and omits an empty release-notes section", () => {
+  it("skips the version from the footer action and omits an empty release-notes section", () => {
     const onDismiss = vi.fn();
+    const onSkipVersion = vi.fn();
     render(
       <AppUpdateDialog
         update={{ ...availableUpdate, releaseNotes: "  " }}
         currentVersion="3.0.0"
         onDismiss={onDismiss}
+        onSkipVersion={onSkipVersion}
       />,
     );
 
     expect(screen.queryByText("Release notes")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Skip until next version" }),
+    );
+    expect(onSkipVersion).toHaveBeenCalledTimes(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("closes without skipping from the dialog close action", () => {
+    const onDismiss = vi.fn();
+    const onSkipVersion = vi.fn();
+    render(
+      <AppUpdateDialog
+        update={availableUpdate}
+        currentVersion="3.0.0"
+        onDismiss={onDismiss}
+        onSkipVersion={onSkipVersion}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close update dialog" }),
+    );
+
     expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onSkipVersion).not.toHaveBeenCalled();
   });
 
   it("renders nothing without update information", () => {
@@ -123,6 +151,7 @@ describe("AppUpdateDialog", () => {
         update={null}
         currentVersion="3.0.0"
         onDismiss={vi.fn()}
+        onSkipVersion={vi.fn()}
       />,
     );
 

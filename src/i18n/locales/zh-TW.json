@@ -1210,7 +1210,7 @@
       "currentVersion": "目前版本",
       "latestVersion": "最新版本",
       "releaseNotes": "更新日誌",
-      "later": "稍後",
+      "skipVersion": "跳過此版本",
       "close": "關閉更新對話框",
       "openLinkFailed": "無法開啟更新連結，請重試。",
       "copyFailed": "複製程式碼失敗，請手動複製。"

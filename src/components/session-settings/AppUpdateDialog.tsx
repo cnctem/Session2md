@@ -26,6 +26,7 @@ interface AppUpdateDialogProps {
   update: AppUpdateInfo | null;
   currentVersion: string;
   onDismiss: () => void;
+  onSkipVersion: () => void;
 }
 
 type OpeningAction = "download" | "release" | "notes";
@@ -34,6 +35,7 @@ export function AppUpdateDialog({
   update,
   currentVersion,
   onDismiss,
+  onSkipVersion,
 }: AppUpdateDialogProps) {
   const { t, i18n } = useTranslation();
   const [openingAction, setOpeningAction] = useState<OpeningAction | null>(
@@ -177,9 +179,9 @@ export function AppUpdateDialog({
             type="button"
             variant="outline"
             disabled={isOpeningLink}
-            onClick={onDismiss}
+            onClick={onSkipVersion}
           >
-            {t("sessionSettings.updateDialog.later")}
+            {t("sessionSettings.updateDialog.skipVersion")}
           </Button>
           <Button
             type="button"

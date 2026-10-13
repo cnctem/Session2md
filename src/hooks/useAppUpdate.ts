@@ -3,6 +3,8 @@ import { getVersion } from "@tauri-apps/api/app";
 import { appUpdateApi, type AppUpdateInfo } from "@/lib/api/appUpdate";
 import { extractErrorMessage } from "@/utils/errorUtils";
 
+const SKIPPED_UPDATE_VERSION_KEY = "session2md:update:skippedVersion";
+
 export interface AppUpdateController {
   currentVersion: string;
   updateInfo: AppUpdateInfo | null;
@@ -12,6 +14,16 @@ export interface AppUpdateController {
   error: string | null;
   check: () => Promise<AppUpdateInfo | null>;
   dismissStartupUpdate: () => void;
+  skipStartupUpdate: () => void;
+}
+
+function getSkippedUpdateVersion(): string | null {
+  try {
+    return window.localStorage.getItem(SKIPPED_UPDATE_VERSION_KEY);
+  } catch (error) {
+    console.warn("[Session2md] Failed to read skipped update version", error);
+    return null;
+  }
 }
 
 export function useAppUpdate(
@@ -61,7 +73,10 @@ export function useAppUpdate(
         setUpdateInfo(result);
         setHasChecked(true);
         if (showStartupPrompt) {
-          setStartupUpdateInfo(result);
+          const skippedVersion = getSkippedUpdateVersion();
+          setStartupUpdateInfo(
+            result && result.latestVersion !== skippedVersion ? result : null,
+          );
         }
         return result;
       } catch (checkError) {
@@ -91,6 +106,23 @@ export function useAppUpdate(
   const dismissStartupUpdate = useCallback(() => {
     setStartupUpdateInfo(null);
   }, []);
+
+  const skipStartupUpdate = useCallback(() => {
+    if (startupUpdateInfo?.latestVersion) {
+      try {
+        window.localStorage.setItem(
+          SKIPPED_UPDATE_VERSION_KEY,
+          startupUpdateInfo.latestVersion,
+        );
+      } catch (error) {
+        console.warn(
+          "[Session2md] Failed to persist skipped update version",
+          error,
+        );
+      }
+    }
+    setStartupUpdateInfo(null);
+  }, [startupUpdateInfo?.latestVersion]);
 
   useEffect(() => {
     const previousAutoCheck = previousAutoCheckRef.current;
@@ -124,5 +156,6 @@ export function useAppUpdate(
     error,
     check,
     dismissStartupUpdate,
+    skipStartupUpdate,
   };
 }

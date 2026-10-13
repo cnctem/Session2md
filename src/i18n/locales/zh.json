@@ -1209,7 +1209,7 @@
       "currentVersion": "当前版本",
       "latestVersion": "最新版本",
       "releaseNotes": "更新日志",
-      "later": "稍后",
+      "skipVersion": "跳过此版本",
       "close": "关闭更新弹窗",
       "openLinkFailed": "无法打开更新链接，请重试。",
       "copyFailed": "复制代码失败，请手动复制。"

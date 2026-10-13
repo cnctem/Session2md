@@ -1209,7 +1209,7 @@
       "currentVersion": "Current version",
       "latestVersion": "Latest version",
       "releaseNotes": "Release notes",
-      "later": "Later",
+      "skipVersion": "Skip until next version",
       "close": "Close update dialog",
       "openLinkFailed": "Unable to open the update link. Please try again.",
       "copyFailed": "Unable to copy the code. Please copy it manually."

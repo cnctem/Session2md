@@ -27,6 +27,7 @@ const availableUpdate: AppUpdateInfo = {
 describe("useAppUpdate", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    window.localStorage.clear();
     appUpdateApiMock.check.mockResolvedValue(null);
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
@@ -131,5 +132,72 @@ describe("useAppUpdate", () => {
 
     expect(result.current.startupUpdateInfo).toBeNull();
     expect(result.current.updateInfo).toEqual(availableUpdate);
+    expect(
+      window.localStorage.getItem("session2md:update:skippedVersion"),
+    ).toBeNull();
+  });
+
+  it("skips startup prompts for the same version while preserving update details", async () => {
+    appUpdateApiMock.check.mockResolvedValue(availableUpdate);
+    const { result, unmount } = renderHook(() => useAppUpdate(true));
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(result.current.startupUpdateInfo).toEqual(availableUpdate);
+
+    act(() => result.current.skipStartupUpdate());
+
+    expect(result.current.startupUpdateInfo).toBeNull();
+    expect(result.current.updateInfo).toEqual(availableUpdate);
+    expect(
+      window.localStorage.getItem("session2md:update:skippedVersion"),
+    ).toBe("3.1.0");
+
+    unmount();
+
+    const remounted = renderHook(() => useAppUpdate(true));
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(appUpdateApiMock.check).toHaveBeenCalledTimes(2);
+    expect(remounted.result.current.startupUpdateInfo).toBeNull();
+    expect(remounted.result.current.updateInfo).toEqual(availableUpdate);
+  });
+
+  it("shows the startup prompt again for a newer version", async () => {
+    window.localStorage.setItem(
+      "session2md:update:skippedVersion",
+      availableUpdate.latestVersion,
+    );
+    const newerUpdate = { ...availableUpdate, latestVersion: "3.2.0" };
+    appUpdateApiMock.check.mockResolvedValue(newerUpdate);
+
+    const { result } = renderHook(() => useAppUpdate(true));
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.startupUpdateInfo).toEqual(newerUpdate);
+  });
+
+  it("keeps a manually checked update visible when its version was skipped", async () => {
+    window.localStorage.setItem(
+      "session2md:update:skippedVersion",
+      availableUpdate.latestVersion,
+    );
+    appUpdateApiMock.check.mockResolvedValue(availableUpdate);
+    const { result } = renderHook(() => useAppUpdate(false));
+
+    await act(async () => {
+      await result.current.check();
+    });
+
+    expect(result.current.updateInfo).toEqual(availableUpdate);
+    expect(result.current.startupUpdateInfo).toBeNull();
   });
 });

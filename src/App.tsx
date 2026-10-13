@@ -128,6 +128,7 @@ function App() {
         update={appUpdate.startupUpdateInfo}
         currentVersion={appUpdate.currentVersion}
         onDismiss={appUpdate.dismissStartupUpdate}
+        onSkipVersion={appUpdate.skipStartupUpdate}
       />
     </div>
   );

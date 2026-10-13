@@ -95,6 +95,7 @@ const FALLBACK_APP_UPDATE: AppUpdateController = {
   error: null,
   check: async () => null,
   dismissStartupUpdate: () => undefined,
+  skipStartupUpdate: () => undefined,
 };
 
 export function Session2mdSettingsPage({

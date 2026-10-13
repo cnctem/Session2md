@@ -1209,7 +1209,7 @@
       "currentVersion": "現在のバージョン",
       "latestVersion": "最新バージョン",
       "releaseNotes": "リリースノート",
-      "later": "後で",
+      "skipVersion": "次のバージョンまでスキップ",
       "close": "更新ダイアログを閉じる",
       "openLinkFailed": "更新リンクを開けませんでした。もう一度お試しください。",
       "copyFailed": "コードをコピーできませんでした。手動でコピーしてください。"
