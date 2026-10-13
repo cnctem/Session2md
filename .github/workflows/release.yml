@@ -408,8 +408,8 @@ jobs:
             ### 下载
 
             - **macOS**: `Session2md-${{ github.ref_name }}-macOS.dmg`（推荐）或 `Session2md-${{ github.ref_name }}-macOS.zip`（解压即用）
-            - **Windows (x86_64)**: `Session2md-${{ github.ref_name }}-Windows.msi`（安装版）或 `Session2md-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
-            - **Windows (ARM64)**: `Session2md-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `Session2md-${{ github.ref_name }}-Windows-arm64-Portable.zip`（绿色版）
+            - **Windows (x86_64)**: `Session2md-${{ github.ref_name }}-Windows.msi`（安装版）或 `Session2md-${{ github.ref_name }}-Windows-Portable.zip`（便携版）
+            - **Windows (ARM64)**: `Session2md-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `Session2md-${{ github.ref_name }}-Windows-arm64-Portable.zip`（便携版）
             - **Linux (x86_64)**: `Session2md-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
             - **Linux (ARM64)**: `Session2md-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
 
