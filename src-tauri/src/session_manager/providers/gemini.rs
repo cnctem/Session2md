@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use serde_json::Value;
@@ -18,7 +19,7 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
 
     let mut sessions = Vec::new();
 
-    // Iterate over project directories: tmp/<project_name>/chats/session-*.json
+    // Iterate over project directories: tmp/<project_name>/chats/session-*.json(l)
     let project_dirs = match std::fs::read_dir(&tmp_dir) {
         Ok(entries) => entries,
         Err(_) => return Vec::new(),
@@ -40,7 +41,7 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
 
         for file_entry in chat_files.flatten() {
             let path = file_entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            if !is_session_file(&path) {
                 continue;
             }
             if let Some(meta) = parse_session(&path) {
@@ -55,10 +56,147 @@ pub fn scan_sessions() -> Vec<SessionMeta> {
     sessions
 }
 
-pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
+/// A session file is either the legacy `.json` document or the `.jsonl` log that
+/// newer Gemini CLI releases write. After a `.json` is migrated to `.jsonl` on
+/// resume, the legacy file can remain beside it; prefer the `.jsonl` so the same
+/// session is not listed twice.
+pub(crate) fn is_session_file(path: &Path) -> bool {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("jsonl") => true,
+        Some("json") => !path.with_extension("jsonl").exists(),
+        _ => false,
+    }
+}
+
+/// Rebuild the legacy single-object shape `{sessionId, ..., messages: [...]}`
+/// from a session file.
+///
+/// A `.json` file already has that shape and is returned as-is. A `.jsonl` file
+/// is replayed the way Gemini CLI's `loadConversationRecord` does: a line with
+/// `sessionId` is metadata, a line with a string `id` is a message (a later line
+/// with the same id overwrites in place), `{"$set": {...}}` merges metadata and
+/// replaces messages when it carries `messages`, and `{"$rewindTo": id}` drops
+/// that message and everything after it.
+pub(crate) fn parse_session_document(data: &str) -> Option<Value> {
+    // Metadata-only `.jsonl` files are still valid single objects; default messages.
+    if let Ok(Value::Object(mut map)) = serde_json::from_str::<Value>(data) {
+        map.entry("messages")
+            .or_insert_with(|| Value::Array(Vec::new()));
+        return Some(Value::Object(map));
+    }
+
+    let mut metadata = serde_json::Map::new();
+    let mut log = MessageLog::default();
+    let mut seen_record = false;
+
+    for line in data.lines() {
+        let Ok(Value::Object(mut record)) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        seen_record = true;
+        if let Some(id) = record.get("$rewindTo").and_then(Value::as_str) {
+            log.rewind_to(id);
+        } else if record.get("id").is_some_and(Value::is_string) {
+            log.upsert(Value::Object(record));
+        } else if let Some(Value::Object(mut set)) = record.remove("$set") {
+            if let Some(Value::Array(list)) = set.remove("messages") {
+                log.reset(list);
+            }
+            metadata.extend(set);
+        } else if record.get("sessionId").is_some_and(Value::is_string) {
+            if let Some(Value::Array(list)) = record.remove("messages") {
+                for msg in list {
+                    log.upsert(msg);
+                }
+            }
+            metadata.extend(record);
+        }
+    }
+
+    if !seen_record {
+        return None;
+    }
+    metadata.insert("messages".to_string(), Value::Array(log.messages));
+    Some(Value::Object(metadata))
+}
+
+/// Replayed JSONL messages: same-id lines overwrite in place while preserving
+/// first-seen order (like the upstream JS `Map`), with an id index so replay
+/// stays linear.
+#[derive(Default)]
+struct MessageLog {
+    messages: Vec<Value>,
+    index: HashMap<String, usize>,
+}
+
+impl MessageLog {
+    /// Lines without a string `id` are not messages and are ignored.
+    fn upsert(&mut self, msg: Value) {
+        let Some(id) = msg.get("id").and_then(Value::as_str).map(str::to_string) else {
+            return;
+        };
+        match self.index.get(&id) {
+            Some(&position) => self.messages[position] = msg,
+            None => {
+                self.index.insert(id, self.messages.len());
+                self.messages.push(msg);
+            }
+        }
+    }
+
+    /// Drop the message with `id` and everything after it; clear when unknown.
+    fn rewind_to(&mut self, id: &str) {
+        let len = self.index.get(id).copied().unwrap_or(0);
+        self.messages.truncate(len);
+        self.index.retain(|_, position| *position < len);
+    }
+
+    /// `$set.messages` checkpoint: replace the whole log.
+    fn reset(&mut self, list: Vec<Value>) {
+        self.messages.clear();
+        self.index.clear();
+        for msg in list {
+            self.upsert(msg);
+        }
+    }
+}
+
+/// Gemini CLI injected context or non-prompt user text (matches upstream's
+/// `isIgnoredUserContent`).
+fn is_ignored_user_text(text: &str) -> bool {
+    let text = text.trim();
+    text.is_empty() || text.starts_with('/') || text.starts_with('?') || is_injected_user_text(text)
+}
+
+/// CLI-injected context (environment info, hook output), not a user prompt.
+fn is_injected_user_text(text: &str) -> bool {
+    let text = text.trim_start();
+    text.starts_with("<session_context>") || text.starts_with("<hook_context>")
+}
+
+/// Flatten a Gemini user message `content` (string or part array) into text.
+fn visible_user_text(content: &Value) -> Option<String> {
+    match content {
+        Value::String(text) => Some(text.clone()),
+        _ => {
+            let text = super::common::normalize_content_parts(content)
+                .into_iter()
+                .map(|part| part.content)
+                .filter(|text| !text.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join("\n");
+            (!text.trim().is_empty()).then_some(text)
+        }
+    }
+}
+
+fn read_session_document(path: &Path) -> Result<Value, String> {
     let data = std::fs::read_to_string(path).map_err(|e| format!("Failed to read session: {e}"))?;
-    let value: Value =
-        serde_json::from_str(&data).map_err(|e| format!("Failed to parse session JSON: {e}"))?;
+    parse_session_document(&data).ok_or_else(|| "Failed to parse session JSON".to_string())
+}
+
+pub fn load_messages(path: &Path) -> Result<Vec<SessionMessage>, String> {
+    let value = read_session_document(path)?;
 
     let messages = value
         .get("messages")
@@ -137,6 +275,19 @@ pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<boo
             meta.session_id
         ));
     }
+    // Remove a leftover migrated `.json` first; otherwise it would reappear in
+    // the list after its `.jsonl` is gone.
+    if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+        let legacy = path.with_extension("json");
+        if legacy.is_file() {
+            std::fs::remove_file(&legacy).map_err(|error| {
+                format!(
+                    "Failed to delete legacy Gemini session file {}: {error}",
+                    legacy.display()
+                )
+            })?;
+        }
+    }
     std::fs::remove_file(path).map_err(|error| {
         format!(
             "Failed to delete Gemini session file {}: {error}",
@@ -147,24 +298,25 @@ pub fn delete_session(_root: &Path, path: &Path, session_id: &str) -> Result<boo
 }
 
 fn parse_session(path: &Path) -> Option<SessionMeta> {
-    let data = std::fs::read_to_string(path).ok()?;
-    let value: Value = serde_json::from_str(&data).ok()?;
+    let value = read_session_document(path).ok()?;
 
     let session_id = value.get("sessionId").and_then(Value::as_str)?.to_string();
 
     let created_at = value.get("startTime").and_then(parse_timestamp_to_ms);
     let last_active_at = value.get("lastUpdated").and_then(parse_timestamp_to_ms);
 
-    // Derive title from first user message
+    // Derive title from the first real user prompt, skipping injected context
+    // and slash commands.
     let title = value
         .get("messages")
         .and_then(Value::as_array)
         .and_then(|msgs| {
             msgs.iter()
-                .find(|m| m.get("type").and_then(Value::as_str) == Some("user"))
-                .and_then(|m| m.get("content").and_then(Value::as_str))
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| truncate_summary(s, 160))
+                .filter(|m| m.get("type").and_then(Value::as_str) == Some("user"))
+                .filter_map(|m| m.get("content"))
+                .filter_map(visible_user_text)
+                .find(|text| !is_ignored_user_text(text))
+                .map(|text| truncate_summary(&text, 160))
         });
 
     let source_path = path.to_string_lossy().to_string();
@@ -253,5 +405,106 @@ mod tests {
             crate::session_manager::SessionMessageKind::ToolCall
         );
         assert_eq!(msgs[2].tool_name.as_deref(), Some("web_fetch"));
+    }
+
+    #[test]
+    fn is_session_file_prefers_migrated_jsonl_over_legacy_json() {
+        let temp = tempdir().expect("tempdir");
+        let legacy = temp.path().join("session-1.json");
+        let jsonl = temp.path().join("session-1.jsonl");
+
+        std::fs::write(&legacy, "{}").expect("write legacy json");
+        assert!(is_session_file(&legacy));
+
+        std::fs::write(&jsonl, "").expect("write jsonl");
+        assert!(is_session_file(&jsonl));
+        assert!(!is_session_file(&legacy));
+    }
+
+    #[test]
+    fn parse_session_document_replays_jsonl_log() {
+        let data = concat!(
+            "{\"sessionId\":\"s1\",\"startTime\":\"2026-03-06T10:00:00Z\"}\n",
+            "{\"id\":\"1\",\"type\":\"user\",\"content\":\"first\"}\n",
+            "{\"id\":\"2\",\"type\":\"gemini\",\"content\":\"one\"}\n",
+            "{\"$set\":{\"lastUpdated\":\"2026-03-06T10:05:00Z\"}}\n",
+            "{\"id\":\"2\",\"type\":\"gemini\",\"content\":\"one-updated\"}\n",
+            "{\"id\":\"3\",\"type\":\"user\",\"content\":\"second\"}\n",
+            "{\"$rewindTo\":\"3\"}\n",
+        );
+
+        let doc = parse_session_document(data).expect("parse document");
+        assert_eq!(doc.get("sessionId").and_then(Value::as_str), Some("s1"));
+        assert_eq!(
+            doc.get("lastUpdated").and_then(Value::as_str),
+            Some("2026-03-06T10:05:00Z")
+        );
+        let messages = doc
+            .get("messages")
+            .and_then(Value::as_array)
+            .expect("messages");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(
+            messages[0].get("content").and_then(Value::as_str),
+            Some("first")
+        );
+        assert_eq!(
+            messages[1].get("content").and_then(Value::as_str),
+            Some("one-updated")
+        );
+    }
+
+    #[test]
+    fn load_messages_reads_jsonl_session() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-abc.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"sessionId\":\"s1\"}\n",
+                "{\"id\":\"1\",\"timestamp\":\"2026-03-06T10:00:00Z\",\"type\":\"user\",\"content\":\"hello jsonl\"}\n",
+                "{\"id\":\"2\",\"timestamp\":\"2026-03-06T10:00:01Z\",\"type\":\"gemini\",\"model\":\"gemini-3-pro\",\"content\":\"hi\"}\n",
+            ),
+        )
+        .expect("write");
+
+        let msgs = load_messages(&path).expect("load");
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].content, "hello jsonl");
+        assert_eq!(msgs[1].role, "assistant");
+    }
+
+    #[test]
+    fn parse_session_skips_injected_context_and_slash_commands() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("session-title.json");
+        std::fs::write(
+            &path,
+            r#"{
+              "sessionId": "s1",
+              "messages": [
+                {"id":"1","type":"user","content":"<session_context>env</session_context>"},
+                {"id":"2","type":"user","content":"/help"},
+                {"id":"3","type":"user","content":[{"text":"real question"}]}
+              ]
+            }"#,
+        )
+        .expect("write");
+
+        let meta = parse_session(&path).expect("parse");
+        assert_eq!(meta.title.as_deref(), Some("real question"));
+    }
+
+    #[test]
+    fn delete_session_removes_migrated_legacy_json() {
+        let temp = tempdir().expect("tempdir");
+        let jsonl = temp.path().join("session-abc.jsonl");
+        let legacy = temp.path().join("session-abc.json");
+        std::fs::write(&jsonl, "{\"sessionId\":\"s1\"}\n").expect("write jsonl");
+        std::fs::write(&legacy, "{\"sessionId\":\"s1\"}").expect("write legacy json");
+
+        assert!(delete_session(temp.path(), &jsonl, "s1").expect("delete"));
+        assert!(!jsonl.exists());
+        assert!(!legacy.exists());
     }
 }

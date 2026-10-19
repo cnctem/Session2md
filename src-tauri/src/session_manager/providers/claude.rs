@@ -254,7 +254,7 @@ fn parse_session(path: &Path) -> Option<SessionMeta> {
 fn is_agent_session(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
-        .map(|name| name.starts_with("agent-"))
+        .map(|name| name.starts_with("agent-") || name == "journal.jsonl")
         .unwrap_or(false)
 }
 
@@ -525,5 +525,26 @@ mod tests {
             .unwrap()
             .metadata
             .is_none());
+    }
+
+    #[test]
+    fn workflow_journal_log_is_excluded_from_sessions() {
+        let path = PathBuf::from("/tmp/project/workflows/wf_1/journal.jsonl");
+
+        assert!(is_agent_session(&path));
+    }
+
+    #[test]
+    fn agent_session_files_are_still_excluded() {
+        let path = PathBuf::from("/tmp/project/agent-abc123.jsonl");
+
+        assert!(is_agent_session(&path));
+    }
+
+    #[test]
+    fn real_session_file_is_not_excluded() {
+        let path = PathBuf::from("/tmp/project/8f8e7c8e-0000-0000-0000-000000000000.jsonl");
+
+        assert!(!is_agent_session(&path));
     }
 }
