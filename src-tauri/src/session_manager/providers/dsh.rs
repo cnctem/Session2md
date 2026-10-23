@@ -227,7 +227,9 @@ fn parse_session_with_origin(path: &Path) -> Result<(SessionMeta, bool), String>
                     latest_title = Some(title.to_string());
                 }
             }
-            "user/message" if first_user_message.is_none() => {
+            "user/message"
+                if first_user_message.is_none() && dsh_user_message_role(&value) == "user" =>
+            {
                 if let Some(content) = value.get("data").and_then(|data| data.get("content")) {
                     let text = super::common::visible_content_text(content);
                     let text = text.trim();
@@ -363,7 +365,11 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
             }
             "user/message" => {
                 if let Some(content) = value.get("data").and_then(|data| data.get("content")) {
-                    output.extend(messages_from_content("user", content, ts));
+                    output.extend(messages_from_content(
+                        dsh_user_message_role(value),
+                        content,
+                        ts,
+                    ));
                 }
             }
             "assistant/message" => {
@@ -476,6 +482,27 @@ fn visible_messages(values: &[Value]) -> Vec<SessionMessage> {
     }
 
     output
+}
+
+/// DSH stores every model-visible message in `user/message` events, including
+/// system-injected material such as runtime/time snapshots, skill catalogs,
+/// agent instructions, background-job notices and peer-agent relays. Only
+/// genuine user input carries `data.source.kind == "user"`; mapping the rest to
+/// `user` would attribute harness-generated context to the user in the
+/// transcript, table of contents and Markdown exports. Sessions written before
+/// `source` metadata existed keep the old default of a user message.
+fn dsh_user_message_role(value: &Value) -> &'static str {
+    let Some(source) = value
+        .get("data")
+        .and_then(|data| data.get("source"))
+        .filter(|source| !source.is_null())
+    else {
+        return "user";
+    };
+    match source.get("kind").and_then(Value::as_str) {
+        Some("user") => "user",
+        _ => "system",
+    }
 }
 
 fn dsh_step_key(value: &Value) -> Option<(u64, u64)> {
@@ -711,6 +738,67 @@ mod tests {
             crate::session_manager::SessionMessageKind::Text
         );
         assert_eq!(messages[2].content, "world");
+    }
+
+    #[test]
+    fn classifies_injected_dsh_context_as_system_messages() {
+        let messages = visible_messages(&[
+            json!({"type":"user/message","time":1_i64,"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"real question"}]}}),
+            json!({"type":"user/message","time":2_i64,"data":{"source":{"kind":"runtime-context","form":"snapshot","sections":[]},"content":[{"type":"text","text":"Current runtime context."}]}}),
+            json!({"type":"user/message","time":3_i64,"data":{"source":{"kind":"time-context","form":"snapshot"},"content":[{"type":"text","text":"Time sampled while preparing turn 1."}]}}),
+            json!({"type":"user/message","time":4_i64,"data":{"source":{"kind":"skill-catalog","form":"catalog","entries":[]},"content":[{"type":"text","text":"<system-reminder>skills</system-reminder>"}]}}),
+            json!({"type":"user/message","time":5_i64,"data":{"source":{"kind":"plugin","plugin":"tool-jobs","form":"notice"},"content":[{"type":"text","text":"background job finished"}]}}),
+            json!({"type":"user/message","time":6_i64,"data":{"source":{"kind":"subagent-report","form":"relay"},"content":[{"type":"text","text":"subagent report"}]}}),
+            json!({"type":"user/message","time":7_i64,"data":{"source":{"kind":"user-approval"},"content":[{"type":"text","text":"approval policy changed"}]}}),
+            json!({"type":"user/message","time":8_i64,"data":{"content":[{"type":"text","text":"legacy question"}]}}),
+        ]);
+
+        assert_eq!(
+            messages
+                .iter()
+                .map(|message| (message.role.as_str(), message.content.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("user", "real question"),
+                ("system", "Current runtime context."),
+                ("system", "Time sampled while preparing turn 1."),
+                ("system", "<system-reminder>skills</system-reminder>"),
+                ("system", "background job finished"),
+                ("system", "subagent report"),
+                ("system", "approval policy changed"),
+                ("user", "legacy question"),
+            ]
+        );
+    }
+
+    #[test]
+    fn session_title_ignores_injected_context_before_the_first_user_turn() {
+        let root = tempdir().expect("root");
+        let dir = root.path().join("workspace").join("session");
+        fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("session.jsonl");
+        let lines = [
+            json!({"type":"session","id":"dsh-title","cwd":"/tmp/project","createdAt":1_700_000_000_000_i64}),
+            json!({"type":"user/message","time":1_i64,"data":{"source":{"kind":"agent-instructions","form":"instructions","baseline":true},"content":[{"type":"text","text":"<system-reminder>workspace instructions</system-reminder>"}]}}),
+            json!({"type":"user/message","time":2_i64,"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"fix the parser"}]}}),
+        ];
+        fs::write(
+            &path,
+            lines
+                .into_iter()
+                .map(|line| line.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .expect("write session");
+
+        let messages = load_messages(&path).expect("messages");
+        assert_eq!(messages[0].role, "system");
+        assert_eq!(messages[1].role, "user");
+
+        let sessions = scan_root(root.path());
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title.as_deref(), Some("fix the parser"));
     }
 
     #[test]
