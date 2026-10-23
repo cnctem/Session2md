@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionManagerPage } from "@/components/sessions/SessionManagerPage";
 import { sessionsApi } from "@/lib/api/sessions";
+import { localFilesApi } from "@/lib/api/localFiles";
 import type { SessionMessage, SessionMeta } from "@/types";
 import {
   setHiddenSessionProviders,
@@ -362,18 +363,24 @@ describe("SessionManagerPage", () => {
     );
   });
 
-  it("shows the CC Switch-aligned source and resume command rows", async () => {
+  it("opens the project directory and offers a copy button beside it", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
+    const openPathSpy = vi
+      .spyOn(localFilesApi, "openPath")
+      .mockResolvedValue("/mock/codex");
     renderPage();
 
     fireEvent.click(
       await screen.findByRole("button", { name: /Alpha Session/i }),
     );
-    const copyDirectoryButton = await screen.findByRole("button", {
+    const openDirectoryButton = await screen.findByRole("button", {
+      name: "sessionManager.openProjectDir",
+    });
+    const copyDirectoryButton = screen.getByRole("button", {
       name: "sessionManager.copyProjectDir",
     });
     const copySourcePathButton = screen.getByRole("button", {
@@ -383,14 +390,19 @@ describe("SessionManagerPage", () => {
       name: "sessionManager.copyCommand",
     });
 
-    expect(copyDirectoryButton).toHaveTextContent("codex");
+    expect(openDirectoryButton).toHaveTextContent("codex");
+    expect(copyDirectoryButton).not.toHaveTextContent("codex");
     expect(copySourcePathButton).toHaveTextContent("session-1.jsonl");
     expect(screen.getByText("codex resume codex-session-1")).toBeVisible();
 
+    fireEvent.click(openDirectoryButton);
     fireEvent.click(copyDirectoryButton);
     fireEvent.click(copySourcePathButton);
     fireEvent.click(copyCommandButton);
 
+    await waitFor(() =>
+      expect(openPathSpy).toHaveBeenCalledWith("/mock/codex"),
+    );
     await waitFor(() =>
       expect(writeText).toHaveBeenNthCalledWith(1, "/mock/codex"),
     );

@@ -1003,6 +1003,7 @@
     "lastActive": "最近活躍",
     "projectDir": "專案目錄",
     "sourcePath": "原始檔案",
+    "openProjectDir": "開啟目錄",
     "copyProjectDir": "複製目錄",
     "projectDirCopied": "目錄已複製",
     "copySourcePath": "複製原始檔案",
@@ -1068,6 +1069,7 @@
     "fileNotFound": "檔案不存在：{{path}}",
     "fileNotFoundHint": "檔案可能已被移動或刪除，或連結指向了錯誤的會話目錄。",
     "openPathFailed": "開啟檔案失敗：{{error}}",
+    "openProjectDirFailed": "開啟目錄失敗：{{error}}",
     "openLinkFailed": "開啟連結失敗：{{error}}"
   },
   "sessionSettings": {

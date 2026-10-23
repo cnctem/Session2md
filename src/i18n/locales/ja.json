@@ -1002,6 +1002,7 @@
     "lastActive": "最終アクティブ",
     "projectDir": "プロジェクトディレクトリ",
     "sourcePath": "元ファイル",
+    "openProjectDir": "ディレクトリを開く",
     "copyProjectDir": "ディレクトリをコピー",
     "projectDirCopied": "ディレクトリをコピーしました",
     "copySourcePath": "元ファイルをコピー",
@@ -1067,6 +1068,7 @@
     "fileNotFound": "ファイルが見つかりません: {{path}}",
     "fileNotFoundHint": "ファイルが移動または削除されたか、リンクが誤ったセッションディレクトリを指している可能性があります。",
     "openPathFailed": "ファイルを開けませんでした: {{error}}",
+    "openProjectDirFailed": "ディレクトリを開けませんでした: {{error}}",
     "openLinkFailed": "リンクを開けませんでした: {{error}}"
   },
   "sessionSettings": {

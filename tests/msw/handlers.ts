@@ -56,6 +56,11 @@ export const handlers = [
 
   http.post(`${TAURI_ENDPOINT}/open_external_url`, () => success(true)),
 
+  http.post(`${TAURI_ENDPOINT}/open_local_path`, async ({ request }) => {
+    const { path } = await withJson<{ path: string }>(request);
+    return success(path);
+  }),
+
   http.post(`${TAURI_ENDPOINT}/delete_session`, async ({ request }) => {
     const { providerId, sessionId, sourcePath } = await withJson<{
       providerId: string;

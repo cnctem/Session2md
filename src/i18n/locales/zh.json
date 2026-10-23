@@ -1002,6 +1002,7 @@
     "lastActive": "最近活跃",
     "projectDir": "项目目录",
     "sourcePath": "原始文件",
+    "openProjectDir": "打开目录",
     "copyProjectDir": "复制目录",
     "projectDirCopied": "目录已复制",
     "copySourcePath": "复制原始文件",
@@ -1067,6 +1068,7 @@
     "fileNotFound": "文件不存在：{{path}}",
     "fileNotFoundHint": "文件可能已被移动或删除，或链接指向了错误的会话目录。",
     "openPathFailed": "打开文件失败：{{error}}",
+    "openProjectDirFailed": "打开目录失败：{{error}}",
     "openLinkFailed": "打开链接失败：{{error}}"
   },
   "sessionSettings": {

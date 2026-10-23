@@ -36,6 +36,7 @@ import {
 } from "@/lib/query/sessions";
 import { useSession2mdSettingsQuery } from "@/lib/query/session2mdSettings";
 import { sessionsApi } from "@/lib/api/sessions";
+import { localFilesApi } from "@/lib/api/localFiles";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { generateUUID } from "@/utils/uuid";
 import { Button } from "@/components/ui/button";
@@ -759,6 +760,19 @@ export function SessionManagerPage({
       void copyText(content, t("sessionManager.codeCopied"));
     },
     [copyText, t],
+  );
+  const handleOpenProjectDir = useCallback(
+    (path: string) => {
+      void localFilesApi.openPath(path).catch((error: unknown) => {
+        toast.error(
+          t("sessionManager.openProjectDirFailed", {
+            error: extractErrorMessage(error),
+            defaultValue: "Failed to open directory: {{error}}",
+          }),
+        );
+      });
+    },
+    [t],
   );
   const handleOpenLink = useCallback(
     (url: string) => {
@@ -1651,34 +1665,60 @@ export function SessionManagerPage({
                         </span>
                       )}
                       {selectedSession.projectDir && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label={t("sessionManager.copyProjectDir")}
-                              onClick={() =>
-                                void copyText(
-                                  selectedSession.projectDir!,
-                                  t("sessionManager.projectDirCopied"),
-                                )
-                              }
-                              className="flex items-center gap-1 transition-colors hover:text-foreground"
-                            >
-                              <FolderOpen className="size-3 shrink-0" />
-                              <span className="max-w-[200px] truncate">
-                                {getBaseName(selectedSession.projectDir)}
-                              </span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-xs">
-                            <p className="text-xs font-medium">
-                              {t("sessionManager.copyProjectDir")}
-                            </p>
-                            <p className="break-all font-mono text-xs">
-                              {selectedSession.projectDir}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <span className="inline-flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label={t("sessionManager.openProjectDir")}
+                                onClick={() =>
+                                  handleOpenProjectDir(
+                                    selectedSession.projectDir!,
+                                  )
+                                }
+                                className="flex items-center gap-1 transition-colors hover:text-foreground"
+                              >
+                                <FolderOpen className="size-3 shrink-0" />
+                                <span className="max-w-[200px] truncate">
+                                  {getBaseName(selectedSession.projectDir)}
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p className="text-xs font-medium">
+                                {t("sessionManager.openProjectDir")}
+                              </p>
+                              <p className="break-all font-mono text-xs">
+                                {selectedSession.projectDir}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label={t("sessionManager.copyProjectDir")}
+                                onClick={() =>
+                                  void copyText(
+                                    selectedSession.projectDir!,
+                                    t("sessionManager.projectDirCopied"),
+                                  )
+                                }
+                                className="flex items-center transition-colors hover:text-foreground"
+                              >
+                                <Copy className="size-3 shrink-0" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p className="text-xs font-medium">
+                                {t("sessionManager.copyProjectDir")}
+                              </p>
+                              <p className="break-all font-mono text-xs">
+                                {selectedSession.projectDir}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </span>
                       )}
                       {sessionModels?.length && (
                         <span

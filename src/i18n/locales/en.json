@@ -1002,6 +1002,7 @@
     "lastActive": "Last active",
     "projectDir": "Project directory",
     "sourcePath": "Source file",
+    "openProjectDir": "Open directory",
     "copyProjectDir": "Copy directory",
     "projectDirCopied": "Directory copied",
     "copySourcePath": "Copy source file",
@@ -1067,6 +1068,7 @@
     "fileNotFound": "File not found: {{path}}",
     "fileNotFoundHint": "The file may have been moved or deleted, or the link points to the wrong session directory.",
     "openPathFailed": "Failed to open file: {{error}}",
+    "openProjectDirFailed": "Failed to open directory: {{error}}",
     "openLinkFailed": "Failed to open link: {{error}}"
   },
   "sessionSettings": {
