@@ -1060,6 +1060,13 @@
     "copyCode": "Copy code",
     "codeCopied": "Code copied",
     "imagePlaceholder": "[Image: {{alt}}]",
+    "imageNotFound": "[Image not found: {{alt}}]",
+    "imageLoadFailed": "[Image failed to load: {{alt}}]",
+    "loadingImage": "Loading image…",
+    "openImage": "Open image",
+    "fileNotFound": "File not found: {{path}}",
+    "fileNotFoundHint": "The file may have been moved or deleted, or the link points to the wrong session directory.",
+    "openPathFailed": "Failed to open file: {{error}}",
     "openLinkFailed": "Failed to open link: {{error}}"
   },
   "sessionSettings": {

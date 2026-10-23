@@ -1060,6 +1060,13 @@
     "copyCode": "コードをコピー",
     "codeCopied": "コードをコピーしました",
     "imagePlaceholder": "[画像: {{alt}}]",
+    "imageNotFound": "[画像が見つかりません: {{alt}}]",
+    "imageLoadFailed": "[画像を読み込めません: {{alt}}]",
+    "loadingImage": "画像を読み込み中…",
+    "openImage": "画像を開く",
+    "fileNotFound": "ファイルが見つかりません: {{path}}",
+    "fileNotFoundHint": "ファイルが移動または削除されたか、リンクが誤ったセッションディレクトリを指している可能性があります。",
+    "openPathFailed": "ファイルを開けませんでした: {{error}}",
     "openLinkFailed": "リンクを開けませんでした: {{error}}"
   },
   "sessionSettings": {

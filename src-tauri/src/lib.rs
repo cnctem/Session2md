@@ -15,6 +15,8 @@ pub fn run() {
             commands::search_sessions,
             commands::export_session_markdown,
             commands::open_external_url,
+            commands::open_local_path,
+            commands::read_local_image,
             commands::delete_session,
             commands::delete_sessions,
             commands::get_session2md_settings,

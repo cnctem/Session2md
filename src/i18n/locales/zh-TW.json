@@ -1061,6 +1061,13 @@
     "copyCode": "複製程式碼",
     "codeCopied": "已複製程式碼",
     "imagePlaceholder": "[圖片：{{alt}}]",
+    "imageNotFound": "[圖片不存在：{{alt}}]",
+    "imageLoadFailed": "[圖片載入失敗：{{alt}}]",
+    "loadingImage": "圖片載入中…",
+    "openImage": "開啟圖片",
+    "fileNotFound": "檔案不存在：{{path}}",
+    "fileNotFoundHint": "檔案可能已被移動或刪除，或連結指向了錯誤的會話目錄。",
+    "openPathFailed": "開啟檔案失敗：{{error}}",
     "openLinkFailed": "開啟連結失敗：{{error}}"
   },
   "sessionSettings": {

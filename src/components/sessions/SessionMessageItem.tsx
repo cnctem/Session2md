@@ -60,6 +60,7 @@ interface MessageTextBlockProps {
   expandedBlockOverrides: ReadonlyMap<string, boolean>;
   onToggleBlock: (blockKey: string, expanded: boolean) => void;
   searchTerms?: string[];
+  baseDir?: string | null;
   className?: string;
   renderMarkdown?: boolean;
   onCopyCode?: (content: string) => void;
@@ -72,6 +73,7 @@ function MessageTextBlock({
   expandedBlockOverrides,
   onToggleBlock,
   searchTerms,
+  baseDir,
   className,
   renderMarkdown = false,
   onCopyCode,
@@ -108,6 +110,7 @@ function MessageTextBlock({
           <MarkdownMessageContent
             content={displayContent}
             searchTerms={searchTerms}
+            baseDir={baseDir}
             onCopyCode={onCopyCode}
             onOpenLink={onOpenLink}
           />
@@ -175,6 +178,7 @@ interface SessionMessageItemProps {
   renderMarkdown: boolean;
   showModel: boolean;
   searchTerms?: string[];
+  baseDir?: string | null;
   onCopy: (content: string) => void;
   onCopyCode: (content: string) => void;
   onOpenLink: (url: string) => void;
@@ -191,6 +195,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
   renderMarkdown,
   showModel,
   searchTerms,
+  baseDir,
   onCopy,
   onCopyCode,
   onOpenLink,
@@ -404,6 +409,7 @@ export const SessionMessageItem = memo(function SessionMessageItem({
               expandedBlockOverrides={expandedBlockOverrides}
               onToggleBlock={onToggleBlock}
               searchTerms={searchTerms}
+              baseDir={baseDir}
               renderMarkdown={renderMarkdown}
               onCopyCode={onCopyCode}
               onOpenLink={onOpenLink}
@@ -425,6 +431,7 @@ interface SystemMessageRunProps {
   renderMarkdown: boolean;
   showModel: boolean;
   searchTerms?: string[];
+  baseDir?: string | null;
   onCopy: (content: string) => void;
   onCopyCode: (content: string) => void;
   onOpenLink: (url: string) => void;
@@ -444,6 +451,7 @@ export const SystemMessageRun = memo(function SystemMessageRun({
   renderMarkdown,
   showModel,
   searchTerms,
+  baseDir,
   onCopy,
   onCopyCode,
   onOpenLink,
@@ -494,6 +502,7 @@ export const SystemMessageRun = memo(function SystemMessageRun({
               renderMarkdown={renderMarkdown}
               showModel={showModel}
               searchTerms={searchTerms}
+              baseDir={baseDir}
               onCopy={onCopy}
               onCopyCode={onCopyCode}
               onOpenLink={onOpenLink}

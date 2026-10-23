@@ -1060,6 +1060,13 @@
     "copyCode": "复制代码",
     "codeCopied": "代码已复制",
     "imagePlaceholder": "[图片：{{alt}}]",
+    "imageNotFound": "[图片不存在：{{alt}}]",
+    "imageLoadFailed": "[图片加载失败：{{alt}}]",
+    "loadingImage": "图片加载中…",
+    "openImage": "打开图片",
+    "fileNotFound": "文件不存在：{{path}}",
+    "fileNotFoundHint": "文件可能已被移动或删除，或链接指向了错误的会话目录。",
+    "openPathFailed": "打开文件失败：{{error}}",
     "openLinkFailed": "打开链接失败：{{error}}"
   },
   "sessionSettings": {

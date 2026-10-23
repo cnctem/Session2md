@@ -4,6 +4,7 @@ import {
   cloneElement,
   isValidElement,
   memo,
+  useCallback,
   useMemo,
   type ReactElement,
   type ReactNode,
@@ -18,6 +19,13 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { localFilesApi } from "@/lib/api/localFiles";
+import { showLocalFileErrorToast } from "@/lib/markdown/localFileErrors";
+import {
+  classifyMarkdownLink,
+  decodeLocalPath,
+} from "@/lib/markdown/localPaths";
+import { MarkdownImage } from "./MarkdownImage";
 import { highlightTerms } from "./utils";
 
 const ALLOWED_ELEMENTS = [
@@ -50,14 +58,10 @@ const ALLOWED_ELEMENTS = [
 ];
 
 const safeMarkdownUrl: UrlTransform = (url) => {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:"
-      ? parsed.href
-      : "";
-  } catch {
-    return "";
-  }
+  const target = classifyMarkdownLink(url);
+  if (target.kind === "external") return target.url;
+  if (target.kind === "local") return url;
+  return "";
 };
 
 const nodeToText = (node: ReactNode): string => {
@@ -95,6 +99,8 @@ const highlightNode = (node: ReactNode, searchTerms?: string[]): ReactNode => {
 interface MarkdownMessageContentProps {
   content: string;
   searchTerms?: string[];
+  /** Session working directory used to resolve relative links and images. */
+  baseDir?: string | null;
   onCopyCode: (content: string) => void;
   onOpenLink: (url: string) => void;
 }
@@ -107,10 +113,20 @@ interface CodeElementProps {
 export const MarkdownMessageContent = memo(function MarkdownMessageContent({
   content,
   searchTerms,
+  baseDir,
   onCopyCode,
   onOpenLink,
 }: MarkdownMessageContentProps) {
   const { t } = useTranslation();
+
+  const handleOpenLocalPath = useCallback(
+    (path: string) => {
+      void localFilesApi
+        .openPath(path, baseDir)
+        .catch((error: unknown) => showLocalFileErrorToast(error, t));
+    },
+    [baseDir, t],
+  );
 
   const components = useMemo<Components>(
     () => ({
@@ -201,16 +217,24 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
       ),
       a: ({ href, children }) => {
         const url = href?.trim();
-        if (!url) {
+        const target = url ? classifyMarkdownLink(url) : null;
+        if (!url || !target || target.kind === "unsupported") {
           return <span>{highlightNode(children, searchTerms)}</span>;
         }
         return (
           <a
             href={url}
+            title={
+              target.kind === "local" ? decodeLocalPath(target.path) : undefined
+            }
             className="font-medium text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:text-primary/80"
             onClick={(event) => {
               event.preventDefault();
-              onOpenLink(url);
+              if (target.kind === "external") {
+                onOpenLink(target.url);
+              } else {
+                handleOpenLocalPath(decodeLocalPath(target.path));
+              }
             }}
           >
             {highlightNode(children, searchTerms)}
@@ -265,17 +289,17 @@ export const MarkdownMessageContent = memo(function MarkdownMessageContent({
         );
       },
       hr: () => <hr className="my-4 border-border/80" />,
-      img: ({ alt }) =>
-        alt ? (
-          <span className="my-2 inline-block rounded border border-border/70 bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
-            {t("sessionManager.imagePlaceholder", {
-              alt,
-              defaultValue: "[Image: {{alt}}]",
-            })}
-          </span>
-        ) : null,
+      img: ({ src, alt }) => (
+        <MarkdownImage
+          key={src}
+          src={src}
+          alt={alt}
+          baseDir={baseDir}
+          onOpenLink={onOpenLink}
+        />
+      ),
     }),
-    [onCopyCode, onOpenLink, searchTerms, t],
+    [baseDir, handleOpenLocalPath, onCopyCode, onOpenLink, searchTerms, t],
   );
 
   return (

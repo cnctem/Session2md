@@ -3594,6 +3594,7 @@ dependencies = [
 name = "session2md"
 version = "3.3.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "dirs 5.0.1",
  "log",

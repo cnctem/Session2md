@@ -1863,6 +1863,7 @@ export function SessionManagerPage({
                                       sessionSettings?.showMessageModel ?? true
                                     }
                                     searchTerms={messageSearchTerms}
+                                    baseDir={selectedSession?.projectDir}
                                     onCopy={handleCopyMessage}
                                     onCopyCode={handleCopyCode}
                                     onOpenLink={handleOpenLink}
@@ -1897,6 +1898,7 @@ export function SessionManagerPage({
                                       sessionSettings?.showMessageModel ?? true
                                     }
                                     searchTerms={messageSearchTerms}
+                                    baseDir={selectedSession?.projectDir}
                                     onCopy={handleCopyMessage}
                                     onCopyCode={handleCopyCode}
                                     onOpenLink={handleOpenLink}

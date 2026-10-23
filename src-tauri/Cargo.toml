@@ -17,6 +17,7 @@ doctest = false
 tauri-build = { version = "2.4.0", features = [] }
 
 [dependencies]
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
 log = "0.4"
